@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/routes.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/session/session.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
+import '../../../data/providers.dart';
 import '../../../shared/widgets/buttons.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/sheets.dart';
@@ -54,10 +56,20 @@ class TakeBreakPage extends ConsumerWidget {
                     'Nothing is deleted, and nobody is told.',
                 actions: const [SheetAction('Hide my profile')],
               );
-              if (choice == 0 && context.mounted) {
-                // TODO(backend): POST Api.mePause.
-                ref.read(sessionProvider.notifier).onPaused(paused: true);
+              if (choice != 0 || !context.mounted) return;
+              try {
+                // Taking a break is unpublishing. It does exactly what the
+                // three facts on this screen promise: the profile stops being
+                // shown, every match and conversation stays, and nobody is
+                // told. Publishing again puts it back.
+                await ref.read(profileRepositoryProvider).unpublish();
+                final profile =
+                    await ref.read(profileRepositoryProvider).load();
+                if (!context.mounted) return;
+                ref.read(sessionProvider.notifier).onProfileChanged(profile);
                 context.go(Routes.account);
+              } on ApiException catch (e) {
+                if (context.mounted) showAppToast(context, e.message);
               }
             },
           ),

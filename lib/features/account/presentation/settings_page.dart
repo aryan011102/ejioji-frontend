@@ -3,10 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/routes.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/session/session.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
-import '../../../shared/widgets/controls.dart';
+import '../../../data/providers.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/sheets.dart';
 
@@ -23,7 +24,6 @@ class SettingsPage extends ConsumerStatefulWidget {
 }
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
-  bool _stealth = false;
 
   Future<void> _delete() async {
     final choice = await showAppActionSheet(
@@ -40,17 +40,36 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
     if (!mounted) return;
     if (choice == 0) {
-      // TODO(backend): DELETE Api.meDelete, then clear the session. Tokens are
-      // cleared regardless of whether the call succeeds.
-      await ref.read(sessionProvider.notifier).signOut();
+      await _confirmDelete();
     } else if (choice == 1) {
       if (mounted) context.push(Routes.takeBreak);
     }
   }
 
+  /// Deleting is immediate and final: no grace period, no undo, and no code
+  /// by SMS. The server asks for the word to be typed, and this is where that
+  /// happens, because a sheet button alone is one mistaken tap away from
+  /// erasing an account.
+  Future<void> _confirmDelete() async {
+    final typed = await showDeleteConfirmation(context);
+    if (typed == null || !mounted) return;
+    try {
+      await ref.read(authRepositoryProvider).deleteAccount(confirmation: typed);
+    } on ApiException catch (e) {
+      if (mounted) showAppToast(context, e.message);
+      return;
+    } finally {
+      // The tokens are gone either way, so the session must follow. A person
+      // who has just asked to be erased must not be left signed in.
+      if (mounted) await ref.read(sessionProvider.notifier).onSessionLost();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final premium = ref.watch(sessionProvider).premium;
+    // Premium does not exist yet: no plans, no purchase, no entitlement. The
+    // rows that depended on it are shown in their free reading and say so,
+    // rather than offering a switch that cannot be honoured.
 
     return AppScaffold(
       navBar: AppNavBar(
@@ -66,7 +85,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             children: [
               AppRow(
                 label: 'Profile views',
-                subtitle: '12 this week',
+                subtitle: 'Not counted yet',
                 leading: const Icon(
                   Icons.visibility_outlined,
                   size: 18,
@@ -82,33 +101,23 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   size: 18,
                   color: AppColors.label2,
                 ),
-                premium: !premium,
-                control: premium
-                    ? AppSwitch(
-                        value: _stealth,
-                        onChanged: (v) => setState(() => _stealth = v),
-                      )
-                    : null,
-                onTap: premium
-                    ? null
-                    : () async {
-                        final c = await showAppActionSheet(
-                          context,
-                          title: 'Stealth mode is part of Premium',
-                          message: "Browse without appearing in anyone's feed "
-                              '— and without landing on their views list.',
-                          actions: const [
-                            SheetAction("See what's in Premium"),
-                          ],
-                        );
-                        if (c == 0 && context.mounted) {
-                          context.push(Routes.premium);
-                        }
-                      },
+                premium: true,
+                onTap: () async {
+                  final c = await showAppActionSheet(
+                    context,
+                    title: 'Stealth mode is not built yet',
+                    message: 'The idea is to browse without appearing in '
+                        "anyone's feed. Nothing supports it yet. Taking a "
+                        'break hides your profile completely in the meantime.',
+                    actions: const [SheetAction('Take a break instead')],
+                  );
+                  if (c == 0 && context.mounted) {
+                    context.push(Routes.takeBreak);
+                  }
+                },
               ),
               AppRow(
                 label: 'Blocked users',
-                value: '2',
                 leading: const Icon(
                   Icons.block,
                   size: 18,
@@ -118,7 +127,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
               AppRow(
                 label: 'Subscription details',
-                value: premium ? 'Premium' : 'Free',
+                value: 'Free',
                 last: true,
                 leading: const Icon(
                   Icons.credit_card,

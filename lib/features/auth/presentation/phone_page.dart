@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/routes.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
+import '../../../data/providers.dart';
 import '../../../shared/widgets/buttons.dart';
 import '../../../shared/widgets/entry.dart';
 import '../../../shared/widgets/layout.dart';
@@ -61,15 +63,37 @@ class _PhonePageState extends ConsumerState<PhonePage> {
     return out.toString();
   }
 
+  /// What the server is sent. The digits are grouped on screen for reading;
+  /// the wire always gets E.164.
+  String get _e164 => '${_c.dial}$_digits';
+
   Future<void> _continue() async {
     if (!_ready || _busy) return;
     setState(() => _busy = true);
-    // TODO(backend): POST Api.requestOtp with the E.164 number. The server
-    // rate-limits per number and per device; the client does not retry.
-    await Future<void>.delayed(const Duration(milliseconds: 350));
-    if (!mounted) return;
-    setState(() => _busy = false);
-    context.push('${Routes.otp}?phone=$_digits&dial=${_c.dial}');
+    try {
+      // The server rate-limits per number, per device and per address. A
+      // refusal here is a real answer, so the client never retries on its own:
+      // every send costs an SMS, and bots hammer this endpoint.
+      final challenge =
+          await ref.read(authRepositoryProvider).requestCode(_e164);
+      if (!mounted) return;
+      context.push(
+        Uri(
+          path: Routes.otp,
+          queryParameters: {
+            'phone': _digits,
+            'dial': _c.dial,
+            'retry': '${challenge.retryAfter.inSeconds}',
+            if (challenge.debugCode != null) 'debug': challenge.debugCode!,
+          },
+        ).toString(),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      showAppToast(context, e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _pickCountry() async {

@@ -7,41 +7,85 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../config/env.dart';
 import '../storage/token_store.dart';
 import 'api_exception.dart';
+import 'endpoints.dart';
+import 'json.dart';
 
-/// The only thing in the app that talks to the network.
+/// The only thing in the app that talks to our API.
 ///
 /// Repositories call this; widgets never do. It attaches the bearer token,
 /// refreshes it once on a 401, and turns every transport failure into an
 /// [ApiException] so no screen ever has to know what Dio is.
 class ApiClient {
-  ApiClient(this._dio, {required this.onSessionLost});
+  ApiClient(this._dio);
 
   final Dio _dio;
 
-  /// Called when a refresh is refused. The session controller listens and
-  /// sends the app back to sign-in; the client itself does not navigate.
-  final Future<void> Function() onSessionLost;
+  /// A single object, for an endpoint that returns one.
+  Future<Json> getJson(String path, {Map<String, Object?>? query}) async =>
+      asJson(await _body(() => _dio.get<Object?>(path, queryParameters: query)));
 
-  Future<T> get<T>(String path, {Map<String, Object?>? query}) =>
-      _send(() => _dio.get<T>(path, queryParameters: query));
+  /// A bare list, for the handful of endpoints that return one at the top
+  /// level (notices, grants, candidates, connections, media).
+  Future<List<Json>> getList(String path, {Map<String, Object?>? query}) async =>
+      asJsonList(
+        await _body(() => _dio.get<Object?>(path, queryParameters: query)),
+      );
 
-  Future<T> post<T>(String path, {Object? body}) =>
-      _send(() => _dio.post<T>(path, data: body));
+  Future<Json> post(String path, {Object? body}) async =>
+      asJson(await _body(() => _dio.post<Object?>(path, data: body)));
 
-  Future<T> patch<T>(String path, {Object? body}) =>
-      _send(() => _dio.patch<T>(path, data: body));
+  Future<List<Json>> postList(String path, {Object? body}) async =>
+      asJsonList(await _body(() => _dio.post<Object?>(path, data: body)));
 
-  Future<T> delete<T>(String path, {Object? body}) =>
-      _send(() => _dio.delete<T>(path, data: body));
+  Future<Json> put(String path, {Object? body}) async =>
+      asJson(await _body(() => _dio.put<Object?>(path, data: body)));
 
-  Future<T> _send<T>(Future<Response<T>> Function() call) async {
+  Future<List<Json>> putList(String path, {Object? body}) async =>
+      asJsonList(await _body(() => _dio.put<Object?>(path, data: body)));
+
+  /// For the endpoints that answer 204. Calling one of the body-returning
+  /// methods on these would throw on the empty body, which is why they are
+  /// separate rather than nullable.
+  Future<void> postEmpty(String path, {Object? body}) =>
+      _run(() => _dio.post<Object?>(path, data: body));
+
+  Future<void> putEmpty(String path, {Object? body}) =>
+      _run(() => _dio.put<Object?>(path, data: body));
+
+  Future<void> deleteEmpty(String path, {Object? body}) =>
+      _run(() => _dio.delete<Object?>(path, data: body));
+
+  /// Raw bytes with an explicit content type, for the Netflix CSV, which is
+  /// posted as the request body rather than as a form.
+  Future<Json> postRaw(
+    String path, {
+    required Object body,
+    required String contentType,
+  }) async =>
+      asJson(
+        await _body(
+          () => _dio.post<Object?>(
+            path,
+            data: body,
+            options: Options(contentType: contentType),
+          ),
+        ),
+      );
+
+  Future<Object?> _body(Future<Response<Object?>> Function() call) async {
+    final res = await _run(call);
+    final data = res.data;
+    if (data == null) {
+      throw const UnknownFailure(debugDetail: 'empty body where one was due');
+    }
+    return data;
+  }
+
+  Future<Response<Object?>> _run(
+    Future<Response<Object?>> Function() call,
+  ) async {
     try {
-      final res = await call();
-      final data = res.data;
-      if (data == null) {
-        throw const UnknownFailure(debugDetail: 'empty body');
-      }
-      return data;
+      return await call();
     } on DioException catch (e) {
       throw ApiException.from(e);
     }
@@ -71,18 +115,18 @@ class ApiClient {
       dio.interceptors.add(
         InterceptorsWrapper(
           onRequest: (o, h) {
-            debugPrint('→ ${o.method} ${o.path}');
+            debugPrint('-> ${o.method} ${o.path}');
             h.next(o);
           },
           onError: (e, h) {
-            debugPrint('✗ ${e.requestOptions.path} ${e.response?.statusCode}');
+            debugPrint('x  ${e.requestOptions.path} ${e.response?.statusCode}');
             h.next(e);
           },
         ),
       );
     }
 
-    return ApiClient(dio, onSessionLost: onLost);
+    return ApiClient(dio);
   }
 }
 
@@ -120,8 +164,12 @@ class _AuthInterceptor extends Interceptor {
     final is401 = err.response?.statusCode == 401;
     final alreadyRetried = err.requestOptions.extra['retried'] == true;
     final isRefreshCall = err.requestOptions.extra['refresh'] == true;
+    final wasAnonymous = err.requestOptions.extra['anonymous'] == true;
 
-    if (!is401 || alreadyRetried || isRefreshCall) {
+    // Signing in with a wrong code is a 401 that means "wrong code", not
+    // "your session ended". Refreshing on it would be nonsense, and would
+    // hand the OTP screen the wrong error to show.
+    if (!is401 || alreadyRetried || isRefreshCall || wasAnonymous) {
       return handler.next(err);
     }
 
@@ -148,16 +196,21 @@ class _AuthInterceptor extends Interceptor {
     final refresh = await _tokens.readRefresh();
     if (refresh == null) return null;
     try {
-      final res = await _dio.post<Map<String, Object?>>(
-        '/auth/refresh',
+      final res = await _dio.post<Object?>(
+        Api.refresh,
         data: {'refresh_token': refresh},
         options: Options(extra: {'anonymous': true, 'refresh': true}),
       );
-      final access = res.data?['access_token'] as String?;
-      final next = res.data?['refresh_token'] as String?;
-      if (access == null) return null;
+      final data = res.data;
+      if (data is! Map) return null;
+      final access = data['access_token'];
+      final next = data['refresh_token'];
+      if (access is! String) return null;
       // The backend rotates refresh tokens, so store whichever it returned.
-      await _tokens.save(access: access, refresh: next ?? refresh);
+      await _tokens.save(
+        access: access,
+        refresh: next is String ? next : refresh,
+      );
       return access;
     } on DioException {
       await _tokens.clear();

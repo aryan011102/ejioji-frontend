@@ -89,9 +89,11 @@ class Avatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // TODO(backend): swap the gradient for a CachedNetworkImage of [imageUrl]
-    // once the media service is live. Photos are served from signed, expiring
-    // URLs — they must never be cached to disk unencrypted.
+    // The URL is signed and expires, so it is only ever held in the in-memory
+    // image cache. Nothing here writes a photo to disk: a cached face outliving
+    // the account it belongs to is the kind of thing erasure cannot reach.
+    final url = imageUrl;
+
     final circle = Container(
       width: size,
       height: size,
@@ -104,6 +106,20 @@ class Avatar extends StatelessWidget {
           colors: [seedColor, const Color(0x8C000000)],
         ),
       ),
+      clipBehavior: url == null ? Clip.none : Clip.antiAlias,
+      child: url == null
+          ? null
+          : Image.network(
+              url,
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              // A signature that has expired, or a photo taken down between
+              // the read and the render. Falling back to the plain circle is
+              // quieter than Flutter's broken-image icon, which on a person
+              // reads as something being wrong with them.
+              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+            ),
     );
 
     if (!blurred) return circle;
@@ -159,36 +175,45 @@ class PhotoFrame extends StatelessWidget {
 /// for — editing your info, and the gallery step of the selfie check.
 class PhotoSlot extends StatelessWidget {
   const PhotoSlot({
-    this.filledColor,
+    this.imageUrl,
     this.onTap,
     this.label = 'Add',
     this.main = false,
     this.width,
+    this.busy = false,
     super.key,
   });
 
-  final Color? filledColor;
+  /// A signed URL for a photo already in the pool. Null means an empty slot.
+  final String? imageUrl;
+
   final VoidCallback? onTap;
   final String label;
   final bool main;
   final double? width;
 
+  /// This slot is where the upload in flight will land.
+  final bool busy;
+
   @override
   Widget build(BuildContext context) {
-    final filled = filledColor != null;
+    final filled = imageUrl != null;
     return Pressable(
-      onTap: onTap,
+      onTap: busy ? null : onTap,
       child: AspectRatio(
         aspectRatio: 3 / 4,
         child: Container(
           width: width,
+          clipBehavior: Clip.antiAlias,
+          foregroundDecoration: filled
+              ? null
+              : const BoxDecoration(color: Color(0x00000000)),
           decoration: BoxDecoration(
-            color: filled ? null : AppColors.photoEmpty,
-            gradient: filled
-                ? LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [filledColor!, const Color(0xC7000000)],
+            color: AppColors.photoEmpty,
+            image: filled
+                ? DecorationImage(
+                    image: NetworkImage(imageUrl!),
+                    fit: BoxFit.cover,
                   )
                 : null,
             borderRadius: BorderRadius.circular(12),
@@ -201,7 +226,16 @@ class PhotoSlot extends StatelessWidget {
                   ),
           ),
           alignment: Alignment.center,
-          child: filled
+          child: busy
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.2,
+                    color: AppColors.accent,
+                  ),
+                )
+              : filled
               ? (main
                   ? Align(
                       alignment: Alignment.bottomLeft,

@@ -11,8 +11,14 @@ abstract final class Routes {
 
   // Building a profile
   static const createProfile = '/onboarding/about-you';
+  static const consent = '/onboarding/permissions';
   static const connect = '/onboarding/connect';
+  static const netflixUpload = '/onboarding/connect/netflix';
+
+  /// Carries `?run=<id>`: the run it is watching. There is no such thing as
+  /// this screen without one.
   static const reading = '/onboarding/reading';
+  static String readingRun(String runId) => '/onboarding/reading?run=$runId';
   static const ready = '/onboarding/ready';
   static const pickCategory = '/onboarding/insights/:index';
   static String pickCategoryAt(int i) => '/onboarding/insights/$i';

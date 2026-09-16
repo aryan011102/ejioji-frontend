@@ -23,7 +23,9 @@ import '../features/home/presentation/notifications_page.dart';
 import '../features/insights/presentation/category_page.dart';
 import '../features/insights/presentation/edit_sources_page.dart';
 import '../features/onboarding/presentation/connect_accounts_page.dart';
+import '../features/onboarding/presentation/consent_page.dart';
 import '../features/onboarding/presentation/create_profile_page.dart';
+import '../features/onboarding/presentation/netflix_upload_page.dart';
 import '../features/onboarding/presentation/reading_page.dart';
 import '../features/profile/presentation/edit_info_page.dart';
 import '../features/profile/presentation/profile_page.dart';
@@ -34,6 +36,7 @@ import '../features/verification/presentation/selfie_page.dart';
 import '../features/verification/presentation/verify_hub_page.dart';
 import '../features/verification/presentation/verify_result_page.dart';
 import '../features/verification/presentation/why_matters_page.dart';
+import '../shared/models/enums.dart';
 import 'routes.dart';
 import 'shell.dart';
 
@@ -74,10 +77,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: Routes.phone, builder: (_, __) => const PhonePage()),
       GoRoute(
         path: Routes.otp,
-        builder: (_, state) => OtpPage(
-          phone: state.uri.queryParameters['phone'] ?? '',
-          dialCode: state.uri.queryParameters['dial'] ?? '+91',
-        ),
+        builder: (_, state) {
+          final q = state.uri.queryParameters;
+          return OtpPage(
+            phone: q['phone'] ?? '',
+            dialCode: q['dial'] ?? '+91',
+            // The server's own cooldown, carried across from the send, so the
+            // Resend countdown matches what it will actually allow.
+            retryAfterSeconds: int.tryParse(q['retry'] ?? '') ?? 60,
+            debugCode: q['debug'],
+          );
+        },
       ),
 
       // Onboarding is a linear run, so it lives outside the shell — a tab bar
@@ -87,10 +97,28 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const CreateProfilePage(),
       ),
       GoRoute(
+        path: Routes.consent,
+        builder: (_, state) {
+          // A single purpose when a source needs one; all of them otherwise.
+          final one = state.uri.queryParameters['purpose'];
+          return ConsentPage(
+            purposes: one == null ? null : [ConsentPurpose.parse(one)],
+          );
+        },
+      ),
+      GoRoute(
         path: Routes.connect,
         builder: (_, __) => const ConnectAccountsPage(),
       ),
-      GoRoute(path: Routes.reading, builder: (_, __) => const ReadingPage()),
+      GoRoute(
+        path: Routes.netflixUpload,
+        builder: (_, __) => const NetflixUploadPage(),
+      ),
+      GoRoute(
+        path: Routes.reading,
+        builder: (_, state) =>
+            ReadingPage(runId: state.uri.queryParameters['run'] ?? ''),
+      ),
       GoRoute(
         path: Routes.pickCategory,
         builder: (_, state) => CategoryPage(

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Where Google sends Safari back to after the consent screen.
+	     A Universal Link rather than a custom URL scheme, for the same reason
+	     as on Android: a custom scheme can be claimed by any other app on the
+	     device, which would hand somebody else the authorization code.
+
+	     TODO(infra): replace oauth.example.com with the host in the backend's
+	     GOOGLE_REDIRECT_URI, serve /.well-known/apple-app-site-association
+	     from it for this bundle id, and add the same entitlement in Xcode
+	     under Signing and Capabilities. Until that is in place the redirect
+	     opens Safari instead of the app and no source can be connected. -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:oauth.example.com</string>
+	</array>
+</dict>
+</plist>

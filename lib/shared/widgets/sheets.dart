@@ -190,6 +190,254 @@ Future<T?> showAppSheet<T>(
   );
 }
 
+/// One field, asked for on its own.
+///
+/// Used for a first name and for a written prompt answer. It is a sheet rather
+/// than a screen because it is one question, and it keeps the keyboard and the
+/// Save button in the same place both times.
+///
+/// Returns the trimmed text, or null if they backed out.
+Future<String?> showTextEntrySheet(
+  BuildContext context, {
+  required String title,
+  required String hint,
+  String initial = '',
+  int maxLength = 200,
+  int minLines = 1,
+  String saveLabel = 'Save',
+}) {
+  return showAppSheet<String>(
+    context,
+    builder: (sheetContext) => _TextEntry(
+      title: title,
+      hint: hint,
+      initial: initial,
+      maxLength: maxLength,
+      minLines: minLines,
+      saveLabel: saveLabel,
+    ),
+  );
+}
+
+class _TextEntry extends StatefulWidget {
+  const _TextEntry({
+    required this.title,
+    required this.hint,
+    required this.initial,
+    required this.maxLength,
+    required this.minLines,
+    required this.saveLabel,
+  });
+
+  final String title;
+  final String hint;
+  final String initial;
+  final int maxLength;
+  final int minLines;
+  final String saveLabel;
+
+  @override
+  State<_TextEntry> createState() => _TextEntryState();
+}
+
+class _TextEntryState extends State<_TextEntry> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = _controller.text.trim();
+    final left = widget.maxLength - _controller.text.length;
+
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(widget.title, style: AppText.title3),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            // Bounded here as well as on the server, so a paste cannot push an
+            // unbounded payload at the API.
+            maxLength: widget.maxLength,
+            minLines: widget.minLines,
+            maxLines: widget.minLines == 1 ? 1 : widget.minLines + 3,
+            textCapitalization: TextCapitalization.sentences,
+            style: AppText.body,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              hintText: widget.hint,
+              hintStyle: AppText.body.copyWith(color: AppColors.label4),
+              counterText: left < 40 ? '$left left' : '',
+              counterStyle: AppText.micro,
+              filled: true,
+              fillColor: AppColors.canvas,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(Radii.row),
+                borderSide: const BorderSide(color: AppColors.hairline),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(Radii.row),
+                borderSide: const BorderSide(color: AppColors.hairline),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(Radii.row),
+                borderSide: const BorderSide(color: AppColors.accent),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Pressable(
+            onTap: text.isEmpty
+                ? null
+                : () => Navigator.of(context).pop(text),
+            child: Container(
+              height: 50,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: text.isEmpty ? AppColors.fill2 : AppColors.fill,
+                borderRadius: BorderRadius.circular(Radii.row),
+              ),
+              child: Text(
+                widget.saveLabel,
+                style: AppText.button.copyWith(
+                  color: text.isEmpty ? AppColors.label3 : AppColors.onAccent,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The last step before an account is erased.
+///
+/// Deleting is immediate and final: no grace period, no undo, and deliberately
+/// no code by SMS. That makes an unlocked, signed-in phone enough to erase the
+/// account, so the one thing standing in the way is having to type the word.
+/// Returns what was typed, or null if they backed out.
+Future<String?> showDeleteConfirmation(BuildContext context) {
+  return showAppSheet<String>(
+    context,
+    builder: (sheetContext) => _DeleteConfirmation(),
+  );
+}
+
+class _DeleteConfirmation extends StatefulWidget {
+  @override
+  State<_DeleteConfirmation> createState() => _DeleteConfirmationState();
+}
+
+class _DeleteConfirmationState extends State<_DeleteConfirmation> {
+  static const _word = 'delete';
+
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ready = _controller.text.trim().toLowerCase() == _word;
+
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('This cannot be undone', style: AppText.title3),
+          const SizedBox(height: 8),
+          Text(
+            'Your profile, your tiles, your photos and every conversation are '
+            'erased straight away. Type $_word to confirm.',
+            style: AppText.callout,
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            autocorrect: false,
+            enableSuggestions: false,
+            textInputAction: TextInputAction.done,
+            style: AppText.body,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              hintText: _word,
+              hintStyle: AppText.body.copyWith(color: AppColors.label4),
+              filled: true,
+              fillColor: AppColors.canvas,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(Radii.row),
+                borderSide: const BorderSide(color: AppColors.hairline),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(Radii.row),
+                borderSide: const BorderSide(color: AppColors.hairline),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(Radii.row),
+                borderSide: const BorderSide(color: AppColors.destructive),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Pressable(
+            onTap: ready
+                ? () => Navigator.of(context).pop(_controller.text.trim())
+                : null,
+            child: Container(
+              height: 50,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: ready ? AppColors.destructive : AppColors.fill2,
+                borderRadius: BorderRadius.circular(Radii.row),
+              ),
+              child: Text(
+                'Delete my account',
+                style: AppText.button.copyWith(
+                  color: ready ? AppColors.label : AppColors.label3,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Pressable(
+            onTap: () => Navigator.of(context).pop(),
+            child: SizedBox(
+              height: 46,
+              child: Center(
+                child: Text(
+                  'Keep my account',
+                  style: AppText.button.copyWith(color: AppColors.accent),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// The quiet confirmation. Addressed to whoever pressed, and never posted
 /// anywhere another person can see it.
 void showAppToast(BuildContext context, String message) {

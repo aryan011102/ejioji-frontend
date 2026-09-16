@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The one colour Android needs to know about: what is behind the app before
+     and around Flutter. It matches AppColors.canvas in core/theme/tokens.dart,
+     and the two have to be changed together. -->
+<resources>
+    <color name="ejioji_canvas">#FF0D0D0F</color>
+</resources>

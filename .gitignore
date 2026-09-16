@@ -18,3 +18,7 @@ config/*.json
 key.properties
 ios/Runner/GoogleService-Info.plist
 android/app/google-services.json
+
+# Licensed fonts are never committed. See assets/fonts/README.md.
+*.ttf
+*.otf

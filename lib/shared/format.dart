@@ -18,12 +18,16 @@ String relativeTime(DateTime at, {DateTime? now}) {
   if (gap.isNegative) return 'now';
   if (gap.inMinutes < 1) return 'now';
   if (gap.inMinutes < 60) return '${gap.inMinutes}m';
-  if (gap.inHours < 24) return '${gap.inHours}h';
 
   // Calendar days, not 24-hour blocks: something at 11pm last night is
-  // "yesterday" at 1am, not "2h".
+  // "Yesterday" at 9am, not "10h".
+  //
+  // This has to be decided before the hours branch. Checking `inHours < 24`
+  // first makes the day comparison below unreachable for exactly the cases it
+  // exists to handle.
   final days = _midnight(current).difference(_midnight(at)).inDays;
-  if (days <= 1) return 'Yesterday';
+  if (days == 0) return '${gap.inHours}h';
+  if (days == 1) return 'Yesterday';
   if (days < 7) return '${days}d';
   if (days < 365) return '${days ~/ 7}w';
   return '${days ~/ 365}y';

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This app is dark only, so there is one set of styles and no values-night
+     pair. A light launch theme on a device with dark mode off would flash
+     white for the fraction of a second before Flutter draws, which is the
+     usual tell that an app was themed in Dart and nowhere else. -->
+<resources>
+    <!-- While the process starts. -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+    </style>
+    <!-- Behind the Flutter UI once it is running. -->
+    <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">@color/ejioji_canvas</item>
+    </style>
+</resources>

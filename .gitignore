@@ -1,0 +1,20 @@
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
+.idea/
+.vscode/
+
+# Build configuration carries environment URLs and pins. Only the example is
+# checked in.
+config/*.json
+!config/*.example.json
+
+# Never commit signing material.
+*.jks
+*.keystore
+key.properties
+ios/Runner/GoogleService-Info.plist
+android/app/google-services.json

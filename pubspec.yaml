@@ -1,0 +1,56 @@
+name: ejioji
+description: ejioji — a profile built from what you already did.
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State. Riverpod over Provider/Bloc here because most of this app is
+  # read-a-thing-and-show-it, and Riverpod's async providers cover loading,
+  # error and data without a bespoke state class per screen.
+  flutter_riverpod: ^2.5.1
+
+  # Routing. Declarative, deep-linkable, and it gives us one place to enforce
+  # the auth and verification redirects rather than scattering guards.
+  go_router: ^14.2.7
+
+  # Networking.
+  dio: ^5.7.0
+
+  # Tokens never touch SharedPreferences. Keychain on iOS, EncryptedSharedPrefs
+  # on Android.
+  flutter_secure_storage: ^9.2.2
+
+  # Non-sensitive, non-secret preferences only (last tab, seen-onboarding).
+  shared_preferences: ^2.3.2
+
+  equatable: ^2.0.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+  # Google Sans is licensed and is NOT redistributable — it is not checked in.
+  # On Android the app asks for it by name and falls back to Roboto when it is
+  # absent, which is the correct behaviour on a stock device. If your build has
+  # a licensed copy, drop the files in and uncomment this block.
+  #
+  # fonts:
+  #   - family: Google Sans
+  #     fonts:
+  #       - asset: assets/fonts/GoogleSans-Regular.ttf
+  #         weight: 400
+  #       - asset: assets/fonts/GoogleSans-Medium.ttf
+  #         weight: 500
+  #       - asset: assets/fonts/GoogleSans-Bold.ttf
+  #         weight: 700

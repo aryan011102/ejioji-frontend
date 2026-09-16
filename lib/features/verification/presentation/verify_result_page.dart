@@ -3,9 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/routes.dart';
-import '../../../core/session/session.dart';
 import '../../../shared/widgets/buttons.dart';
-import '../../../shared/widgets/identity.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/states.dart';
 import '../../../shared/widgets/steps.dart';
@@ -27,24 +25,11 @@ class VerifyResultPage extends ConsumerStatefulWidget {
 }
 
 class _VerifyResultPageState extends ConsumerState<VerifyResultPage> {
-  @override
-  void initState() {
-    super.initState();
-    if (widget.route == VerifyRoute.digilocker) {
-      // Instant, so the tier moves as the screen appears. The selfie does not:
-      // it is still with a reviewer.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          final current = ref.read(sessionProvider).tier;
-          ref.read(sessionProvider.notifier).onVerified(
-                current == VerificationTier.blue
-                    ? VerificationTier.gold
-                    : VerificationTier.blue,
-              );
-        }
-      });
-    }
-  }
+  // Nothing is recorded here any more. There is no verification endpoint, so
+  // the previous version awarded a tick purely in local state: the app said
+  // "verified" and the server had never heard of it. A badge that means
+  // nothing is worse than no badge, so the screen now only describes what
+  // would happen. See `verify_hub_page.dart`.
 
   @override
   Widget build(BuildContext context) {

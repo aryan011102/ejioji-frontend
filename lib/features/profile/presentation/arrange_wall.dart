@@ -3,7 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/tokens.dart';
-import '../../../shared/mock/demo_data.dart';
+import '../../../shared/models/tile.dart' as api;
+import '../../../shared/models/tile_look.dart';
 import '../../../shared/widgets/pressable.dart';
 import '../../../shared/widgets/tiles.dart';
 
@@ -20,16 +21,19 @@ const kMinTiles = 6;
 /// immediate drag would fight every scroll gesture on the screen.
 class ArrangeWall extends StatefulWidget {
   const ArrangeWall({
-    required this.order,
+    required this.tiles,
     required this.onReorder,
     required this.onRemove,
     required this.onFloorHit,
     super.key,
   });
 
-  final List<String> order;
-  final void Function(String moved, String target) onReorder;
-  final void Function(String id) onRemove;
+  /// In the order they are shown. A tile is identified by its key, which is
+  /// stable across a refresh, so rearranging and then re-pulling a source
+  /// does not scatter the wall.
+  final List<api.ProfileTile> tiles;
+  final void Function(String movedKey, String targetKey) onReorder;
+  final void Function(String key) onRemove;
 
   /// Called instead of removing when the wall is already at the floor.
   final VoidCallback onFloorHit;
@@ -53,28 +57,25 @@ class _ArrangeWallState extends State<ArrangeWall>
     super.dispose();
   }
 
-  DemoInsight _byId(String id) =>
-      Demo.wall.firstWhere((t) => t.id == id);
-
   @override
   Widget build(BuildContext context) {
-    final canRemove = widget.order.length > kMinTiles;
+    final canRemove = widget.tiles.length > kMinTiles;
 
     return BentoGrid(
       children: [
-        for (final id in widget.order)
+        for (final tile in widget.tiles)
           BentoItem(
-            size: _byId(id).size,
+            size: tile.tileSize,
             child: _ArrangeableTile(
-              insight: _byId(id),
+              tile: tile,
               wobble: _wobble,
-              dragging: _dragging == id,
+              dragging: _dragging == tile.key,
               canRemove: canRemove,
-              onDragStart: () => setState(() => _dragging = id),
+              onDragStart: () => setState(() => _dragging = tile.key),
               onDragEnd: () => setState(() => _dragging = null),
-              onAccept: (moved) => widget.onReorder(moved, id),
+              onAccept: (moved) => widget.onReorder(moved, tile.key),
               onRemove: () =>
-                  canRemove ? widget.onRemove(id) : widget.onFloorHit(),
+                  canRemove ? widget.onRemove(tile.key) : widget.onFloorHit(),
             ),
           ),
       ],
@@ -84,7 +85,7 @@ class _ArrangeWallState extends State<ArrangeWall>
 
 class _ArrangeableTile extends StatelessWidget {
   const _ArrangeableTile({
-    required this.insight,
+    required this.tile,
     required this.wobble,
     required this.dragging,
     required this.canRemove,
@@ -94,7 +95,7 @@ class _ArrangeableTile extends StatelessWidget {
     required this.onRemove,
   });
 
-  final DemoInsight insight;
+  final api.ProfileTile tile;
   final Animation<double> wobble;
   final bool dragging;
   final bool canRemove;
@@ -106,21 +107,20 @@ class _ArrangeableTile extends StatelessWidget {
   Widget _tile({bool ghost = false}) => Opacity(
         opacity: ghost ? 0.9 : 1,
         child: InsightTile(
-          size: insight.size,
-          number: insight.number,
-          caption: insight.caption,
-          prompt: insight.prompt,
-          answer: insight.answer,
-          tone: insight.tone,
-          hasMedia: insight.media,
-          isTrack: insight.track,
+          size: tile.tileSize,
+          number: tile.isAnswer ? null : tile.headline,
+          caption: tile.isAnswer ? null : tile.body,
+          prompt: tile.question,
+          answer: tile.isAnswer ? tile.headline : null,
+          tone: tile.tone,
+          isTrack: tile.looksLikeTrack,
         ),
       );
 
   @override
   Widget build(BuildContext context) {
     return DragTarget<String>(
-      onWillAcceptWithDetails: (d) => d.data != insight.id,
+      onWillAcceptWithDetails: (d) => d.data != tile.key,
       onAcceptWithDetails: (d) => onAccept(d.data),
       builder: (context, candidate, rejected) {
         final hovered = candidate.isNotEmpty;
@@ -130,19 +130,19 @@ class _ArrangeableTile extends StatelessWidget {
           builder: (context, child) {
             // A small alternating tilt, phase-shifted per tile so the wall does
             // not pulse in unison and read as a glitch.
-            final phase = insight.id.hashCode % 6;
+            final phase = tile.key.hashCode % 6;
             final angle =
                 math.sin((wobble.value * 2 * math.pi) + phase) * 0.012;
             return Transform.rotate(angle: dragging ? 0 : angle, child: child);
           },
           child: LongPressDraggable<String>(
-            data: insight.id,
+            data: tile.key,
             onDragStarted: onDragStart,
             onDragEnd: (_) => onDragEnd(),
             onDraggableCanceled: (_, __) => onDragEnd(),
             feedback: SizedBox(
-              width: insight.size.crossAxisCells * 170,
-              height: insight.size.mainAxisCells * 170,
+              width: tile.tileSize.crossAxisCells * 170,
+              height: tile.tileSize.mainAxisCells * 170,
               child: Material(
                 color: const Color(0x00000000),
                 child: _tile(ghost: true),

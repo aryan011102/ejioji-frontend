@@ -3,13 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/routes.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/session/session.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
-import '../../../shared/mock/demo_data.dart';
+import '../../../data/providers.dart';
+import '../../../shared/models/profile.dart';
 import '../../../shared/widgets/identity.dart';
 import '../../../shared/widgets/layout.dart';
+import '../../../shared/widgets/not_yet.dart';
 import '../../../shared/widgets/pressable.dart';
+import '../../../shared/widgets/sheets.dart';
 
 /// The third tab. Four jobs, in the order they matter: who you are, how
 /// believable you are, what you could become, and everything else.
@@ -19,104 +23,95 @@ import '../../../shared/widgets/pressable.dart';
 class AccountPage extends ConsumerWidget {
   const AccountPage({super.key});
 
+  Future<void> _resume(BuildContext context, WidgetRef ref) async {
+    try {
+      final publish = await ref.read(profileRepositoryProvider).publish();
+      if (!context.mounted) return;
+      ref.read(sessionProvider.notifier).onPublishChanged(publish);
+      ref.invalidate(myProfileProvider);
+    } on ApiException catch (e) {
+      if (context.mounted) showAppToast(context, e.message);
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
+    final profile = ref.watch(myProfileProvider);
 
     return AppScaffold(
-      child: ListView(
-        padding: const EdgeInsets.only(bottom: 150),
-        children: [
-          const LargeTitle('You'),
-          if (session.paused)
-            _PausedBanner(
-              onResume: () =>
-                  ref.read(sessionProvider.notifier).onPaused(paused: false),
+      child: RefreshIndicator(
+        color: AppColors.accent,
+        backgroundColor: AppColors.row,
+        onRefresh: () async => ref.invalidate(myProfileProvider),
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: 150),
+          children: [
+            const LargeTitle('You'),
+            if (session.isUnderReview)
+              const NotYetNote(
+                text: 'Your profile is being looked at by a moderator, so it '
+                    'is hidden for now. You cannot send new chat requests '
+                    'until that is finished.',
+              )
+            else if (session.isPaused)
+              _PausedBanner(onResume: () => _resume(context, ref)),
+            Opacity(
+              opacity: session.isVisible ? 1 : 0.5,
+              child: _ProfileCard(
+                profile: profile.valueOrNull,
+                onTap: () => context.push(Routes.editProfile),
+              ),
             ),
-          Opacity(
-            opacity: session.paused ? 0.5 : 1,
-            child: _ProfileCard(
-              tier: session.tier,
-              onTap: () => context.push(Routes.editProfile),
-            ),
-          ),
-          if (session.tier == VerificationTier.none)
+            // Verification has no backend yet. The invitation still points at
+            // the hub, which says so plainly; what it must not do is claim a
+            // tick nobody issued, or gate chat on one.
             _Invitation(
               icon: Icons.check,
               tint: AppColors.blueSoft,
               iconColor: AppColors.blue,
-              title: 'Verify to chat, and get a tick',
-              body: 'Two ways, either one opens chat. Takes a couple of '
-                  'minutes.',
+              title: 'Verification is coming',
+              body: 'An ID check and a selfie check, neither switched on yet.',
               onTap: () => context.push(Routes.verify),
-            )
-          else
+            ),
+            _PremiumPromo(onTap: () => context.push(Routes.premium)),
             SectionGroup(
-              footer: session.tier == VerificationTier.gold
-                  ? 'Both checks passed. The gold tick says an ID and a photo '
-                      'were verified.'
-                  : 'One check passed. Do the other one for the gold tick.',
               children: [
                 AppRow(
-                  label: session.tier == VerificationTier.gold
-                      ? 'Verified — gold'
-                      : 'Verified — blue',
-                  subtitle: session.tier == VerificationTier.gold
-                      ? 'ID and photo'
-                      : 'One check',
-                  value: session.tier == VerificationTier.gold ? null : 'Add',
+                  label: 'Settings',
                   last: true,
-                  leading: VerifiedTick(tier: session.tier, size: 22),
-                  onTap: () => context.push(Routes.verify),
+                  leading: const Icon(
+                    Icons.settings,
+                    size: 18,
+                    color: AppColors.label2,
+                  ),
+                  onTap: () => context.push(Routes.settings),
                 ),
               ],
             ),
-          if (session.premium)
-            SectionGroup(
-              children: [
-                AppRow(
-                  label: 'Premium is on',
-                  subtitle: 'Renews 8 October',
-                  last: true,
-                  leading: const Icon(
-                    Icons.auto_awesome,
-                    size: 18,
-                    color: AppColors.accent,
-                  ),
-                  onTap: () => context.push(Routes.subscription),
-                ),
-              ],
-            )
-          else
-            _PremiumPromo(onTap: () => context.push(Routes.premium)),
-          SectionGroup(
-            children: [
-              AppRow(
-                label: 'Settings',
-                last: true,
-                leading: const Icon(
-                  Icons.settings,
-                  size: 18,
-                  color: AppColors.label2,
-                ),
-                onTap: () => context.push(Routes.settings),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
 class _ProfileCard extends StatelessWidget {
-  const _ProfileCard({required this.tier, required this.onTap});
+  const _ProfileCard({required this.profile, required this.onTap});
 
-  final VerificationTier tier;
+  /// Null while the first read is in flight. The card keeps its shape and
+  /// leaves the name and counts blank rather than showing a placeholder
+  /// person, so nothing on this screen is ever a name that is not yours.
+  final MyProfile? profile;
+
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final name = profile?.profile?.firstName ?? '';
+    final photos = profile?.photos.length ?? 0;
+    final tiles = profile?.tiles.length ?? 0;
+
     return SectionGroup(
       children: [
         PressableRow(
@@ -125,7 +120,11 @@ class _ProfileCard extends StatelessWidget {
             padding: const EdgeInsets.all(14),
             child: Row(
               children: [
-                const Avatar(seedColor: Demo.meSeed, size: 62),
+                Avatar(
+                  seedColor: AppColors.fill,
+                  size: 62,
+                  imageUrl: profile?.photos.firstOrNull?.stillUrl,
+                ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
@@ -135,20 +134,17 @@ class _ProfileCard extends StatelessWidget {
                         children: [
                           Flexible(
                             child: Text(
-                              Demo.meName,
+                              name,
                               overflow: TextOverflow.ellipsis,
                               style: AppText.title3.copyWith(fontSize: 19),
                             ),
                           ),
-                          if (tier != VerificationTier.none) ...[
-                            const SizedBox(width: 6),
-                            VerifiedTick(tier: tier, size: 19),
-                          ],
                         ],
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '8 insights · 3 photos',
+                        '$tiles ${tiles == 1 ? 'tile' : 'tiles'} · '
+                        '$photos ${photos == 1 ? 'photo' : 'photos'}',
                         style: AppText.footnote.copyWith(fontSize: 13.5),
                       ),
                       const SizedBox(height: 5),

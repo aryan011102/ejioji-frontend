@@ -190,6 +190,121 @@ Future<T?> showAppSheet<T>(
   );
 }
 
+/// The last step before an account is erased.
+///
+/// Deleting is immediate and final: no grace period, no undo, and deliberately
+/// no code by SMS. That makes an unlocked, signed-in phone enough to erase the
+/// account, so the one thing standing in the way is having to type the word.
+/// Returns what was typed, or null if they backed out.
+Future<String?> showDeleteConfirmation(BuildContext context) {
+  return showAppSheet<String>(
+    context,
+    builder: (sheetContext) => _DeleteConfirmation(),
+  );
+}
+
+class _DeleteConfirmation extends StatefulWidget {
+  @override
+  State<_DeleteConfirmation> createState() => _DeleteConfirmationState();
+}
+
+class _DeleteConfirmationState extends State<_DeleteConfirmation> {
+  static const _word = 'delete';
+
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ready = _controller.text.trim().toLowerCase() == _word;
+
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('This cannot be undone', style: AppText.title3),
+          const SizedBox(height: 8),
+          Text(
+            'Your profile, your tiles, your photos and every conversation are '
+            'erased straight away. Type $_word to confirm.',
+            style: AppText.callout,
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            autocorrect: false,
+            enableSuggestions: false,
+            textInputAction: TextInputAction.done,
+            style: AppText.body,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              hintText: _word,
+              hintStyle: AppText.body.copyWith(color: AppColors.label4),
+              filled: true,
+              fillColor: AppColors.canvas,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(Radii.row),
+                borderSide: const BorderSide(color: AppColors.hairline),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(Radii.row),
+                borderSide: const BorderSide(color: AppColors.hairline),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(Radii.row),
+                borderSide: const BorderSide(color: AppColors.destructive),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Pressable(
+            onTap: ready
+                ? () => Navigator.of(context).pop(_controller.text.trim())
+                : null,
+            child: Container(
+              height: 50,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: ready ? AppColors.destructive : AppColors.fill2,
+                borderRadius: BorderRadius.circular(Radii.row),
+              ),
+              child: Text(
+                'Delete my account',
+                style: AppText.button.copyWith(
+                  color: ready ? AppColors.label : AppColors.label3,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Pressable(
+            onTap: () => Navigator.of(context).pop(),
+            child: SizedBox(
+              height: 46,
+              child: Center(
+                child: Text(
+                  'Keep my account',
+                  style: AppText.button.copyWith(color: AppColors.accent),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// The quiet confirmation. Addressed to whoever pressed, and never posted
 /// anywhere another person can see it.
 void showAppToast(BuildContext context, String message) {

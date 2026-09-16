@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/session/session.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
 import '../../../shared/widgets/buttons.dart';
@@ -63,19 +62,14 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
       ),
       footer: Column(
         children: [
-          PrimaryButton(
-            label: 'Start Premium',
-            onPressed: () {
-              // TODO(backend): hand off to the store, then POST the receipt to
-              // Api.purchase. Entitlement is decided server-side — the client
-              // never grants itself Premium on a local receipt.
-              ref.read(sessionProvider.notifier).onPremium(active: true);
-              context.pop();
-            },
-          ),
+          // There is no billing behind this: no plans endpoint, no store
+          // handoff, no receipt validation and no entitlement. The button used
+          // to set Premium in local state, which is exactly the thing a client
+          // must never do, so it is disabled until a server can decide it.
+          const PrimaryButton(label: 'Start Premium', onPressed: null),
           const SizedBox(height: 9),
           Text(
-            'Renews until cancelled · cancel any time in the App Store',
+            'Premium is not available yet. Nothing here can be bought.',
             textAlign: TextAlign.center,
             style: AppText.micro,
           ),

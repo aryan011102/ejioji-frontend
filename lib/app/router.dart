@@ -74,10 +74,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: Routes.phone, builder: (_, __) => const PhonePage()),
       GoRoute(
         path: Routes.otp,
-        builder: (_, state) => OtpPage(
-          phone: state.uri.queryParameters['phone'] ?? '',
-          dialCode: state.uri.queryParameters['dial'] ?? '+91',
-        ),
+        builder: (_, state) {
+          final q = state.uri.queryParameters;
+          return OtpPage(
+            phone: q['phone'] ?? '',
+            dialCode: q['dial'] ?? '+91',
+            // The server's own cooldown, carried across from the send, so the
+            // Resend countdown matches what it will actually allow.
+            retryAfterSeconds: int.tryParse(q['retry'] ?? '') ?? 60,
+            debugCode: q['debug'],
+          );
+        },
       ),
 
       // Onboarding is a linear run, so it lives outside the shell — a tab bar

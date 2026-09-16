@@ -394,10 +394,15 @@ class StaggeredGrid extends StatelessWidget {
 ///
 /// One photo with dots, not a collage: a collage says "here are four small
 /// things", and this is one thing you can swipe.
+/// The photos tile that fills the hole at the end of the wall.
+///
+/// The URLs are signed and expire, so a failure here is ordinary rather than
+/// exceptional: it falls back to a plain fill instead of Flutter's grey box
+/// with a crossed-out icon, which on a profile reads as a broken person.
 class PhotosTile extends StatefulWidget {
-  const PhotosTile({required this.photos, super.key});
+  const PhotosTile({required this.photoUrls, super.key});
 
-  final List<Color> photos;
+  final List<String> photoUrls;
 
   @override
   State<PhotosTile> createState() => _PhotosTileState();
@@ -422,16 +427,13 @@ class _PhotosTileState extends State<PhotosTile> {
         children: [
           PageView.builder(
             controller: _controller,
-            itemCount: widget.photos.length,
+            itemCount: widget.photoUrls.length,
             onPageChanged: (i) => setState(() => _page = i),
-            itemBuilder: (context, i) => DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [widget.photos[i], const Color(0xC7000000)],
-                ),
-              ),
+            itemBuilder: (context, i) => Image.network(
+              widget.photoUrls[i],
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) =>
+                  const ColoredBox(color: AppColors.photoEmpty),
             ),
           ),
           Positioned(
@@ -441,7 +443,7 @@ class _PhotosTileState extends State<PhotosTile> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                for (var i = 0; i < widget.photos.length; i++)
+                for (var i = 0; i < widget.photoUrls.length; i++)
                   Container(
                     width: 6,
                     height: 6,

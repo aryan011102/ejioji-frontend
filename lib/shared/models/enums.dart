@@ -70,29 +70,29 @@ enum ConsentPurpose {
       );
 }
 
-enum Provider {
+enum SourceProvider {
   youtube('youtube', 'YouTube'),
   spotify('spotify', 'Spotify'),
   gmail('gmail', 'Food orders'),
   netflix('netflix', 'Netflix'),
   unknown('', '');
 
-  const Provider(this.wire, this.label);
+  const SourceProvider(this.wire, this.label);
 
   final String wire;
   final String label;
 
   /// The purpose that must be granted before this source may be connected.
   ConsentPurpose get purpose => switch (this) {
-        Provider.youtube => ConsentPurpose.youtubeImport,
-        Provider.spotify => ConsentPurpose.spotifyImport,
-        Provider.gmail => ConsentPurpose.gmailReceipts,
-        Provider.netflix => ConsentPurpose.netflixUpload,
-        Provider.unknown => ConsentPurpose.unknown,
+        SourceProvider.youtube => ConsentPurpose.youtubeImport,
+        SourceProvider.spotify => ConsentPurpose.spotifyImport,
+        SourceProvider.gmail => ConsentPurpose.gmailReceipts,
+        SourceProvider.netflix => ConsentPurpose.netflixUpload,
+        SourceProvider.unknown => ConsentPurpose.unknown,
       };
 
-  static Provider parse(String? raw) =>
-      values.firstWhere((v) => v.wire == raw, orElse: () => Provider.unknown);
+  static SourceProvider parse(String? raw) =>
+      values.firstWhere((v) => v.wire == raw, orElse: () => SourceProvider.unknown);
 }
 
 enum ProviderStatus {

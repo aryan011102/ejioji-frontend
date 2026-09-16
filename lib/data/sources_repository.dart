@@ -25,7 +25,7 @@ class SourcesRepository {
   /// This fails with a 403 if the matching consent purpose is not open, which
   /// is deliberate: consent is checked before anyone sees Google's screen,
   /// not after.
-  Future<Authorization> authorize(Provider provider) async {
+  Future<Authorization> authorize(SourceProvider provider) async {
     final body = await _api.post(Api.authorize(provider.wire));
     return Authorization.fromJson(body);
   }
@@ -37,7 +37,7 @@ class SourcesRepository {
   /// A callback anyone could complete would let an attacker have a victim
   /// finish the attacker's flow.
   Future<ConnectResult> complete(
-    Provider provider, {
+    SourceProvider provider, {
     String? code,
     String? state,
     String? error,

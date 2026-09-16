@@ -30,6 +30,21 @@ dependencies:
   # Non-sensitive, non-secret preferences only (last tab, seen-onboarding).
   shared_preferences: ^2.3.2
 
+  # Photos. The picker returns bytes we hand straight to a signed blob URL;
+  # the file never passes through our own API.
+  image_picker: ^1.1.2
+
+  # Opening the provider's consent page in the system browser, never a WebView.
+  # A WebView we control must not see somebody's Google password.
+  url_launcher: ^6.3.0
+
+  # Receiving the OAuth redirect back. The provider sends the browser to an
+  # App Link / Universal Link and this is how the app hears about it.
+  app_links: ^6.3.2
+
+  # Reading the Netflix viewing-history CSV the person downloaded.
+  file_picker: ^8.1.2
+
   equatable: ^2.0.5
 
 dev_dependencies:

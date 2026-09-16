@@ -69,7 +69,7 @@ class Insight {
   /// How many records stand behind this. Confidence, roughly.
   final int support;
 
-  final List<Provider> providers;
+  final List<SourceProvider> providers;
 
   /// When this was computed. A tile from a year ago still claims today's
   /// taste, so the age is shown rather than hidden.
@@ -85,7 +85,7 @@ class Insight {
         support: j.intOr('support', 0),
         providers: j
             .strings('providers')
-            .map(Provider.parse)
+            .map(SourceProvider.parse)
             .toList(growable: false),
         computedAt: j.time('computed_at'),
       );

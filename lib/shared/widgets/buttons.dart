@@ -173,6 +173,7 @@ class MiniButton extends StatelessWidget {
     this.onPressed,
     this.icon,
     this.tone = MiniTone.filled,
+    this.busy = false,
     super.key,
   });
 
@@ -180,6 +181,10 @@ class MiniButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final Widget? icon;
   final MiniTone tone;
+
+  /// Keeps the button its own size while it works, so a row of them does not
+  /// jump when one is pressed.
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
@@ -194,7 +199,7 @@ class MiniButton extends StatelessWidget {
     };
 
     return Pressable(
-      onTap: onPressed,
+      onTap: busy ? null : onPressed,
       child: Container(
         height: 32,
         padding: const EdgeInsets.symmetric(horizontal: 13),
@@ -204,20 +209,22 @@ class MiniButton extends StatelessWidget {
           border: border == null ? null : Border.all(color: border),
         ),
         alignment: Alignment.center,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (icon != null) ...[icon!, const SizedBox(width: 6)],
-            Text(
-              label,
-              style: AppText.footnote.copyWith(
-                color: fg,
-                fontWeight: FontWeight.w600,
-                fontSize: 13.5,
+        child: busy
+            ? _Spinner(color: fg)
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (icon != null) ...[icon!, const SizedBox(width: 6)],
+                  Text(
+                    label,
+                    style: AppText.footnote.copyWith(
+                      color: fg,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13.5,
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
       ),
     );
   }

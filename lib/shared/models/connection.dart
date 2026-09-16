@@ -46,7 +46,7 @@ class IngestionRun {
   });
 
   final String id;
-  final Provider provider;
+  final SourceProvider provider;
   final String providerAccountId;
 
   /// 1 on the initial connect; a refresh is simply a second one-time fetch
@@ -100,7 +100,7 @@ class IngestionRun {
 
   static IngestionRun fromJson(Json j) => IngestionRun(
         id: j.str('id'),
-        provider: Provider.parse(j.strOrNull('provider')),
+        provider: SourceProvider.parse(j.strOrNull('provider')),
         providerAccountId: j.str('provider_account_id'),
         runSeq: j.intOr('run_seq', 1),
         reason: j.strOrNull('reason') ?? 'initial',
@@ -131,7 +131,7 @@ class Connection {
   });
 
   final String id;
-  final Provider provider;
+  final SourceProvider provider;
   final ProviderStatus status;
   final List<String> scopes;
   final DateTime connectedAt;
@@ -144,7 +144,7 @@ class Connection {
     final run = j.objectOrNull('latest_run');
     return Connection(
       id: j.str('id'),
-      provider: Provider.parse(j.strOrNull('provider')),
+      provider: SourceProvider.parse(j.strOrNull('provider')),
       status: ProviderStatus.parse(j.strOrNull('status')),
       scopes: j.strings('scopes'),
       connectedAt: j.time('connected_at'),

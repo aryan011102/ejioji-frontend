@@ -98,5 +98,5 @@ class ConsentState {
 
   /// A source cannot be connected without this, and the server will refuse the
   /// authorize call rather than fail later.
-  bool canConnect(Provider provider) => isGranted(provider.purpose);
+  bool canConnect(SourceProvider provider) => isGranted(provider.purpose);
 }

@@ -34,6 +34,10 @@ dependencies:
   # the file never passes through our own API.
   image_picker: ^1.1.2
 
+  # Video behind a tile plays in the tile itself, muted until tapped. The
+  # first-party player; nothing else here needs one.
+  video_player: ^2.9.2
+
   # Opening the provider's consent page in the system browser, never a WebView.
   # A WebView we control must not see somebody's Google password.
   url_launcher: ^6.3.0

@@ -43,6 +43,9 @@ abstract final class Api {
   static const profilePrompts = '$prefix/profile/prompts';
   static String promptAnswer(String key) => '$prefix/profile/prompts/$key';
   static const profileTiles = '$prefix/profile/tiles';
+  static const tileMediaAll = '$prefix/profile/tiles/media';
+  static String tileMedia(String kind, String key) =>
+      '$prefix/profile/tiles/$kind/${Uri.encodeComponent(key)}/media';
   static const publish = '$prefix/profile/publish';
 
   // Media. Bytes go straight to blob storage on the URL this hands back; they

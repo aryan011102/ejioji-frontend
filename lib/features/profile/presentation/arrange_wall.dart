@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/tokens.dart';
+import '../../../shared/models/media.dart';
 import '../../../shared/models/tile.dart' as api;
 import '../../../shared/models/tile_look.dart';
 import '../../../shared/widgets/pressable.dart';
@@ -22,6 +23,7 @@ const kMinTiles = 6;
 class ArrangeWall extends StatefulWidget {
   const ArrangeWall({
     required this.tiles,
+    required this.mediaOf,
     required this.onReorder,
     required this.onRemove,
     required this.onFloorHit,
@@ -32,6 +34,10 @@ class ArrangeWall extends StatefulWidget {
   /// stable across a refresh, so rearranging and then re-pulling a source
   /// does not scatter the wall.
   final List<api.ProfileTile> tiles;
+
+  /// What sits behind each tile, so arranging does not strip the photos off.
+  final MediaAsset? Function(api.ProfileTile) mediaOf;
+
   final void Function(String movedKey, String targetKey) onReorder;
   final void Function(String key) onRemove;
 
@@ -68,6 +74,7 @@ class _ArrangeWallState extends State<ArrangeWall>
             size: tile.tileSize,
             child: _ArrangeableTile(
               tile: tile,
+              media: widget.mediaOf(tile),
               wobble: _wobble,
               dragging: _dragging == tile.key,
               canRemove: canRemove,
@@ -86,6 +93,7 @@ class _ArrangeWallState extends State<ArrangeWall>
 class _ArrangeableTile extends StatelessWidget {
   const _ArrangeableTile({
     required this.tile,
+    required this.media,
     required this.wobble,
     required this.dragging,
     required this.canRemove,
@@ -96,6 +104,7 @@ class _ArrangeableTile extends StatelessWidget {
   });
 
   final api.ProfileTile tile;
+  final MediaAsset? media;
   final Animation<double> wobble;
   final bool dragging;
   final bool canRemove;
@@ -114,6 +123,8 @@ class _ArrangeableTile extends StatelessWidget {
           answer: tile.isAnswer ? tile.headline : null,
           tone: tile.tone,
           isTrack: tile.looksLikeTrack,
+          // The still only: a wall of wobbling tiles is no place to play clips.
+          mediaUrl: media?.stillUrl,
         ),
       );
 

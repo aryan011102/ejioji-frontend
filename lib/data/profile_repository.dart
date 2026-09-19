@@ -87,6 +87,29 @@ class ProfileRepository {
     return ProfileTile.listFrom(body);
   }
 
+  /// What is behind each tile, picked or not.
+  Future<List<TileMediaEntry>> tileMedia() async =>
+      TileMediaEntry.listFrom(await _api.getList(Api.tileMediaAll));
+
+  /// Puts a tile upload behind one tile, picked or not, deleting what was there.
+  /// The asset is the tile's, not the pool's: it does not count toward the
+  /// twelve, and it shows only while the tile is on the profile.
+  Future<MediaAsset> setTileMedia(
+    TileKind kind,
+    String key,
+    String mediaId,
+  ) async =>
+      MediaAsset.fromJson(
+        await _api.put(
+          Api.tileMedia(kind.wire, key),
+          body: {'media_id': mediaId},
+        ),
+      );
+
+  /// Takes it off again, deleting the asset and its blobs with it.
+  Future<void> clearTileMedia(TileKind kind, String key) =>
+      _api.deleteEmpty(Api.tileMedia(kind.wire, key));
+
   /// Sets the photo order. A profile shows at most six.
   Future<List<MediaAsset>> setPhotos(List<String> mediaIds) async {
     final body = await _api.putList(

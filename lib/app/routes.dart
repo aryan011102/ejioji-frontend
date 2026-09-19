@@ -14,6 +14,7 @@ abstract final class Routes {
   static const consent = '/onboarding/permissions';
   static const connect = '/onboarding/connect';
   static const netflixUpload = '/onboarding/connect/netflix';
+  static const spotifyUpload = '/onboarding/connect/spotify';
 
   /// Carries `?run=<id>`: the run it is watching. There is no such thing as
   /// this screen without one.
@@ -44,7 +45,16 @@ abstract final class Routes {
 
   // Safety
   static const reportReason = '/report/:id';
-  static String reportFor(String id) => '/report/$id';
+  /// [name] and [matchId] travel with the report: the name for the copy,
+  /// the match so the report can cite the conversation it is about.
+  static String reportFor(String id, {String? name, String? matchId}) =>
+      Uri(
+        path: '/report/$id',
+        queryParameters: {
+          if (name != null) 'name': name,
+          if (matchId != null) 'match': matchId,
+        },
+      ).toString();
   static const reportDetails = '/report/:id/details';
   static String reportDetailsFor(String id) => '/report/$id/details';
   static const reportSent = '/report/:id/sent';

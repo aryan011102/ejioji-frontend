@@ -3,48 +3,72 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/routes.dart';
+import '../../../core/network/api_exception.dart';
+import '../../../core/session/session.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
-import '../../../shared/mock/demo_data.dart';
+import '../../../data/providers.dart';
+import '../../../shared/models/enums.dart';
 import '../../../shared/widgets/buttons.dart';
-import '../../../shared/widgets/controls.dart';
-import '../../../shared/widgets/identity.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/pressable.dart';
+import '../../../shared/widgets/sheets.dart';
 import '../../../shared/widgets/states.dart';
 import '../../../shared/widgets/steps.dart';
 
 /// The reasons, ordered by how badly they need actioning rather than by how
-/// often they are picked.
+/// often they are picked, each mapped onto the server's list.
 ///
-/// The two that carry real harm sit at the top where a moderator must see them
-/// first. "Something else" is last, because a list that opens with it never
-/// gets read past it.
-const _reasons = <(String, String, String?)>[
+/// "Married or in a relationship" has no reason of its own on the server, so
+/// it goes as `other` with those words at the top of the note, where the
+/// moderator reads first.
+const _reasons = <(String, ReportReason, String, String?)>[
   (
     'fake',
+    ReportReason.fakeProfile,
     "Fake profile or someone else's photos",
     "Photos that belong to someone else, or details that don't add up.",
   ),
   (
     'money',
+    ReportReason.scam,
     'Asking for money',
     'Investments, emergencies, a story that ends with a UPI ID.',
   ),
-  ('abuse', 'Harassment, threats or abuse', null),
-  ('sexual', 'Sexual content or nudity', null),
-  ('minor', 'They may be under 18', null),
-  ('married', 'Married or in a relationship', null),
-  ('other', 'Something else', null),
+  ('abuse', ReportReason.harassment, 'Harassment, threats or abuse', null),
+  ('sexual', ReportReason.inappropriate, 'Sexual content or nudity', null),
+  ('hate', ReportReason.hate, 'Hate speech', null),
+  ('minor', ReportReason.underage, 'They may be under 18', null),
+  ('married', ReportReason.other, 'Married or in a relationship', null),
+  ('other', ReportReason.other, 'Something else', null),
 ];
+
+(String, ReportReason, String, String?)? _reasonById(String? id) =>
+    _reasons.where((r) => r.$1 == id).firstOrNull;
+
+String _them(String? name) => name ?? 'this person';
+
+Map<String, String> _carry({String? name, String? matchId}) => {
+      if (name != null) 'name': name,
+      if (matchId != null) 'match': matchId,
+    };
 
 /// Reporting is the one flow where the person using it is upset, so it asks
 /// for as little as it can: one tap to name the thing, one optional screen to
 /// say more, and then it stops asking.
 class ReportReasonPage extends ConsumerStatefulWidget {
-  const ReportReasonPage({required this.userId, super.key});
+  const ReportReasonPage({
+    required this.userId,
+    this.name,
+    this.matchId,
+    super.key,
+  });
 
   final String userId;
+  final String? name;
+
+  /// Set when the report starts from a conversation, so it can cite it.
+  final String? matchId;
 
   @override
   ConsumerState<ReportReasonPage> createState() => _ReportReasonPageState();
@@ -55,9 +79,10 @@ class _ReportReasonPageState extends ConsumerState<ReportReasonPage> {
 
   @override
   Widget build(BuildContext context) {
+    final them = _them(widget.name);
     return AppScaffold(
       navBar: AppNavBar(
-        title: 'Report ${Demo.themFirst}',
+        title: widget.name == null ? 'Report' : 'Report ${widget.name}',
         backLabel: 'Cancel',
         onBack: () => context.pop(),
       ),
@@ -65,19 +90,27 @@ class _ReportReasonPageState extends ConsumerState<ReportReasonPage> {
         label: 'Continue',
         onPressed: _chosen == null
             ? null
-            : () => context.push(Routes.reportDetailsFor(widget.userId)),
+            : () => context.push(
+                  Uri(
+                    path: Routes.reportDetailsFor(widget.userId),
+                    queryParameters: {
+                      'reason': _chosen!,
+                      ..._carry(name: widget.name, matchId: widget.matchId),
+                    },
+                  ).toString(),
+                ),
       ),
       child: ListView(
         padding: const EdgeInsets.only(bottom: 40),
         children: [
-          const LargeTitle(
+          LargeTitle(
             'What happened?',
-            subtitle: 'Pick the closest one. ${Demo.themFirst} is never told '
-                'you reported them.',
+            subtitle: 'Pick the closest one. ${them[0].toUpperCase()}'
+                '${them.substring(1)} is never told you reported them.',
           ),
           SectionGroup(
             children: [
-              for (final (id, label, hint) in _reasons)
+              for (final (id, _, label, hint) in _reasons)
                 _ReasonRow(
                   label: label,
                   hint: hint,
@@ -141,11 +174,7 @@ class _ReasonRow extends StatelessWidget {
                           : Border.all(color: AppColors.label4, width: 1.5),
                     ),
                     child: selected
-                        ? const Icon(
-                            Icons.check,
-                            size: 14,
-                            color: AppColors.onAccent,
-                          )
+                        ? const Icon(Icons.check, size: 14, color: AppColors.onAccent)
                         : null,
                   ),
                 ),
@@ -169,34 +198,46 @@ class _ReasonRow extends StatelessWidget {
         if (!last)
           const Padding(
             padding: EdgeInsets.only(left: 48),
-            child: Divider(
-              height: 0.5,
-              thickness: 0.5,
-              color: AppColors.separator,
-            ),
+            child: Divider(height: 0.5, thickness: 0.5, color: AppColors.separator),
           ),
       ],
     );
   }
 }
 
-/// Everything here is optional except the block, which is on by default.
+/// The optional note, then send.
 ///
-/// Someone who has just reported almost never wants to keep hearing from the
-/// person — but it stays a switch, because reporting a friend's hacked account
-/// is a real thing that happens.
+/// A report always blocks (the server does both in one call), so there is no
+/// switch for it: a switch that could be turned off would be a promise the
+/// server does not keep.
 class ReportDetailsPage extends ConsumerStatefulWidget {
-  const ReportDetailsPage({required this.userId, super.key});
+  const ReportDetailsPage({
+    required this.userId,
+    required this.reason,
+    this.name,
+    this.matchId,
+    super.key,
+  });
 
   final String userId;
+
+  /// The row's id from the first page (`fake`, `money`, ...).
+  final String? reason;
+  final String? name;
+  final String? matchId;
 
   @override
   ConsumerState<ReportDetailsPage> createState() => _ReportDetailsPageState();
 }
 
 class _ReportDetailsPageState extends ConsumerState<ReportDetailsPage> {
-  bool _block = true;
   final _detail = TextEditingController();
+  bool _sending = false;
+
+  /// How many of their latest messages a report from a conversation cites. A
+  /// moderator sees each cited message with ten either side, and nothing else
+  /// of the conversation, so a report that cites nothing shows them nothing.
+  static const _cite = 5;
 
   @override
   void dispose() {
@@ -204,8 +245,73 @@ class _ReportDetailsPageState extends ConsumerState<ReportDetailsPage> {
     super.dispose();
   }
 
+  Future<List<String>> _citations() async {
+    final matchId = widget.matchId;
+    final me = ref.read(sessionProvider).userId;
+    if (matchId == null || me == null) return const [];
+    try {
+      final page = await ref.read(chatRepositoryProvider).messages(matchId);
+      final theirs = page.messages.where((m) => !m.mine(me)).toList();
+      return [
+        for (final m in theirs.skip(theirs.length > _cite ? theirs.length - _cite : 0))
+          m.id,
+      ];
+    } on ApiException {
+      // The report still goes without citations rather than not at all.
+      return const [];
+    }
+  }
+
+  Future<void> _send((String, ReportReason, String, String?) reason) async {
+    if (_sending) return;
+    setState(() => _sending = true);
+    try {
+      final typed = _detail.text.trim();
+      final note = reason.$1 == 'married'
+          ? [reason.$3, if (typed.isNotEmpty) typed].join('\n\n')
+          : typed;
+      await ref.read(trustRepositoryProvider).report(
+            userId: widget.userId,
+            reason: reason.$2,
+            note: note.isEmpty ? null : note,
+            messageIds: await _citations(),
+          );
+      if (!mounted) return;
+      // The report blocked them, which ends a match and declines a request:
+      // every list that could show them is stale.
+      ref
+        ..invalidate(conversationsProvider)
+        ..invalidate(matchesProvider)
+        ..invalidate(incomingRequestsProvider)
+        ..invalidate(outgoingRequestsProvider)
+        ..invalidate(blockedProvider);
+      context.go(
+        Uri(
+          path: Routes.reportSentFor(widget.userId),
+          queryParameters: _carry(name: widget.name),
+        ).toString(),
+      );
+    } on ApiException catch (e) {
+      if (mounted) showAppToast(context, e.message);
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final reason = _reasonById(widget.reason);
+    if (reason == null) {
+      return AppScaffold(
+        navBar: AppNavBar(backLabel: 'Back', onBack: () => context.pop()),
+        child: const EmptyState(
+          icon: Icons.flag_outlined,
+          title: 'Pick a reason first',
+          body: 'Go back and choose what happened.',
+        ),
+      );
+    }
+
     return AppScaffold(
       navBar: AppNavBar(
         title: 'Anything else?',
@@ -214,12 +320,8 @@ class _ReportDetailsPageState extends ConsumerState<ReportDetailsPage> {
       ),
       footer: PrimaryButton(
         label: 'Send report',
-        // TODO(backend): POST Api.report with the reason, the optional note and
-        // any evidence ids, plus whether to block. The report is immutable
-        // once sent — there is no edit.
-        onPressed: () => context.push(
-          '${Routes.reportSentFor(widget.userId)}?blocked=$_block',
-        ),
+        busy: _sending,
+        onPressed: () => _send(reason),
       ),
       child: ListView(
         padding: const EdgeInsets.fromLTRB(0, 18, 0, 40),
@@ -227,10 +329,7 @@ class _ReportDetailsPageState extends ConsumerState<ReportDetailsPage> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: Insets.gutter),
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 12,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
                 color: AppColors.row,
                 borderRadius: BorderRadius.circular(Radii.row),
@@ -244,9 +343,7 @@ class _ReportDetailsPageState extends ConsumerState<ReportDetailsPage> {
                     foreground: AppColors.destructive,
                   ),
                   const SizedBox(width: 11),
-                  Expanded(
-                    child: Text('Asking for money', style: AppText.body),
-                  ),
+                  Expanded(child: Text(reason.$3, style: AppText.body)),
                   TextActionButton(
                     label: 'Change',
                     onPressed: () => context.pop(),
@@ -277,116 +374,83 @@ class _ReportDetailsPageState extends ConsumerState<ReportDetailsPage> {
                 filled: true,
                 fillColor: AppColors.row,
                 contentPadding: const EdgeInsets.all(14),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(Radii.row),
-                  borderSide: const BorderSide(color: AppColors.hairline),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(Radii.row),
-                  borderSide: const BorderSide(color: AppColors.hairline),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(Radii.row),
-                  borderSide: const BorderSide(color: AppColors.hairline),
-                ),
+                border: _border,
+                enabledBorder: _border,
+                focusedBorder: _border,
               ),
             ),
           ),
-          _label('Screenshots · optional'),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: Insets.gutter),
-            child: Row(
-              children: [
-                for (var i = 0; i < 3; i++) ...[
-                  if (i > 0) const SizedBox(width: 10),
-                  const Expanded(child: PhotoSlot()),
-                ],
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              Insets.titleGutter,
-              8,
-              Insets.titleGutter,
-              22,
-            ),
-            child: Text(
-              'We can already see this conversation. Screenshots help when '
-              'something happened somewhere else.',
-              style: AppText.caption,
-            ),
-          ),
+          const SizedBox(height: 22),
           SectionGroup(
             children: [
               AppRow(
-                label: 'Block ${Demo.themFirst} too',
-                subtitle: 'They stop being able to find you or write to you.',
+                label: 'Reporting also blocks ${_them(widget.name)}',
+                subtitle: 'They stop being able to find you or write to you, '
+                    'and any conversation between you closes.',
                 last: true,
-                leading: const Icon(
-                  Icons.block,
-                  size: 18,
-                  color: AppColors.label2,
-                ),
-                control: AppSwitch(
-                  value: _block,
-                  onChanged: (v) => setState(() => _block = v),
-                ),
+                leading: const Icon(Icons.block, size: 18, color: AppColors.label2),
               ),
             ],
           ),
+          if (widget.matchId != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                Insets.titleGutter,
+                0,
+                Insets.titleGutter,
+                0,
+              ),
+              child: Text(
+                'The moderator sees their last few messages to you, and what '
+                'was said around them. Not the whole conversation.',
+                style: AppText.caption,
+              ),
+            ),
         ],
       ),
     );
   }
 
+  OutlineInputBorder get _border => OutlineInputBorder(
+        borderRadius: BorderRadius.circular(Radii.row),
+        borderSide: const BorderSide(color: AppColors.hairline),
+      );
+
   Widget _label(String text) => Padding(
-        padding: const EdgeInsets.fromLTRB(
-          Insets.titleGutter,
-          22,
-          Insets.titleGutter,
-          8,
-        ),
+        padding: const EdgeInsets.fromLTRB(Insets.titleGutter, 22, Insets.titleGutter, 8),
         child: Text(text.toUpperCase(), style: AppText.groupHeader),
       );
 }
 
 /// A receipt, not a thank-you.
 ///
-/// It says who reads it, when, and what the other person is told — which is
+/// It says who reads it, when, and what the other person is told, which is
 /// nothing, now or later.
 class ReportSentPage extends ConsumerWidget {
-  const ReportSentPage({required this.blocked, super.key});
+  const ReportSentPage({this.name, super.key});
 
-  final bool blocked;
+  final String? name;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final them = _them(name);
+    final capital = '${them[0].toUpperCase()}${them.substring(1)}';
     return AppScaffold(
       navBar: const AppNavBar(),
-      footer: Column(
-        children: [
-          PrimaryButton(
-            label: 'Done',
-            onPressed: () => context.go(Routes.chats),
-          ),
-          const SizedBox(height: 8),
-          const SecondaryButton(label: 'Safety tips'),
-        ],
+      footer: PrimaryButton(
+        label: 'Done',
+        onPressed: () => context.go(Routes.chats),
       ),
       child: ResultScaffoldBody(
         mark: const ResultMark(icon: Icons.flag, size: 82),
         title: 'Report sent.',
-        body: 'Someone will read it within 24 hours. ${Demo.themFirst} is not '
-            'told, now or later, and nothing you wrote is shown to them.',
-        note: blocked
-            ? const NoteCard(
-                icon: Icons.block,
-                text: '${Demo.themFirst} is blocked. The chat has moved out of '
-                    'your list, and they can no longer find you or write to '
-                    'you.',
-              )
-            : null,
+        body: 'Someone will read it within 24 hours. $capital is not told, now or '
+            'later, and nothing you wrote is shown to them.',
+        note: NoteCard(
+          icon: Icons.block,
+          text: '$capital is blocked. Any chat between you has closed, and they '
+              'can no longer find you or write to you.',
+        ),
       ),
     );
   }

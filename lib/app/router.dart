@@ -27,6 +27,7 @@ import '../features/onboarding/presentation/consent_page.dart';
 import '../features/onboarding/presentation/create_profile_page.dart';
 import '../features/onboarding/presentation/netflix_upload_page.dart';
 import '../features/onboarding/presentation/reading_page.dart';
+import '../features/onboarding/presentation/spotify_upload_page.dart';
 import '../features/profile/presentation/edit_info_page.dart';
 import '../features/profile/presentation/profile_page.dart';
 import '../features/safety/presentation/report_page.dart';
@@ -113,6 +114,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.netflixUpload,
         builder: (_, __) => const NetflixUploadPage(),
+      ),
+      GoRoute(
+        path: Routes.spotifyUpload,
+        builder: (_, __) => const SpotifyUploadPage(),
       ),
       GoRoute(
         path: Routes.reading,
@@ -202,19 +207,25 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       GoRoute(
         path: Routes.reportReason,
-        builder: (_, state) =>
-            ReportReasonPage(userId: state.pathParameters['id'] ?? ''),
+        builder: (_, state) => ReportReasonPage(
+          userId: state.pathParameters['id'] ?? '',
+          name: state.uri.queryParameters['name'],
+          matchId: state.uri.queryParameters['match'],
+        ),
       ),
       GoRoute(
         path: Routes.reportDetails,
-        builder: (_, state) =>
-            ReportDetailsPage(userId: state.pathParameters['id'] ?? ''),
+        builder: (_, state) => ReportDetailsPage(
+          userId: state.pathParameters['id'] ?? '',
+          reason: state.uri.queryParameters['reason'],
+          name: state.uri.queryParameters['name'],
+          matchId: state.uri.queryParameters['match'],
+        ),
       ),
       GoRoute(
         path: Routes.reportSent,
-        builder: (_, state) => ReportSentPage(
-          blocked: state.uri.queryParameters['blocked'] != 'false',
-        ),
+        builder: (_, state) =>
+            ReportSentPage(name: state.uri.queryParameters['name']),
       ),
 
       GoRoute(

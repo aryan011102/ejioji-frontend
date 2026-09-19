@@ -74,7 +74,7 @@ class _NotConnectedChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
-        'Not built yet',
+        'Coming soon',
         style: AppText.micro.copyWith(color: AppColors.label3),
       ),
     );

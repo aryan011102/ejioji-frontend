@@ -39,8 +39,9 @@ class ConnectAccountsPage extends ConsumerWidget {
     ),
     (
       SourceProvider.gmail,
-      'Food orders',
-      'Zomato and Swiggy receipts in Gmail. No other mail is read',
+      'Gmail receipts',
+      'Zomato and Swiggy food receipts, and Myntra delivery emails. No other '
+          'mail is read',
     ),
     (
       SourceProvider.netflix,
@@ -50,7 +51,7 @@ class ConnectAccountsPage extends ConsumerWidget {
     (
       SourceProvider.spotify,
       'Spotify',
-      'Not available: Spotify caps apps like ours at five people',
+      'The listening history you download from your own account',
     ),
   ];
 
@@ -72,6 +73,11 @@ class ConnectAccountsPage extends ConsumerWidget {
 
     if (provider == SourceProvider.netflix) {
       if (context.mounted) await context.push(Routes.netflixUpload);
+      return;
+    }
+
+    if (provider == SourceProvider.spotify) {
+      if (context.mounted) await context.push(Routes.spotifyUpload);
       return;
     }
 
@@ -132,8 +138,10 @@ class ConnectAccountsPage extends ConsumerWidget {
                     last: provider == _sources.last.$1,
                     control: MiniButton(
                       label: switch (provider) {
-                        SourceProvider.spotify => 'Soon',
                         _ when linked.containsKey(provider) => 'Read again',
+                        SourceProvider.netflix ||
+                        SourceProvider.spotify =>
+                          'Upload',
                         _ => 'Connect',
                       },
                       tone: linked.containsKey(provider)
@@ -147,11 +155,7 @@ class ConnectAccountsPage extends ConsumerWidget {
                               color: AppColors.ok,
                             )
                           : null,
-                      // Spotify is shown because people ask for it, and
-                      // disabled because its developer mode caps at five
-                      // users and its extended quota is closed to us.
-                      onPressed: provider == SourceProvider.spotify ||
-                              connecting != null ||
+                      onPressed: connecting != null ||
                               !consent.hasValue
                           ? null
                           : () => _connect(

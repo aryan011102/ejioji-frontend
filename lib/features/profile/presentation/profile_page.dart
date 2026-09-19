@@ -153,7 +153,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     if (!mounted) return;
 
     if (choice == 0) {
-      unawaited(context.push<void>(Routes.reportFor(person.userId)));
+      unawaited(
+        context.push<void>(
+          Routes.reportFor(person.userId, name: person.firstName),
+        ),
+      );
     } else if (choice == 1) {
       try {
         // Blocking is two-way and immediate: it ends any match, declines a

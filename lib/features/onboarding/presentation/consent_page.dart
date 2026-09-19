@@ -71,13 +71,16 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
           'The channels you subscribe to and the videos you liked. Not your '
               'watch history, and not your playlists.',
         ConsentPurpose.gmailReceipts =>
-          'Zomato and Swiggy delivery receipts only, found by searching for '
-              'those two senders. No other mail is read, ever.',
+          'Zomato and Swiggy food receipts and Myntra delivery emails only, '
+              'found by searching for those senders. No other mail is read, '
+              'ever.',
         ConsentPurpose.netflixUpload =>
           'The viewing activity file you download from your own Netflix '
               'profile and upload here.',
         ConsentPurpose.spotifyImport =>
-          'Your top tracks and artists. Not available yet.',
+          'The listening history you download from your own Spotify '
+              'account and upload here. Podcasts and private sessions are left '
+              'out.',
         ConsentPurpose.aiProcessing =>
           'Lets an AI suggest what is worth counting, and write the captions. '
               'It never invents a number: every value is computed here.',

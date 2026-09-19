@@ -78,6 +78,17 @@
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>To put photos on your profile. We only receive the ones you pick.</string>
 
+	<!-- Never asked today: photos come from the library and files from the
+	     Files app. But image_picker carries camera and video-recording code
+	     and file_picker carries music-library code, and App Store Connect
+	     silently drops a build that links those without a purpose string. -->
+	<key>NSCameraUsageDescription</key>
+	<string>To take a photo to send or put on your profile.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>To record sound with a video you send.</string>
+	<key>NSAppleMusicUsageDescription</key>
+	<string>To pick a file you choose to share. We only receive the one you pick.</string>
+
 	<!-- url_launcher checks whether it can open a link before opening it, and
 	     on iOS that check needs the scheme declared. Only https: the consent
 	     pages are the only thing this app opens. -->

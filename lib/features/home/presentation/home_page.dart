@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/routes.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/session/session.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
 import '../../../data/feed_controller.dart';
+import '../../../shared/models/enums.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/pressable.dart';
 import '../../../shared/widgets/states.dart';
@@ -54,6 +56,22 @@ class HomePage extends ConsumerWidget {
 
     final error = feed.error;
     if (error != null && feed.cards.isEmpty) {
+      final step = _missingStep(error);
+      if (step != null) {
+        return AppScaffold(
+          child: EmptyState(
+            icon: step.icon,
+            title: step.title,
+            body: step.body,
+            primaryLabel: step.label,
+            onPrimary: () async {
+              await context.push<Object?>(step.route);
+              // Whatever they did there, ask again: the server decides.
+              ref.read(feedProvider.notifier).refresh();
+            },
+          ),
+        );
+      }
       return AppScaffold(
         child: ErrorView(
           error: error,
@@ -103,6 +121,39 @@ class HomePage extends ConsumerWidget {
       candidate: person,
     );
   }
+}
+
+/// The feed refuses three ways before anything is wrong: no matching consent,
+/// no profile, no "show me" choice. Each is a step still to take, so each gets
+/// the button that takes it rather than "That did not load".
+({IconData icon, String title, String body, String label, String route})?
+    _missingStep(Object error) {
+  if (error is! ApiException) return null;
+  return switch (error.code) {
+    'consent_required' => (
+        icon: Icons.handshake_outlined,
+        title: 'One permission first',
+        body: 'Home suggests people to you and you to them. That needs your '
+            'permission for matching.',
+        label: 'Review permission',
+        route: '${Routes.consent}?purpose=${ConsentPurpose.matching.wire}',
+      ),
+    'preferences_needed' => (
+        icon: Icons.tune,
+        title: 'Who would you like to see?',
+        body: 'Choose who is shown to you, and we will start looking.',
+        label: 'Choose',
+        route: Routes.filters,
+      ),
+    'profile_needed' => (
+        icon: Icons.person_outline,
+        title: 'Your details first',
+        body: 'Add your details so we know who to suggest.',
+        label: 'Add my details',
+        route: Routes.editProfile,
+      ),
+    _ => null,
+  };
 }
 
 class _HomeBar extends StatelessWidget {

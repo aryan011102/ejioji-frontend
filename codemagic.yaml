@@ -1,0 +1,104 @@
+workflows:
+  # TestFlight build, started by hand from Codemagic. Adapted from Buddy's
+  # ios-internal-testflight: same team, same App Store Connect integration and
+  # distribution certificate, none of Buddy's Firebase, Maps or Razorpay.
+  #
+  # Environment group theonebytwo_secrets:
+  #   CERT_PRIVATE_KEY   base64 of the distribution certificate's private key
+  #                      (the same value as Buddy's: the certificate is the team's)
+  #   APP_STORE_APP_ID   the app's Apple ID number (App Store Connect, App Information)
+  #   API_BASE_URL       the backend, https only (the Railway test server for now)
+  #
+  # The bundle ID com.theonebytwo.app must already be registered with the
+  # Associated Domains capability, or the profile made here will not carry
+  # Runner.entitlements and signing fails.
+  ios-testflight:
+    name: iOS TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: App Store Connect
+    environment:
+      groups:
+        - theonebytwo_secrets
+      flutter: stable
+      xcode: 26.0
+      cocoapods: default
+    scripts:
+      - name: Write build configuration from secrets
+        script: |
+          set -e
+          case "$API_BASE_URL" in
+            https://*) ;;
+            *) echo "ERROR: API_BASE_URL must be set and start with https://"; exit 1 ;;
+          esac
+          # Staging, not prod: prod requires CERT_PINS, and the test server's
+          # certificate is not pinned.
+          cat > "$CM_BUILD_DIR/config/testflight.json" <<EOF
+          {
+            "FLAVOR": "staging",
+            "API_BASE_URL": "$API_BASE_URL",
+            "CERT_PINS": ""
+          }
+          EOF
+      - name: Restore signing certificate private key
+        script: |
+          mkdir -p ~/private_keys
+          echo "$CERT_PRIVATE_KEY" | base64 --decode > ~/private_keys/cert_key.pem
+          # sanity check: fails fast if the secret was pasted wrapped or malformed
+          openssl rsa -in ~/private_keys/cert_key.pem -check -noout
+      - name: Initialize keychain
+        script: |
+          keychain initialize
+      - name: Fetch / create signing files
+        script: |
+          app-store-connect fetch-signing-files "com.theonebytwo.app" \
+            --type=IOS_APP_STORE \
+            --certificate-key=@file:$HOME/private_keys/cert_key.pem \
+            --create
+      - name: Add certificates to keychain
+        script: |
+          keychain add-certificates
+      - name: Set up code signing settings on Xcode project
+        script: |
+          xcode-project use-profiles
+      - name: Get Flutter packages
+        script: |
+          cd $CM_BUILD_DIR
+          flutter pub get
+      - name: Generate Flutter iOS config
+        script: |
+          cd $CM_BUILD_DIR
+          flutter build ios --config-only --no-codesign \
+            --dart-define-from-file=config/testflight.json
+      - name: Pod install
+        script: |
+          cd $CM_BUILD_DIR/ios
+          pod install --repo-update
+      - name: Set build number
+        script: |
+          set -e
+          test -n "$APP_STORE_APP_ID" || { echo "ERROR: APP_STORE_APP_ID is not set"; exit 1; }
+          cd $CM_BUILD_DIR
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APP_ID" 2>/dev/null || echo 0)
+          BUILD_NUMBER=$((LATEST + 1))
+          echo "Using build number: $BUILD_NUMBER"
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> $CM_ENV
+      - name: Build IPA
+        script: |
+          cd $CM_BUILD_DIR
+          # build name (CFBundleShortVersionString) comes from pubspec.yaml
+          flutter build ipa --release \
+            --build-number=$BUILD_NUMBER \
+            --dart-define-from-file=config/testflight.json \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - flutter_drive.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        # beta_groups:    # uncomment + add group name once testers are added
+        #   - Team

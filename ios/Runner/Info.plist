@@ -85,5 +85,11 @@
 	<array>
 		<string>https</string>
 	</array>
+
+	<!-- The only encryption in the app is the operating system's HTTPS, which
+	     is exempt. Saying so here stops App Store Connect asking the export
+	     compliance question on every TestFlight upload. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

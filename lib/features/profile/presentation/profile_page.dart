@@ -119,25 +119,16 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     }
   }
 
-  Future<void> _publish() async {
+  /// There is no publish step: a profile shows to others as soon as it passes
+  /// the bar. Finishing setup only refreshes what the session knows and moves
+  /// on to Home.
+  Future<void> _done() async {
     try {
-      final publish = await ref.read(profileRepositoryProvider).publish();
+      final profile = await ref.read(profileRepositoryProvider).load();
       if (!mounted) return;
-      ref.read(sessionProvider.notifier).onPublishChanged(publish);
+      ref.read(sessionProvider.notifier).onProfileChanged(profile);
       ref.invalidate(myProfileProvider);
-      if (publish.visible) {
-        context.go(Routes.home);
-      } else {
-        // The server decides, and it returns why. Showing its first reason
-        // beats a generic refusal, and beats the client trying to guess the
-        // rule for itself.
-        showAppToast(
-          context,
-          publish.blocking.isEmpty
-              ? 'Your profile is not showing yet.'
-              : publish.blocking.first.message,
-        );
-      }
+      context.go(Routes.home);
     } on ApiException catch (e) {
       if (mounted) showAppToast(context, e.message);
     }
@@ -435,8 +426,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       child: NoteCard(
         icon: Icons.visibility_off_outlined,
         text: publish.blocking.isEmpty
-            ? 'Your profile is not showing to anyone. Publish it when you are '
-                'ready.'
+            ? 'Your profile is hidden. Show it again from the You tab.'
             : publish.blocking.map((b) => b.message).join('. '),
       ),
     );
@@ -490,8 +480,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               Expanded(
                 flex: 2,
                 child: PrimaryButton(
-                  label: 'Publish my profile',
-                  onPressed: ready ? _publish : null,
+                  label: 'Done',
+                  onPressed: _done,
                 ),
               ),
             ],
@@ -499,7 +489,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           if (!ready && publish != null && publish.blocking.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
-              publish.blocking.first.message,
+              'Others see you once this is done: '
+              '${publish.blocking.first.message}',
               textAlign: TextAlign.center,
               style: AppText.caption,
             ),

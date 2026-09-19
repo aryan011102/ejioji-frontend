@@ -102,5 +102,13 @@
 	     compliance question on every TestFlight upload. -->
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+
+	<!-- The OAuth return link (https://theonebytwo.com/oauth/google) is read
+	     by app_links in ConnectController, and only there. Left on, Flutter's
+	     own deep linking also hands it to the router, which has no such page:
+	     a "Page Not Found" covered the connect screen, and the push to the
+	     reading screen that follows never showed. -->
+	<key>FlutterDeepLinkingEnabled</key>
+	<false/>
 </dict>
 </plist>

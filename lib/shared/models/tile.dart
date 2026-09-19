@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/network/json.dart';
 import 'enums.dart';
+import 'media.dart';
 
 /// The typed half of an insight.
 ///
@@ -195,6 +196,7 @@ class ProfileTile {
     required this.category,
     this.insight,
     this.prompt,
+    this.media,
   });
 
   final TileKind kind;
@@ -215,6 +217,11 @@ class ProfileTile {
 
   bool get isAnswer => kind == TileKind.prompt;
 
+  /// The photo or video the person put behind it, if any. It belongs to the
+  /// tile rather than the profile, so it survives the tile being dropped and
+  /// picked again.
+  final MediaAsset? media;
+
   static ProfileTile fromJson(Json j) {
     final insight = j.objectOrNull('insight');
     final prompt = j.objectOrNull('prompt');
@@ -224,6 +231,7 @@ class ProfileTile {
       category: TileCategory.parse(j.strOrNull('category')),
       insight: insight == null ? null : Insight.fromJson(insight),
       prompt: prompt == null ? null : PromptAnswer.fromJson(prompt),
+      media: _media(j),
     );
   }
 
@@ -232,4 +240,33 @@ class ProfileTile {
 
   /// The shape sent back when the order or the selection changes.
   Json toRef() => {'kind': kind.wire, 'key': key};
+}
+
+MediaAsset? _media(Json j) {
+  final m = j.objectOrNull('media');
+  return m == null ? null : MediaAsset.fromJson(m);
+}
+
+/// What is behind one tile, picked or not. The picker's candidates carry no
+/// media of their own, so it reads these alongside them.
+@immutable
+class TileMediaEntry {
+  const TileMediaEntry({
+    required this.kind,
+    required this.key,
+    required this.media,
+  });
+
+  final TileKind kind;
+  final String key;
+  final MediaAsset media;
+
+  static TileMediaEntry fromJson(Json j) => TileMediaEntry(
+        kind: TileKind.parse(j.strOrNull('kind')),
+        key: j.str('key'),
+        media: MediaAsset.fromJson(j.object('media')),
+      );
+
+  static List<TileMediaEntry> listFrom(List<Json> items) =>
+      items.map(TileMediaEntry.fromJson).toList(growable: false);
 }

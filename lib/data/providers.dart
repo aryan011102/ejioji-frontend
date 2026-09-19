@@ -108,6 +108,11 @@ final candidatesProvider = FutureProvider.autoDispose<List<Insight>>(
   (ref) => ref.watch(sourcesRepositoryProvider).candidates(),
 );
 
+/// What is behind each tile, picked or not.
+final tileMediaListProvider = FutureProvider.autoDispose<List<TileMediaEntry>>(
+  (ref) => ref.watch(profileRepositoryProvider).tileMedia(),
+);
+
 final mediaPoolProvider = FutureProvider.autoDispose<List<MediaAsset>>(
   (ref) => ref.watch(mediaRepositoryProvider).pool(),
 );

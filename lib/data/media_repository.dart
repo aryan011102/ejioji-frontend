@@ -49,6 +49,26 @@ class MediaRepository {
     return complete(ticket.mediaId);
   }
 
+  /// Uploads something to put behind a tile: a photo, or a video on its own.
+  ///
+  /// Tile media is not in the pool and has its own cap. A video goes with no
+  /// still: the server cuts the poster frame itself, and asking the phone for
+  /// one would mean a second decoder in the app for no gain.
+  Future<MediaAsset> uploadForTile(Uint8List bytes, {required bool video}) async {
+    final ticket = await _startUpload(
+      kind: video ? MediaKind.video : MediaKind.photo,
+      purpose: 'tile',
+      stillBytes: video ? null : bytes.length,
+      videoBytes: video ? bytes.length : null,
+    );
+    await _write(
+      video ? ticket.video : ticket.still,
+      bytes,
+      video ? 'video' : 'still',
+    );
+    return complete(ticket.mediaId);
+  }
+
   /// For a chat photo or video, which is the same mechanism against a
   /// different ticket: the asset is tied to the conversation and never enters
   /// the profile pool.
@@ -77,14 +97,16 @@ class MediaRepository {
 
   Future<UploadTicket> _startUpload({
     required MediaKind kind,
-    required int stillBytes,
+    String purpose = 'profile',
+    int? stillBytes,
     int? videoBytes,
   }) async {
     final body = await _api.post(
       Api.mediaUploads,
       body: {
         'kind': kind.wire,
-        'still_bytes': stillBytes,
+        'purpose': purpose,
+        if (stillBytes != null) 'still_bytes': stillBytes,
         if (videoBytes != null) 'video_bytes': videoBytes,
       },
     );

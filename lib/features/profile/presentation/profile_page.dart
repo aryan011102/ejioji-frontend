@@ -11,6 +11,8 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
 import '../../../data/feed_controller.dart';
 import '../../../data/providers.dart';
+import '../../../data/tile_media_controller.dart';
+import '../../../shared/models/enums.dart';
 import '../../../shared/models/media.dart';
 import '../../../shared/models/person.dart';
 import '../../../shared/models/profile.dart';
@@ -288,6 +290,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               else if (_arranging)
                 ArrangeWall(
                   tiles: shown,
+                  mediaOf: _media,
                   onReorder: (moved, target) => _reorder(tiles, moved, target),
                   onRemove: (key) => _remove(tiles, key),
                   onFloorHit: () => showAppToast(
@@ -310,6 +313,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                           answer: t.isAnswer ? t.headline : null,
                           tone: t.tone,
                           isTrack: t.looksLikeTrack,
+                          mediaUrl: _media(t)?.stillUrl,
+                          videoUrl: _media(t)?.videoUrl,
+                          isLivePhoto: _media(t)?.kind == MediaKind.livePhoto,
                           // The source glyph is for the owner sorting their
                           // own wall. A viewer is being introduced to a person
                           // and does not need a filing system on the photos.
@@ -336,6 +342,14 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       ),
     );
   }
+
+  /// What sits behind a tile. Your own wall also takes this session's
+  /// uploads, so a new photo is there before the profile is pulled again; a
+  /// viewer sees only what the server sent, because tile keys are shared
+  /// between people and your upload is not theirs.
+  MediaAsset? _media(api.ProfileTile t) => _viewer
+      ? t.media
+      : ref.watch(tileMediaProvider).resolve(t.kind, t.key, t.media);
 
   PreferredSizeWidget _topBar(BuildContext context, Candidate? person) {
     if (_viewer) {

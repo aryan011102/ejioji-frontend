@@ -9,7 +9,9 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
 import '../../../data/providers.dart';
+import '../../../data/tile_media_controller.dart';
 import '../../../shared/models/enums.dart';
+import '../../../shared/models/media.dart';
 import '../../../shared/models/tile.dart';
 import '../../../shared/models/tile_look.dart';
 import '../../../shared/widgets/buttons.dart';
@@ -139,6 +141,12 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
     final candidates = ref.watch(candidatesProvider);
     final profile = ref.watch(myProfileProvider);
     final bank = ref.watch(promptBankProvider);
+    final media = ref.watch(tileMediaProvider);
+    final saved = <String, MediaAsset>{
+      for (final e in ref.watch(tileMediaListProvider).valueOrNull ??
+          const <TileMediaEntry>[])
+        TileMedia.id(e.kind, e.key): e.media,
+    };
     final all = [candidates, profile, bank];
     final failed = all.where((a) => a.hasError).firstOrNull;
 
@@ -249,7 +257,8 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                       widget.editing
                           ? '${picked.length} on your profile. Tap to add or '
                               'drop one.'
-                          : 'Pick up to three.',
+                          : 'Pick up to three, and put a photo or video '
+                              'behind any of them.',
                       style: AppText.callout.copyWith(fontSize: 14),
                     ),
                   ],
@@ -261,6 +270,8 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                   for (final ins in inCategory)
                     _item(
                       (kind: TileKind.insight, key: ins.key),
+                      media: media,
+                      serverMedia: saved[TileMedia.id(TileKind.insight, ins.key)],
                       size: ins.tileSize,
                       number: ins.displayValue,
                       caption: ins.caption,
@@ -270,6 +281,8 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                   for (final a in answered)
                     _item(
                       (kind: TileKind.prompt, key: a.promptKey),
+                      media: media,
+                      serverMedia: saved[TileMedia.id(TileKind.prompt, a.promptKey)],
                       size: TileSize.wide,
                       prompt: a.question,
                       answer: a.answer,
@@ -318,6 +331,8 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
 
   BentoItem _item(
     _Choice choice, {
+    required TileMedia media,
+    required MediaAsset? serverMedia,
     required TileSize size,
     required String tone,
     String? number,
@@ -327,6 +342,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
     bool isTrack = false,
   }) {
     final picked = _picked!;
+    final behind = media.resolve(choice.kind, choice.key, serverMedia);
     return BentoItem(
       size: size,
       child: InsightTile(
@@ -337,10 +353,54 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
         answer: answer,
         tone: tone,
         isTrack: isTrack,
+        mediaUrl: behind?.stillUrl,
+        videoUrl: behind?.videoUrl,
+        isLivePhoto: behind?.kind == MediaKind.livePhoto,
+        mediaBusy: media.isBusy(choice.kind, choice.key),
+        // Nothing is dimmed: every tile keeps a live camera, and a faded one
+        // would read as switched off.
+        selectable: true,
         selected: picked.contains(choice),
-        dimmed: picked.isNotEmpty && !picked.contains(choice),
         onTap: () => _toggle(choice),
+        onMedia: () => _chooseMedia(choice, hasMedia: behind != null),
       ),
+    );
+  }
+
+  /// The sheet behind the camera on a tile.
+  Future<void> _chooseMedia(_Choice choice, {required bool hasMedia}) async {
+    final answer = choice.kind == TileKind.prompt;
+    final taken = await showAppActionSheet(
+      context,
+      title: 'Put something behind this',
+      message: answer
+          ? 'It sits under your answer, on your profile only if this answer '
+              'is picked.'
+          : 'It sits under the number, on your profile only if this insight '
+              'is picked.',
+      actions: [
+        const SheetAction('Photo Library', icon: Icons.photo_library_outlined),
+        const SheetAction('Take Photo or Video', icon: Icons.photo_camera),
+        const SheetAction('Choose File', icon: Icons.folder_outlined),
+        if (hasMedia) const SheetAction('Remove', destructive: true),
+      ],
+    );
+    if (taken == null || !mounted) return;
+
+    void onError(String message) {
+      if (mounted) showAppToast(context, message);
+    }
+
+    final controller = ref.read(tileMediaProvider.notifier);
+    if (taken == 3) {
+      await controller.clear(choice.kind, choice.key, onError: onError);
+      return;
+    }
+    await controller.attach(
+      choice.kind,
+      choice.key,
+      TileMediaSource.values[taken],
+      onError: onError,
     );
   }
 

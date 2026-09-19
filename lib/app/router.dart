@@ -69,8 +69,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         SessionStage.signedOut => inAuth ? null : Routes.splash,
         SessionStage.onboarding =>
           inOnboarding ? null : Routes.createProfile,
+        // Only the start of setup is closed once it is done. The other
+        // onboarding screens (permissions, connecting a source, an upload, the
+        // reading screen) are opened again from Home and Edit sources, and
+        // sending them home made those buttons do nothing.
         SessionStage.ready =>
-          inAuth || inOnboarding ? Routes.home : null,
+          inAuth || here == Routes.createProfile ? Routes.home : null,
       };
     },
     routes: [

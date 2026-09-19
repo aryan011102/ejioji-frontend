@@ -80,6 +80,13 @@ class ProfileRepository {
     return ProfileTile.listFrom(body);
   }
 
+  /// The same, from bare `{kind, key}` references: for the picker, which adds
+  /// tiles that are not on the profile yet and so have no [ProfileTile].
+  Future<List<ProfileTile>> setTileRefs(List<Map<String, Object?>> refs) async {
+    final body = await _api.putList(Api.profileTiles, body: {'tiles': refs});
+    return ProfileTile.listFrom(body);
+  }
+
   /// Sets the photo order. A profile shows at most six.
   Future<List<MediaAsset>> setPhotos(List<String> mediaIds) async {
     final body = await _api.putList(

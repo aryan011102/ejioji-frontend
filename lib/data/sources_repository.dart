@@ -65,6 +65,19 @@ class SourcesRepository {
     return IngestionRun.fromJson(body);
   }
 
+  /// Spotify, from the person's own data download: one JSON array of plays.
+  /// Several files are joined into one array before this is called. Any
+  /// element that is not a play refuses the whole body on the server, so
+  /// nothing else from the download (address, payments) can ride along.
+  Future<IngestionRun> uploadSpotify(String json) async {
+    final body = await _api.postRaw(
+      Api.spotifyUpload,
+      body: json,
+      contentType: 'application/json',
+    );
+    return IngestionRun.fromJson(body);
+  }
+
   Future<IngestionRun> run(String runId) async =>
       IngestionRun.fromJson(await _api.getJson(Api.run(runId)));
 

@@ -33,7 +33,7 @@ class VerifyHubPage extends ConsumerWidget {
       ),
       child: const NotYet(
         icon: Icons.verified_outlined,
-        title: 'Verification is not switched on yet.',
+        title: 'Verification is coming soon.',
         body: 'Two ways are planned: a DigiLocker check of your name and date '
             'of birth, or a live selfie. Neither is connected to anything yet, '
             'so nobody carries a tick and chat is not gated on one.',

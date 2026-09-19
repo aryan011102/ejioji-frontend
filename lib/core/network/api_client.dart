@@ -31,8 +31,19 @@ class ApiClient {
         await _body(() => _dio.get<Object?>(path, queryParameters: query)),
       );
 
-  Future<Json> post(String path, {Object? body}) async =>
-      asJson(await _body(() => _dio.post<Object?>(path, data: body)));
+  /// [anonymous] is for the calls made before anyone is signed in (asking for
+  /// and checking a code): no bearer is sent, and a 401 is passed through as
+  /// the answer rather than taken as a session to refresh.
+  Future<Json> post(String path, {Object? body, bool anonymous = false}) async =>
+      asJson(
+        await _body(
+          () => _dio.post<Object?>(
+            path,
+            data: body,
+            options: anonymous ? Options(extra: {'anonymous': true}) : null,
+          ),
+        ),
+      );
 
   Future<List<Json>> postList(String path, {Object? body}) async =>
       asJsonList(await _body(() => _dio.post<Object?>(path, data: body)));

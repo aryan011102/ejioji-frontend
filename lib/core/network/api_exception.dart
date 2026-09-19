@@ -7,10 +7,14 @@ import 'package:dio/dio.dart';
 /// about hosts, status codes or payloads. What actually went wrong is in
 /// [debugDetail], which is logged in debug builds and dropped in release.
 sealed class ApiException implements Exception {
-  const ApiException(this.message, {this.debugDetail});
+  const ApiException(this.message, {this.debugDetail, this.code});
 
   final String message;
   final String? debugDetail;
+
+  /// The server's machine-readable reason (`rate_limited`, `conflict`, ...),
+  /// for the few screens that act on one. Null for transport failures.
+  final String? code;
 
   @override
   String toString() => 'ApiException($message)';
@@ -40,32 +44,50 @@ sealed class ApiException implements Exception {
 
   static ApiException _fromStatus(DioException e) {
     final status = e.response?.statusCode ?? 0;
-    // The server's own message is used only for 4xx, where it is a validation
-    // string meant for a person. A 5xx body is never shown — it can carry a
-    // stack trace, and it is not the user's problem either way.
-    final serverMessage = status < 500 ? _extractMessage(e.response?.data) : null;
+    // The server's own message is used only for 4xx, where it is written for
+    // a person. A 5xx body is never shown: it can carry a stack trace, and it
+    // is not the user's problem either way.
+    final (code, serverMessage) =
+        status < 500 ? _extract(e.response?.data) : (null, null);
 
     return switch (status) {
-      401 => const UnauthorisedFailure(),
-      403 => const ForbiddenFailure(),
-      404 => const NotFoundFailure(),
-      429 => const RateLimitedFailure(),
+      401 => UnauthorisedFailure(code: code, serverMessage: serverMessage),
+      403 => ForbiddenFailure(message: serverMessage, code: code),
+      404 => NotFoundFailure(code: code),
+      429 => RateLimitedFailure(
+          message: serverMessage,
+          retryAfter: _retryAfter(e.response),
+        ),
       >= 400 && < 500 => ValidationFailure(
           serverMessage ?? 'That did not go through. Have another look.',
+          code: code,
         ),
       _ => const ServerFailure(),
     };
   }
 
-  static String? _extractMessage(Object? data) {
-    if (data is! Map) return null;
-    final detail = data['detail'] ?? data['message'];
-    // Bounded so a hostile or broken server cannot push a wall of text into
-    // the UI.
-    if (detail is String && detail.isNotEmpty && detail.length <= 200) {
-      return detail;
+  /// Our backend answers every error as `{"error": {"code", "message"}}`.
+  /// FastAPI's own request validation answers `{"detail": ...}`, where detail
+  /// is a list of field errors: not for people, so it falls back to the
+  /// generic line.
+  static (String?, String?) _extract(Object? data) {
+    if (data is! Map) return (null, null);
+    final error = data['error'];
+    if (error is Map) {
+      final code = error['code'];
+      return (code is String ? code : null, _bounded(error['message']));
     }
-    return null;
+    return (null, _bounded(data['detail'] ?? data['message']));
+  }
+
+  /// Bounded so a hostile or broken server cannot push a wall of text into
+  /// the UI.
+  static String? _bounded(Object? text) =>
+      text is String && text.isNotEmpty && text.length <= 200 ? text : null;
+
+  static Duration? _retryAfter(Response<Object?>? response) {
+    final seconds = int.tryParse(response?.headers.value('retry-after') ?? '');
+    return seconds == null || seconds <= 0 ? null : Duration(seconds: seconds);
   }
 }
 
@@ -79,24 +101,44 @@ final class TimeoutFailure extends ApiException {
 }
 
 final class UnauthorisedFailure extends ApiException {
-  const UnauthorisedFailure() : super('Your session has ended. Sign in again.');
+  const UnauthorisedFailure({super.code, this.serverMessage})
+      : super('Your session has ended. Sign in again.');
+
+  /// What the server said, kept for the sign-in screen, where a 401 is not
+  /// an ended session (see [WrongCodeFailure]).
+  final String? serverMessage;
+}
+
+/// A refused sign-in code. The server answers it with a 401 like an ended
+/// session, but it means something else, so the sign-in calls are sent
+/// anonymously and turned into this, with the server's own words.
+final class WrongCodeFailure extends ApiException {
+  const WrongCodeFailure([String? message])
+      : super(message ?? 'That code did not work. Check it, or ask for a new one.');
 }
 
 final class ForbiddenFailure extends ApiException {
-  const ForbiddenFailure() : super('You do not have access to that.');
+  const ForbiddenFailure({String? message, super.code})
+      : super(message ?? 'You do not have access to that.');
 }
 
 final class NotFoundFailure extends ApiException {
-  const NotFoundFailure() : super('That is no longer here.');
+  const NotFoundFailure({super.code}) : super('That is no longer here.');
 }
 
 final class RateLimitedFailure extends ApiException {
-  const RateLimitedFailure()
-      : super('Too many tries. Wait a minute and try again.');
+  const RateLimitedFailure({String? message, this.retryAfter})
+      : super(
+          message ?? 'Too many tries. Wait a minute and try again.',
+          code: 'rate_limited',
+        );
+
+  /// From the Retry-After header, when the server sent one.
+  final Duration? retryAfter;
 }
 
 final class ValidationFailure extends ApiException {
-  const ValidationFailure(super.message);
+  const ValidationFailure(super.message, {super.code});
 }
 
 final class ServerFailure extends ApiException {

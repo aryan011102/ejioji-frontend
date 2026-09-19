@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../core/network/api_client.dart';
+import '../core/network/api_exception.dart';
 import '../core/network/endpoints.dart';
 import '../core/network/json.dart';
 import '../core/storage/device.dart';
@@ -88,6 +89,7 @@ class AuthRepository {
   Future<OtpChallenge> requestCode(String phone) async {
     final body = await _api.post(
       Api.otpStart,
+      anonymous: true,
       body: {
         'phone': phone,
         'device_key': await _device.key(),
@@ -103,15 +105,23 @@ class AuthRepository {
     required String phone,
     required String code,
   }) async {
-    final body = await _api.post(
-      Api.otpVerify,
-      body: {
-        'phone': phone,
-        'code': code,
-        'device_key': await _device.key(),
-        'platform': DeviceIdentity.platform,
-      },
-    );
+    final Json body;
+    try {
+      body = await _api.post(
+        Api.otpVerify,
+        anonymous: true,
+        body: {
+          'phone': phone,
+          'code': code,
+          'device_key': await _device.key(),
+          'platform': DeviceIdentity.platform,
+        },
+      );
+    } on UnauthorisedFailure catch (e) {
+      // Here a 401 means the code was wrong, expired or used up (or the
+      // account is closed), not that a session ended: there is no session yet.
+      throw WrongCodeFailure(e.serverMessage);
+    }
 
     final tokens = body.object('tokens');
     await _tokens.save(

@@ -53,7 +53,7 @@ enum City {
 enum ConsentPurpose {
   spotifyImport('spotify_import', 'Spotify'),
   youtubeImport('youtube_import', 'YouTube'),
-  gmailReceipts('gmail_receipts', 'Food orders from Gmail'),
+  gmailReceipts('gmail_receipts', 'Order emails in Gmail'),
   netflixUpload('netflix_upload', 'Netflix history'),
   aiProcessing('ai_processing', 'AI suggestions'),
   matching('matching', 'Matching'),
@@ -73,7 +73,7 @@ enum ConsentPurpose {
 enum SourceProvider {
   youtube('youtube', 'YouTube'),
   spotify('spotify', 'Spotify'),
-  gmail('gmail', 'Food orders'),
+  gmail('gmail', 'Gmail receipts'),
   netflix('netflix', 'Netflix'),
   unknown('', '');
 

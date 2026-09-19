@@ -162,7 +162,7 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
         children: [
           const NoteCard(
             icon: Icons.shield_outlined,
-            text: 'Keep it in the app for now. Nobody from ejioji will ever ask '
+            text: 'Keep it in the app for now. Nobody from theonebytwo will ever ask '
                 'for money, documents or an OTP. Report anyone who does.',
           ),
           const SizedBox(height: 12),

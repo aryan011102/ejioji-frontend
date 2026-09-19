@@ -145,7 +145,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             children: [
               AppRow(
                 label: 'Dark',
-                subtitle: 'ejioji is dark only, for now',
+                subtitle: 'theonebytwo is dark only, for now',
                 last: true,
                 leading: Icon(
                   Icons.nightlight_round,
@@ -169,7 +169,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 onTap: () => showAppActionSheet(
                   context,
                   title: 'Message the founder',
-                  message: 'hi@ejioji.com — I read these myself.',
+                  message: 'pritika@theonebytwo.com — I read these myself.',
                   actions: const [
                     SheetAction('Open Mail'),
                     SheetAction('Copy address'),
@@ -186,7 +186,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 onTap: () => context.push(Routes.support),
               ),
               AppRow(
-                label: 'Rate ejioji on the App Store',
+                label: 'Rate theonebytwo on the App Store',
                 last: true,
                 leading: const Icon(
                   Icons.star_outline,
@@ -217,7 +217,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
             ],
           ),
-          Center(child: Text('ejioji 1.0 (build 1)', style: AppText.micro)),
+          Center(child: Text('theonebytwo 1.0 (build 1)', style: AppText.micro)),
         ],
       ),
     );

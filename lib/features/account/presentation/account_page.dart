@@ -271,7 +271,7 @@ class _PremiumPromo extends StatelessWidget {
                   ),
                   const SizedBox(width: 9),
                   Text(
-                    'ejioji Premium',
+                    'theonebytwo Premium',
                     style: AppText.title3.copyWith(fontSize: 18),
                   ),
                 ],

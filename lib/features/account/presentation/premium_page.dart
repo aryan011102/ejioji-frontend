@@ -97,7 +97,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
                     ),
                     const SizedBox(width: 9),
                     Text(
-                      'EJIOJI PREMIUM',
+                      'THEONEBYTWO PREMIUM',
                       style: AppText.micro.copyWith(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,

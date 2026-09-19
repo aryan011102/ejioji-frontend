@@ -13,7 +13,7 @@ class EjiojiApp extends ConsumerWidget {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: AppTheme.overlay,
       child: MaterialApp.router(
-        title: 'ejioji',
+        title: 'theonebytwo',
         debugShowCheckedModeBanner: false,
         routerConfig: ref.watch(routerProvider),
         theme: AppTheme.dark,

@@ -32,7 +32,7 @@ class WhyMattersPage extends ConsumerWidget {
     (
       'What we never see',
       'DigiLocker shares your name and date of birth with us and nothing else. '
-          'Your Aadhaar number never reaches ejioji. The selfie is used for the '
+          'Your Aadhaar number never reaches theonebytwo. The selfie is used for the '
           'check and deleted after it, and it is never shown to another person '
           '— not to matches, not to families, not on your profile.',
     ),

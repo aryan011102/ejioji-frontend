@@ -20,8 +20,9 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.ejioji"
+        // Permanent once published (Aryan, 2026-09-19). The Kotlin namespace
+        // above stays com.ejioji: it is only the code package, never shown.
+        applicationId = "com.theonebytwo.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

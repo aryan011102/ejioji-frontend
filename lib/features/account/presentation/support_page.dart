@@ -30,7 +30,7 @@ class SupportPage extends ConsumerWidget {
               20,
             ),
             child: Text(
-              'ejioji builds a profile out of things you already did — '
+              'theonebytwo builds a profile out of things you already did — '
               'receipts, listening, watching, moving. What follows says '
               'exactly what is read, what is shown, and how to get rid of all '
               'of it.',
@@ -107,7 +107,7 @@ class SupportPage extends ConsumerWidget {
           ),
           const SectionGroup(
             header: 'The legal ones',
-            footer: "Questions this page doesn't answer go to hi@ejioji.com, "
+            footer: "Questions this page doesn't answer go to pritika@theonebytwo.com, "
                 'which is a person.',
             children: [
               AppRow(label: 'Privacy policy'),

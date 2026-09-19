@@ -28,7 +28,7 @@ class SplashPage extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Spacer(),
-            Text('ejioji', style: AppText.largeTitle.copyWith(fontSize: 44)),
+            Text('theonebytwo', style: AppText.largeTitle.copyWith(fontSize: 44)),
             const SizedBox(height: 14),
             Text(
               'A profile built from what you already did, not what you would '

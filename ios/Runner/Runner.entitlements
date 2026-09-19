@@ -7,14 +7,14 @@
 	     as on Android: a custom scheme can be claimed by any other app on the
 	     device, which would hand somebody else the authorization code.
 
-	     TODO(infra): replace oauth.example.com with the host in the backend's
-	     GOOGLE_REDIRECT_URI, serve /.well-known/apple-app-site-association
-	     from it for this bundle id, and add the same entitlement in Xcode
-	     under Signing and Capabilities. Until that is in place the redirect
-	     opens Safari instead of the app and no source can be connected. -->
+	     The host is the one in the backend's GOOGLE_REDIRECT_URI. Its
+	     /.well-known/apple-app-site-association (repo theonebytwo-site) must
+	     name <Team ID>.com.theonebytwo.app. Needs a paid Apple developer
+	     team: a free Apple ID (Sideloadly) cannot carry this entitlement,
+	     so there the redirect opens Safari and no source can be connected. -->
 	<key>com.apple.developer.associated-domains</key>
 	<array>
-		<string>applinks:oauth.example.com</string>
+		<string>applinks:theonebytwo.com</string>
 	</array>
 </dict>
 </plist>

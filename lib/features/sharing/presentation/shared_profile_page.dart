@@ -125,7 +125,7 @@ class SharedProfilePage extends ConsumerWidget {
                             'can withdraw it, and the page stops working when '
                             'they do.'
                         : "This is ${Demo.themFirst}'s profile as it stands on "
-                            'ejioji — nothing added, nothing taken out. It '
+                            'theonebytwo — nothing added, nothing taken out. It '
                             'holds no contact details, no social accounts and '
                             'no way to message anyone.',
                   ),
@@ -188,7 +188,7 @@ class SharedProfilePage extends ConsumerWidget {
                       const SizedBox(width: 7),
                       Expanded(
                         child: Text(
-                          'Photo verified\nby ejioji',
+                          'Photo verified\nby theonebytwo',
                           style: AppText.footnote.copyWith(fontSize: 13.5),
                         ),
                       ),
@@ -379,7 +379,7 @@ class _AddressBar extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'ejioji.com/$slug',
+                'theonebytwo.com/$slug',
                 overflow: TextOverflow.ellipsis,
                 style: AppText.footnote.copyWith(fontSize: 13),
               ),

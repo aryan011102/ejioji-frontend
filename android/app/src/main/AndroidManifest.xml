@@ -5,7 +5,7 @@
     <uses-permission android:name="android.permission.INTERNET"/>
 
     <application
-        android:label="ejioji"
+        android:label="theonebytwo"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -37,19 +37,18 @@
                  code. android:autoVerify makes Android check the host's
                  assetlinks.json before it will route the link here.
 
-                 TODO(infra): OAUTH_REDIRECT_HOST below is a placeholder. Set
-                 it to the host in the backend's GOOGLE_REDIRECT_URI, and serve
-                 /.well-known/assetlinks.json from it with this app's package
-                 name and signing certificate fingerprint. Until both match,
-                 the redirect opens a browser tab instead of the app and no
-                 source can be connected. -->
+                 The host is the one in the backend's GOOGLE_REDIRECT_URI
+                 (https://theonebytwo.com/oauth/google). Its
+                 /.well-known/assetlinks.json (repo theonebytwo-site) must list
+                 this app's package name and signing certificate fingerprint,
+                 or the redirect opens a browser tab instead of the app. -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data
                     android:scheme="https"
-                    android:host="OAUTH_REDIRECT_HOST"
+                    android:host="theonebytwo.com"
                     android:pathPrefix="/oauth"/>
             </intent-filter>
         </activity>

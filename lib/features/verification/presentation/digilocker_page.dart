@@ -74,13 +74,13 @@ class DigilockerStepsPage extends ConsumerWidget {
             number: '2',
             title: 'Approve two fields',
             body: 'Your name and your date of birth. That is the whole request '
-                '— your Aadhaar number is never shared with ejioji.',
+                '— your Aadhaar number is never shared with theonebytwo.',
             last: true,
           ),
           const SizedBox(height: 26),
           const NoteCard(
             icon: Icons.lock_outline,
-            text: 'DigiLocker is run by the Government of India. ejioji never '
+            text: 'DigiLocker is run by the Government of India. theonebytwo never '
                 'sees your password or your OTP.',
           ),
         ],

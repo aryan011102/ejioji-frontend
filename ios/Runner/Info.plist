@@ -56,12 +56,12 @@
 	<!-- Portrait only, matching the lock set in main.dart. A profile rotated
 	     to landscape is a wall of half-height tiles, and none of the layouts
 	     were drawn for it. Declaring it here as well stops the rotation
-	     animation happening before Dart refuses it. -->
+	     animation happening before Dart refuses it.
+
+	     iPhone only (TARGETED_DEVICE_FAMILY = 1): App Store Connect refuses an
+	     iPad build that does not allow every orientation, for multitasking.
+	     An iPad still runs the app, in its iPhone mode. -->
 	<key>UISupportedInterfaceOrientations</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-	</array>
-	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>

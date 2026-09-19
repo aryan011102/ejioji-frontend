@@ -44,6 +44,7 @@ class PhotoPool {
 class PhotoController extends Notifier<PhotoPool> {
   /// The pool holds twelve, pending uploads included; a profile shows six.
   static const maxPhotos = 12;
+  static const maxOnProfile = 6;
 
   final _picker = ImagePicker();
 
@@ -88,6 +89,7 @@ class PhotoController extends Notifier<PhotoPool> {
           await ref.read(mediaRepositoryProvider).upload(still: bytes);
       state = state.copyWith(assets: [...state.assets, asset]);
       ref.invalidate(mediaPoolProvider);
+      await _putOnProfile(onError);
     } on ApiException catch (e) {
       onError(e.message);
     } finally {
@@ -110,13 +112,22 @@ class PhotoController extends Notifier<PhotoPool> {
             if (a.id != mediaId) a,
         ],
       );
-      ref
-        ..invalidate(mediaPoolProvider)
-        ..invalidate(myProfileProvider);
+      ref.invalidate(mediaPoolProvider);
+      // The server took it off the profile already; this moves a seventh
+      // photo up into the space it left.
+      await _putOnProfile(onError);
     } on ApiException catch (e) {
       onError(e.message);
     }
   }
+
+  /// The profile shows the pool's first six, in the pool's order. No screen
+  /// lets anyone choose otherwise, so an upload that stopped at the pool
+  /// would never reach the profile and publishing would say too few photos.
+  Future<void> _putOnProfile(void Function(String) onError) => setOnProfile(
+        [for (final a in state.assets.take(maxOnProfile)) a.id],
+        onError: onError,
+      );
 
   /// Sets which photos are on the profile, and in what order.
   Future<void> setOnProfile(

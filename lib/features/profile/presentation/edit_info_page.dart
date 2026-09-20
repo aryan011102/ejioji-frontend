@@ -294,18 +294,25 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
                       for (var i = 0; i < _slots; i++) ...[
                         if (i > 0) const SizedBox(width: 10),
                         Expanded(
-                          child: PhotoSlot(
-                            imageUrl: i < photos.assets.length
-                                ? photos.assets[i].stillUrl
-                                : null,
-                            busy: photos.uploading &&
-                                i == photos.assets.length,
-                            main: i == 0,
-                            onTap: () => i < photos.assets.length
-                                ? _photoSheet(photos.assets[i].id)
-                                : ref
-                                    .read(photoPoolProvider.notifier)
-                                    .add(onError: _toast),
+                          child: DraggablePhotoSlot(
+                            index: i,
+                            filled: i < photos.assets.length,
+                            onMove: (from, to) => ref
+                                .read(photoPoolProvider.notifier)
+                                .movePhoto(from, to, onError: _toast),
+                            child: PhotoSlot(
+                              imageUrl: i < photos.assets.length
+                                  ? photos.assets[i].stillUrl
+                                  : null,
+                              busy: photos.uploading &&
+                                  i == photos.assets.length,
+                              main: i == 0,
+                              onTap: () => i < photos.assets.length
+                                  ? _photoSheet(photos.assets[i].id)
+                                  : ref
+                                      .read(photoPoolProvider.notifier)
+                                      .add(onError: _toast),
+                            ),
                           ),
                         ),
                       ],
@@ -314,8 +321,9 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
                     child: Text(
-                      'Your first photo is the one people see first. Photos '
-                      'save as soon as you add them.',
+                      'Your first photo is the one people see first. Hold '
+                      'one and drag it to change the order. Photos save as '
+                      'soon as you add them.',
                       style: AppText.caption,
                     ),
                   ),

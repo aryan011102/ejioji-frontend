@@ -78,6 +78,8 @@ class AppNavBar extends StatelessWidget implements PreferredSizeWidget {
     this.onTitle,
     this.backLabel,
     this.onBack,
+    this.leadingLabel,
+    this.onLeading,
     this.trailingLabel,
     this.onTrailing,
     this.trailingEnabled = true,
@@ -92,6 +94,11 @@ class AppNavBar extends StatelessWidget implements PreferredSizeWidget {
 
   final String? backLabel;
   final VoidCallback? onBack;
+
+  /// A plain word on the left with no chevron, for a screen you leave rather
+  /// than go back from: Cancel on something being composed.
+  final String? leadingLabel;
+  final VoidCallback? onLeading;
   final String? trailingLabel;
   final VoidCallback? onTrailing;
   final bool trailingEnabled;
@@ -113,9 +120,25 @@ class AppNavBar extends StatelessWidget implements PreferredSizeWidget {
         children: [
           SizedBox(
             width: 112,
-            child: backLabel == null
-                ? null
-                : Pressable(
+            child: leadingLabel != null
+                ? Align(
+                    alignment: Alignment.centerLeft,
+                    child: Pressable(
+                      onTap: onLeading ?? () => Navigator.of(context).maybePop(),
+                      semanticLabel: leadingLabel!,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 6, 10, 6),
+                        child: Text(
+                          leadingLabel!,
+                          style: AppText.navAction
+                              .copyWith(color: AppColors.accent),
+                        ),
+                      ),
+                    ),
+                  )
+                : backLabel == null
+                    ? null
+                    : Pressable(
                     onTap: onBack ?? () => Navigator.of(context).maybePop(),
                     semanticLabel: 'Back to $backLabel',
                     child: Padding(

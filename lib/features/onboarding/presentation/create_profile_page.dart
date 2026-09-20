@@ -229,18 +229,26 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
                     for (var i = 0; i < _slots; i++) ...[
                       if (i > 0) const SizedBox(width: 10),
                       Expanded(
-                        child: PhotoSlot(
-                          imageUrl: i < photos.assets.length
-                              ? photos.assets[i].stillUrl
-                              : null,
-                          busy: photos.uploading && i == photos.assets.length,
-                          main: i == 0,
-                          label: i == 0 ? 'Main' : 'Add',
-                          onTap: () => i < photos.assets.length
-                              ? _photoSheet(photos.assets[i].id)
-                              : ref
-                                  .read(photoPoolProvider.notifier)
-                                  .add(onError: _toast),
+                        child: DraggablePhotoSlot(
+                          index: i,
+                          filled: i < photos.assets.length,
+                          onMove: (from, to) => ref
+                              .read(photoPoolProvider.notifier)
+                              .movePhoto(from, to, onError: _toast),
+                          child: PhotoSlot(
+                            imageUrl: i < photos.assets.length
+                                ? photos.assets[i].stillUrl
+                                : null,
+                            busy: photos.uploading &&
+                                i == photos.assets.length,
+                            main: i == 0,
+                            label: i == 0 ? 'Main' : 'Add',
+                            onTap: () => i < photos.assets.length
+                                ? _photoSheet(photos.assets[i].id)
+                                : ref
+                                    .read(photoPoolProvider.notifier)
+                                    .add(onError: _toast),
+                          ),
                         ),
                       ),
                     ],
@@ -249,8 +257,9 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
                   child: Text(
-                    'Your first photo is the one people see first. Clear face, '
-                    'no group shots. Two are needed to publish.',
+                    'Your first photo is the one people see first. Hold one '
+                    'and drag it to change the order. Clear face, no group '
+                    'shots. Two are needed to publish.',
                     style: AppText.caption,
                   ),
                 ),

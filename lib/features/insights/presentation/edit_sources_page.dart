@@ -129,6 +129,7 @@ class _EditSourcesPageState extends ConsumerState<EditSourcesPage> {
                   pickableCategories(
                     candidates.requireValue,
                     bank.requireValue.answers,
+                    bank.requireValue,
                   ),
                 ),
     );

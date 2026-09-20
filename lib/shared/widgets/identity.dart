@@ -173,6 +173,66 @@ class PhotoFrame extends StatelessWidget {
 
 /// The empty 3:4 well from Create profile, reused wherever a photo is asked
 /// for — editing your info, and the gallery step of the selfie check.
+/// A photo slot that can be picked up and dropped on another one.
+///
+/// This is how the main photo is chosen: the first slot is what people see
+/// first, so dragging a photo there makes it the main one. There is no "make
+/// this the main photo" menu item, because the order matters past the first
+/// slot too and a menu would only speak about one of them.
+///
+/// A long press starts the drag, so a plain tap still opens the photo's own
+/// sheet. An empty slot cannot be dragged, only dropped on.
+class DraggablePhotoSlot extends StatelessWidget {
+  const DraggablePhotoSlot({
+    required this.index,
+    required this.filled,
+    required this.onMove,
+    required this.child,
+    super.key,
+  });
+
+  final int index;
+  final bool filled;
+  final void Function(int from, int to) onMove;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return DragTarget<int>(
+      onWillAcceptWithDetails: (details) => details.data != index,
+      onAcceptWithDetails: (details) => onMove(details.data, index),
+      builder: (context, candidate, rejected) {
+        final over = candidate.isNotEmpty;
+        final slot = AnimatedScale(
+          scale: over ? 1.04 : 1,
+          duration: const Duration(milliseconds: 140),
+          child: child,
+        );
+        if (!filled) return slot;
+        return LayoutBuilder(
+          builder: (context, constraints) => LongPressDraggable<int>(
+            data: index,
+            // Sized here because the slot is an Expanded inside a Row, and
+            // what is dragged has no parent to take a width from.
+            feedback: Opacity(
+              opacity: 0.9,
+              child: SizedBox(
+                width: constraints.maxWidth,
+                child: Material(
+                  color: const Color(0x00000000),
+                  child: child,
+                ),
+              ),
+            ),
+            childWhenDragging: Opacity(opacity: 0.25, child: child),
+            child: slot,
+          ),
+        );
+      },
+    );
+  }
+}
+
 class PhotoSlot extends StatelessWidget {
   const PhotoSlot({
     this.imageUrl,

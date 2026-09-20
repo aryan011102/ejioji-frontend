@@ -12,6 +12,13 @@
 	     name <Team ID>.com.theonebytwo.app. Needs a paid Apple developer
 	     team: a free Apple ID (Sideloadly) cannot carry this entitlement,
 	     so there the redirect opens Safari and no source can be connected. -->
+	<!-- Push notifications. `development` is what a debug build needs; Xcode
+	     rewrites it to `production` for a release build and the App Store
+	     refuses anything else, so this value is the debug one on purpose.
+	     Needs the same paid Apple developer team as the entitlement below,
+	     and an APNs key uploaded into the Firebase project. -->
+	<key>aps-environment</key>
+	<string>development</string>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
 		<string>applinks:theonebytwo.com</string>

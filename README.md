@@ -92,6 +92,36 @@ uncomment the `fonts:` block in `pubspec.yaml`.
 
 ---
 
+## Push notifications
+
+Three of them, all sent by the backend: a chat message, a chat request, and a
+request accepted. The app asks for permission once somebody is signed in, and
+tells the server its token then and on every rotation. What was written never
+travels: a push carries a first name, a fixed line of copy, and ids.
+
+They need a Firebase project, and its public client values go in
+`config/dev.json` next to the base URL:
+
+```
+"FCM_PROJECT_ID", "FCM_SENDER_ID",
+"FCM_ANDROID_APP_ID", "FCM_ANDROID_API_KEY",
+"FCM_IOS_APP_ID", "FCM_IOS_API_KEY"
+```
+
+The project and the sender are project-wide; the app id and the key are per
+platform, because Firebase registers a phone app once per platform. The Android
+pair is in `google-services.json` and the iOS pair in `GoogleService-Info.plist`
+(both gitignored, and neither is read by the build: they are where these values
+are copied from).
+
+None of them is a secret; every Android app ships them in plain sight. What
+actually sends a push is a service-account key, and that lives on the server.
+They are defines rather than checked-in console files so that a build without a
+Firebase project still builds and runs, with push simply off. That is also why
+the web build never touches Firebase.
+
+`core/push/push.dart` is the only file that knows Firebase exists.
+
 ## What is wired, and what is not
 
 Built and navigable: sign-in (number, OTP), onboarding (basics, connect,

@@ -17,6 +17,7 @@ import 'consent_repository.dart';
 import 'matching_repository.dart';
 import 'media_repository.dart';
 import 'profile_repository.dart';
+import 'push_controller.dart';
 import 'sources_repository.dart';
 import 'trust_repository.dart';
 
@@ -30,6 +31,13 @@ final apiClientProvider = Provider<ApiClient>((ref) {
     onLost: () async => ref.read(sessionProvider.notifier).onSessionLost(),
   );
 });
+
+/// The push token for this install, kept in step with the server for as long
+/// as somebody is signed in. Does nothing at all in a build without a
+/// Firebase project, or in the browser.
+final pushRegistrationProvider = Provider<PushRegistration>(
+  (ref) => PushRegistration(ref.watch(authRepositoryProvider)),
+);
 
 final authRepositoryProvider = Provider<AuthRepository>(
   (ref) => AuthRepository(

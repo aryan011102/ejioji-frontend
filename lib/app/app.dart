@@ -1,15 +1,64 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/push/push.dart';
+import '../core/session/session.dart';
 import '../core/theme/app_theme.dart';
 import 'router.dart';
+import 'routes.dart';
 
-class EjiojiApp extends ConsumerWidget {
+class EjiojiApp extends ConsumerStatefulWidget {
   const EjiojiApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<EjiojiApp> createState() => _EjiojiAppState();
+}
+
+class _EjiojiAppState extends ConsumerState<EjiojiApp> {
+  StreamSubscription<PushOpen>? _taps;
+
+  @override
+  void initState() {
+    super.initState();
+    // Two ways in: the app was opened by a notification, or it was already
+    // running behind one. Both land on the same screen.
+    _taps = Push.taps.listen(_open);
+    unawaited(
+      Push.launchedBy().then((open) {
+        if (open != null) _open(open);
+      }),
+    );
+  }
+
+  @override
+  void dispose() {
+    unawaited(_taps?.cancel());
+    super.dispose();
+  }
+
+  /// Opens what the notification was about.
+  ///
+  /// Nothing is trusted from the payload beyond an id: a request opens the
+  /// list it is waiting in rather than acting on it, and a message opens the
+  /// conversation, which loads from the server like any other.
+  void _open(PushOpen open) {
+    if (!ref.read(sessionProvider).isSignedIn) return;
+    final router = ref.read(routerProvider);
+    final id = open.id;
+    switch (open.kind) {
+      case PushKind.message:
+      case PushKind.match:
+        if (id != null) router.push(Routes.conversationWith(id));
+      case PushKind.request:
+        router.go(Routes.chats);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: AppTheme.overlay,
       child: MaterialApp.router(

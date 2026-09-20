@@ -30,6 +30,23 @@ class AppTabBar extends StatelessWidget {
   final ValueChanged<AppTab> onSelect;
   final int chatsBadge;
 
+  /// The bar itself, without the safe area under it.
+  static const barHeight = 62.0;
+
+  /// The gap the floating bar keeps between itself and the safe area.
+  static const _floatingInset = 6.0;
+
+  /// How much room the bar takes above the bottom safe area.
+  ///
+  /// Anything floating over the same screen has to clear this, and the number
+  /// belongs here rather than in each of them: the shell sets `extendBody`, so
+  /// content runs underneath the bar on both platforms, and a page that guesses
+  /// drifts the day this bar changes height. Measured from the same origin a
+  /// page inside [AppScaffold] gets, which is already inside the safe area, so
+  /// it is the same figure on a phone with a home indicator and one without.
+  static double get clearance =>
+      AppPlatform.floatingTabBar ? barHeight + _floatingInset : barHeight;
+
   @override
   Widget build(BuildContext context) {
     return AppPlatform.floatingTabBar ? _floating(context) : _docked(context);
@@ -41,14 +58,14 @@ class AppTabBar extends StatelessWidget {
         Insets.gutter,
         0,
         Insets.gutter,
-        MediaQuery.paddingOf(context).bottom + 6,
+        MediaQuery.paddingOf(context).bottom + _floatingInset,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(31),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
           child: Container(
-            height: 62,
+            height: barHeight,
             decoration: BoxDecoration(
               color: AppColors.glass,
               borderRadius: BorderRadius.circular(31),
@@ -77,7 +94,7 @@ class AppTabBar extends StatelessWidget {
         ),
       ),
       padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
-      child: SizedBox(height: 62, child: _items()),
+      child: SizedBox(height: barHeight, child: _items()),
     );
   }
 

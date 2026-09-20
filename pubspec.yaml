@@ -49,6 +49,14 @@ dependencies:
   # Reading the Netflix viewing-history CSV the person downloaded.
   file_picker: ^8.1.2
 
+  # Push notifications. firebase_core is the platform handshake and
+  # firebase_messaging is the token and the messages; nothing else Firebase
+  # offers is used, and no analytics SDK is here on purpose. Both stay asleep
+  # unless the FCM_* defines are set, so a build without a Firebase project
+  # (and every web build) runs exactly as it did before.
+  firebase_core: ^4.15.0
+  firebase_messaging: ^16.7.0
+
   equatable: ^2.0.5
 
 dev_dependencies:

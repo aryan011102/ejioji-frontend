@@ -39,6 +39,41 @@ abstract final class Env {
       .where((p) => p.isNotEmpty)
       .toList(growable: false);
 
+  /// Firebase, for push notifications only.
+  ///
+  /// None of these is a secret: every Android app ships them in plain sight
+  /// inside `google-services.json`, and they identify the project rather than
+  /// authorise anything. They are defines rather than a checked-in file so
+  /// that a build without a Firebase project still builds and runs, with push
+  /// simply off. What actually sends a push is a service-account key, and
+  /// that lives on the server and never comes near this app.
+  ///
+  /// The project and the sender are one project-wide pair. The app id and the
+  /// api key are per platform, because Firebase registers a phone app once per
+  /// platform: the Android values come from `google-services.json` and the
+  /// iOS ones from `GoogleService-Info.plist`, and crossing them over is a
+  /// registration Firebase will refuse.
+  static const String fcmProjectId = String.fromEnvironment('FCM_PROJECT_ID');
+  static const String fcmSenderId = String.fromEnvironment('FCM_SENDER_ID');
+  static const String fcmAndroidAppId =
+      String.fromEnvironment('FCM_ANDROID_APP_ID');
+  static const String fcmAndroidApiKey =
+      String.fromEnvironment('FCM_ANDROID_API_KEY');
+  static const String fcmIosAppId = String.fromEnvironment('FCM_IOS_APP_ID');
+  static const String fcmIosApiKey = String.fromEnvironment('FCM_IOS_API_KEY');
+
+  /// Whether this build was given a Firebase project to talk to, with the
+  /// pair for the platform it is running on. Everything in `core/push` is a
+  /// no-op while this is false.
+  static bool pushConfigured({required bool android}) {
+    final appId = android ? fcmAndroidAppId : fcmIosAppId;
+    final apiKey = android ? fcmAndroidApiKey : fcmIosApiKey;
+    return fcmProjectId.isNotEmpty &&
+        fcmSenderId.isNotEmpty &&
+        appId.isNotEmpty &&
+        apiKey.isNotEmpty;
+  }
+
   /// Called once from bootstrap. Fails the build rather than shipping a
   /// misconfigured binary.
   static void assertValid() {

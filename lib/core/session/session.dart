@@ -136,6 +136,11 @@ class SessionController extends Notifier<Session> {
       userId: userId,
       publish: profile.publish,
     );
+    // Not awaited: this asks for the notification permission and talks to two
+    // servers, and none of that should hold up the first screen. It is also
+    // the only place it happens, so somebody who signed in on a build without
+    // push gets asked the next time they open the app.
+    unawaited(ref.read(pushRegistrationProvider).start());
   }
 
   /// Called by anything that has just changed the profile, so the router and
@@ -154,6 +159,7 @@ class SessionController extends Notifier<Session> {
   /// The only correct response to a refused refresh. The client calls this;
   /// it does not navigate itself.
   Future<void> onSessionLost() async {
+    await ref.read(pushRegistrationProvider).stop();
     await ref.read(tokenStoreProvider).clear();
     state = const Session(stage: SessionStage.signedOut);
   }
@@ -165,6 +171,9 @@ class SessionController extends Notifier<Session> {
   /// want the device to forget the session.
   Future<void> signOut() async {
     final auth = ref.read(authRepositoryProvider);
+    // The phone forgets its token whatever the server says, so no push can
+    // reach the next person to sign in on this install.
+    await ref.read(pushRegistrationProvider).stop();
     try {
       await auth.clearPushToken();
     } on ApiException {

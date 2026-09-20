@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/app.dart';
 import 'core/config/env.dart';
+import 'core/push/push.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,6 +17,11 @@ Future<void> main() async {
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
   ]);
+
+  // Before the first frame, because a notification may be what opened the app
+  // and the tap is read back the moment it is on screen. Silent and harmless
+  // in a build with no Firebase project.
+  await Push.init();
 
   runApp(const ProviderScope(child: EjiojiApp()));
 }

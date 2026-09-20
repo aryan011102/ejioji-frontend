@@ -1,5 +1,12 @@
 {
   "FLAVOR": "dev",
   "API_BASE_URL": "http://10.0.2.2:8000",
-  "CERT_PINS": ""
+  "CERT_PINS": "",
+
+  "FCM_PROJECT_ID": "",
+  "FCM_SENDER_ID": "",
+  "FCM_ANDROID_APP_ID": "",
+  "FCM_ANDROID_API_KEY": "",
+  "FCM_IOS_APP_ID": "",
+  "FCM_IOS_API_KEY": ""
 }

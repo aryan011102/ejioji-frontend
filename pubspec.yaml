@@ -56,6 +56,25 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^4.0.0
 
+  # Generates every launcher icon size from assets/branding. Run after changing
+  # those images: dart run flutter_launcher_icons
+  flutter_launcher_icons: ^0.14.4
+
+flutter_launcher_icons:
+  # The logo as sent, on black. iOS rounds the corners itself, and the App Store
+  # refuses an icon with transparency, hence remove_alpha_ios.
+  image_path: assets/branding/icon.png
+  ios: true
+  remove_alpha_ios: true
+  android: ic_launcher
+  # Android 8+ masks icons to whatever shape the launcher likes (circle,
+  # squircle), so the logo sits smaller, centred inside the safe area, on black.
+  adaptive_icon_background: "#000000"
+  adaptive_icon_foreground: assets/branding/icon_foreground.png
+  # The foreground image already keeps the logo inside the safe area.
+  adaptive_icon_foreground_inset: 0
+  min_sdk_android: 21
+
 flutter:
   uses-material-design: true
 

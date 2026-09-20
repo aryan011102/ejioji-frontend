@@ -4,4 +4,5 @@
      and the two have to be changed together. -->
 <resources>
     <color name="ejioji_canvas">#FF0D0D0F</color>
+	<color name="ic_launcher_background">#000000</color>
 </resources>

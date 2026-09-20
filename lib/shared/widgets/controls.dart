@@ -139,13 +139,24 @@ class AppChip extends StatelessWidget {
             color: selected ? const Color(0x00000000) : AppColors.hairline,
           ),
         ),
-        child: Text(
-          label,
-          style: AppText.body.copyWith(
-            fontSize: 14.5,
-            color: selected ? AppColors.onAccent : AppColors.label,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // The tick is what reads as "chosen" at a glance; the fill alone
+            // does not, once several chips sit in one wrap.
+            if (selected) ...[
+              const Icon(Icons.check, size: 16, color: AppColors.onAccent),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              label,
+              style: AppText.body.copyWith(
+                fontSize: 14.5,
+                color: selected ? AppColors.onAccent : AppColors.label,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+              ),
+            ),
+          ],
         ),
       ),
     );

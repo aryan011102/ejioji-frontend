@@ -205,9 +205,18 @@ class MatchPreferences {
     required this.ageIsDefault,
     this.ageMin,
     this.ageMax,
+    this.cities = const [],
+    this.languages = const [],
+    this.educationLevels = const [],
   });
 
   final List<Gender> showGenders;
+
+  /// The three filters added 2026-09-20. Empty narrows nothing, and empty
+  /// cities means your own city, which is what the feed always did.
+  final List<City> cities;
+  final List<Language> languages;
+  final List<Education> educationLevels;
 
   /// Null means the server's default, which tracks the person's own age as
   /// their birthday moves rather than freezing a number.
@@ -232,6 +241,18 @@ class MatchPreferences {
       ageMin: j.intOrNull('age_min'),
       ageMax: j.intOrNull('age_max'),
       ageIsDefault: j.flag('age_is_default', fallback: true),
+      cities: [
+        for (final raw in j.strings('cities'))
+          if (City.parse(raw) case final c when c != City.unknown) c,
+      ],
+      languages: [
+        for (final raw in j.strings('languages'))
+          if (Language.parse(raw) case final l?) l,
+      ],
+      educationLevels: [
+        for (final raw in j.strings('education_levels'))
+          if (Education.parse(raw) case final e?) e,
+      ],
     );
   }
 }

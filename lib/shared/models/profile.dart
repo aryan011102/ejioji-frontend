@@ -7,8 +7,11 @@ import 'tile.dart';
 
 /// The manual half of a profile. Four fields, deliberately.
 ///
-/// There is no surname field anywhere in this product: surname next to
-/// purchase history is how caste gets inferred.
+/// `lastName` exists from 2026-09-20 and is optional. It was deliberately absent
+/// before that, because a surname next to purchase history is how caste gets
+/// inferred, and this product holds the purchase history. The backend decision
+/// log for that date is where the reversal is argued; nothing in matching reads
+/// it.
 @immutable
 class Profile {
   const Profile({
@@ -17,9 +20,13 @@ class Profile {
     required this.age,
     required this.gender,
     required this.city,
+    this.lastName,
+    this.languages = const [],
+    this.education,
   });
 
   final String firstName;
+  final String? lastName;
   final DateTime birthDate;
 
   /// Computed by the server, so it cannot drift from the birth date.
@@ -28,12 +35,27 @@ class Profile {
   final Gender? gender;
   final City city;
 
+  /// Empty means not stated, which is not the same as speaking nothing: it
+  /// means this person is never matched on language.
+  final List<Language> languages;
+  final Education? education;
+
+  /// The name as it is shown. A person with no last name is just their first.
+  String get displayName =>
+      lastName == null || lastName!.isEmpty ? firstName : '$firstName $lastName';
+
   static Profile fromJson(Json j) => Profile(
         firstName: j.str('first_name'),
+        lastName: j.strOrNull('last_name'),
         birthDate: j.date('birth_date'),
         age: j.intOr('age', 0),
         gender: Gender.parse(j.strOrNull('gender')),
         city: City.parse(j.strOrNull('city')),
+        languages: [
+          for (final raw in j.strings('languages'))
+            if (Language.parse(raw) case final l?) l,
+        ],
+        education: Education.parse(j.strOrNull('education')),
       );
 }
 
@@ -137,14 +159,23 @@ class MyProfile {
 /// new city does not need an app release.
 @immutable
 class ProfileOptions {
-  const ProfileOptions({required this.genders, required this.cities});
+  const ProfileOptions({
+    required this.genders,
+    required this.cities,
+    required this.languages,
+    required this.educations,
+  });
 
   final List<PromptOption> genders;
   final List<PromptOption> cities;
+  final List<PromptOption> languages;
+  final List<PromptOption> educations;
 
   static ProfileOptions fromJson(Json j) => ProfileOptions(
         genders: PromptOption.listFrom(j.objects('genders')),
         cities: PromptOption.listFrom(j.objects('cities')),
+        languages: PromptOption.listFrom(j.objects('languages')),
+        educations: PromptOption.listFrom(j.objects('educations')),
       );
 }
 

@@ -27,6 +27,9 @@ class MatchingRepository {
     required List<Gender> showGenders,
     int? ageMin,
     int? ageMax,
+    List<City> cities = const [],
+    List<Language> languages = const [],
+    List<Education> educationLevels = const [],
   }) async {
     final body = await _api.put(
       Api.preferences,
@@ -34,6 +37,9 @@ class MatchingRepository {
         'show_genders': [for (final g in showGenders) g.wire],
         'age_min': ageMin,
         'age_max': ageMax,
+        'cities': [for (final c in cities) c.wire],
+        'languages': [for (final l in languages) l.wire],
+        'education_levels': [for (final e in educationLevels) e.wire],
       },
     );
     return MatchPreferences.fromJson(body);

@@ -37,6 +37,8 @@ enum City {
   chennai('chennai', 'Chennai'),
   kolkata('kolkata', 'Kolkata'),
   ahmedabad('ahmedabad', 'Ahmedabad'),
+  jaipur('jaipur', 'Jaipur'),
+  surat('surat', 'Surat'),
   unknown('', '');
 
   const City(this.wire, this.label);
@@ -46,6 +48,56 @@ enum City {
 
   static City parse(String? raw) =>
       values.firstWhere((v) => v.wire == raw, orElse: () => City.unknown);
+}
+
+/// Which languages someone can hold a conversation in, never a mother tongue.
+/// The server decides the list; these are here so a stored value parses. Order
+/// on screen comes from `/profile/options`, not from this declaration.
+enum Language {
+  hindi('hindi', 'Hindi'),
+  english('english', 'English'),
+  marathi('marathi', 'Marathi'),
+  tamil('tamil', 'Tamil'),
+  telugu('telugu', 'Telugu'),
+  bengali('bengali', 'Bengali'),
+  gujarati('gujarati', 'Gujarati'),
+  kannada('kannada', 'Kannada'),
+  malayalam('malayalam', 'Malayalam'),
+  punjabi('punjabi', 'Punjabi'),
+  odia('odia', 'Odia'),
+  urdu('urdu', 'Urdu');
+
+  const Language(this.wire, this.label);
+
+  final String wire;
+  final String label;
+
+  static Language? parse(String? raw) {
+    for (final v in values) {
+      if (v.wire == raw) return v;
+    }
+    return null;
+  }
+}
+
+/// Level only. No institution and no field of study.
+enum Education {
+  bachelors('bachelors', "Bachelor's"),
+  masters('masters', "Master's"),
+  doctorate('doctorate', 'Doctorate'),
+  other('other', 'Other');
+
+  const Education(this.wire, this.label);
+
+  final String wire;
+  final String label;
+
+  static Education? parse(String? raw) {
+    for (final v in values) {
+      if (v.wire == raw) return v;
+    }
+    return null;
+  }
 }
 
 /// The six things a person can consent to: one per source, plus the two that

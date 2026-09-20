@@ -15,7 +15,7 @@ import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/sheets.dart';
 import '../../../shared/widgets/states.dart';
 
-/// The four fields again, revisited rather than filled in.
+/// The same fields again, revisited rather than filled in.
 ///
 /// Two things change from setup: Continue becomes Save, and leaving half-done
 /// is allowed. Save is grey until something changes, because a Save that is
@@ -35,9 +35,12 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
   static const _slots = 3;
 
   String? _name;
+  String? _lastName;
   DateTime? _birthDate;
   Gender? _gender;
   City? _city;
+  final _languages = <Language>{};
+  Education? _education;
 
   bool _dirty = false;
   bool _saving = false;
@@ -71,13 +74,21 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
     }
     setState(() => _saving = true);
     try {
-      // The four fields go together: the server takes them as one profile, so
-      // there is no such thing as a partial save here.
+      // The fields go together: the server takes them as one profile, so there
+      // is no such thing as a partial save here. That is also why every one of
+      // them has to be sent, including the optional ones: leaving a field out
+      // of this call is how you quietly erase it.
       await ref.read(profileRepositoryProvider).save(
             firstName: _name!,
+            lastName: (_lastName ?? '').trim().isEmpty ? null : _lastName,
             birthDate: _birthDate!,
             gender: _gender!,
             city: _city!,
+            languages: [
+              for (final l in Language.values)
+                if (_languages.contains(l)) l,
+            ],
+            education: _education,
           );
       final profile = await ref.read(profileRepositoryProvider).load();
       if (!mounted) return;
@@ -103,6 +114,63 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
     if (typed != null) {
       setState(() {
         _name = typed;
+        _dirty = true;
+      });
+    }
+  }
+
+  Future<void> _editLastName() async {
+    final typed = await showTextEntrySheet(
+      context,
+      title: 'Last name',
+      hint: 'Optional',
+      initial: _lastName ?? '',
+      maxLength: 40,
+    );
+    if (typed != null) {
+      setState(() {
+        _lastName = typed;
+        _dirty = true;
+      });
+    }
+  }
+
+  Future<void> _pickLanguages() async {
+    final offered =
+        ref.read(profileOptionsProvider).valueOrNull?.languages ?? [];
+    if (offered.isEmpty) return;
+    final chosen = await showMultiChoiceSheet(
+      context,
+      title: 'Languages',
+      subtitle: 'Select every language you speak comfortably.',
+      options: [for (final o in offered) (o.key, o.label)],
+      initial: {for (final l in _languages) l.wire},
+    );
+    if (chosen == null) return;
+    setState(() {
+      _languages
+        ..clear()
+        ..addAll([
+          for (final o in offered)
+            if (chosen.contains(o.key))
+              if (Language.parse(o.key) case final l?) l,
+        ]);
+      _dirty = true;
+    });
+  }
+
+  Future<void> _pickEducation() async {
+    final offered =
+        ref.read(profileOptionsProvider).valueOrNull?.educations ?? [];
+    if (offered.isEmpty) return;
+    final choice = await showAppActionSheet(
+      context,
+      title: 'Education',
+      actions: [for (final e in offered) SheetAction(e.label)],
+    );
+    if (choice != null) {
+      setState(() {
+        _education = Education.parse(offered[choice].key);
         _dirty = true;
       });
     }
@@ -178,9 +246,12 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
     if (!_seeded && details != null) {
       _seeded = true;
       _name = details.firstName;
+      _lastName = details.lastName;
       _birthDate = details.birthDate;
       _gender = details.gender;
       _city = details.city;
+      _languages.addAll(details.languages);
+      _education = details.education;
     }
 
     return AppScaffold(
@@ -261,6 +332,12 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
                   onTap: _editName,
                 ),
                 FieldRow(
+                  label: 'Last name',
+                  value: (_lastName ?? '').isEmpty ? null : _lastName,
+                  placeholder: 'Optional',
+                  onTap: _editLastName,
+                ),
+                FieldRow(
                   label: 'Date of birth',
                   value: _birthDate == null ? null : _formatDate(_birthDate!),
                   onTap: _pickDate,
@@ -268,8 +345,34 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
                 FieldRow(
                   label: 'Gender',
                   value: _gender?.label,
+                  last: true,
                   onTap: _pickGender,
                 ),
+              ],
+            ),
+            SectionGroup(
+              header: 'Background',
+              footer: 'Both are optional, and both narrow who you see and who '
+                  'sees you once you set a filter on them.',
+              children: [
+                FieldRow(
+                  label: 'Languages',
+                  value: _languages.isEmpty ? null : _languageSummary,
+                  placeholder: 'Optional',
+                  onTap: _pickLanguages,
+                ),
+                FieldRow(
+                  label: 'Education',
+                  value: _education?.label,
+                  placeholder: 'Optional',
+                  last: true,
+                  onTap: _pickEducation,
+                ),
+              ],
+            ),
+            SectionGroup(
+              header: 'Location',
+              children: [
                 FieldRow(
                   label: 'City',
                   value: _city == null || _city == City.unknown
@@ -284,6 +387,16 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
         ),
       ),
     );
+  }
+
+  /// Two names, then a count: twelve labels would not fit the row.
+  String get _languageSummary {
+    final chosen = [
+      for (final l in Language.values)
+        if (_languages.contains(l)) l.label,
+    ];
+    if (chosen.length <= 2) return chosen.join(', ');
+    return '${chosen.take(2).join(', ')} +${chosen.length - 2}';
   }
 
   static String _formatDate(DateTime d) {

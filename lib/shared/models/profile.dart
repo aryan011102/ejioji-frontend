@@ -182,10 +182,28 @@ class ProfileOptions {
 /// The prompt bank, and which of them this person has answered.
 @immutable
 class PromptBank {
-  const PromptBank({required this.prompts, required this.answers});
+  const PromptBank({
+    required this.prompts,
+    required this.answers,
+    this.askedCategories = const [],
+    this.askBelowTiles = 2,
+  });
 
   final List<Prompt> prompts;
   final List<PromptAnswer> answers;
+
+  /// The categories a person is asked about when their data comes back thin:
+  /// the ones a source can fill. Travel, going out and the rest have no source
+  /// and are never asked, because asking whenever they came back empty would
+  /// ask everyone, forever.
+  ///
+  /// The server sends this, and the count below, so the rule can change
+  /// without waiting on a release.
+  final List<TileCategory> askedCategories;
+
+  /// How few computed tiles a category may have before it is asked about
+  /// instead. One tile is a thin section, so one is not enough.
+  final int askBelowTiles;
 
   PromptAnswer? answerFor(String promptKey) {
     for (final a in answers) {
@@ -197,8 +215,23 @@ class PromptBank {
   List<Prompt> inCategory(TileCategory category) =>
       prompts.where((p) => p.category == category).toList(growable: false);
 
+  /// Whether to ask about [category] rather than show what was computed for
+  /// it. The tile it does have is still shown, above the questions: nothing we
+  /// found is hidden from the person it is about.
+  bool asks(TileCategory category, int tiles) =>
+      tiles < askBelowTiles &&
+      askedCategories.contains(category) &&
+      inCategory(category).isNotEmpty;
+
   static PromptBank fromJson(Json j) => PromptBank(
         prompts: j.objects('prompts').map(Prompt.fromJson).toList(growable: false),
         answers: PromptAnswer.listFrom(j.objects('answers')),
+        askedCategories: [
+          for (final raw in j.strings('asked_categories'))
+            if (TileCategory.parse(raw) case final c
+                when c != TileCategory.unknown)
+              c,
+        ],
+        askBelowTiles: j.intOr('ask_below_tiles', 2),
       );
 }

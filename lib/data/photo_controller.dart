@@ -56,10 +56,57 @@ class PhotoController extends Notifier<PhotoPool> {
 
   Future<void> load() async {
     try {
-      final assets = await ref.read(mediaRepositoryProvider).pool();
-      state = state.copyWith(assets: assets, loading: false);
+      final pool = await ref.read(mediaRepositoryProvider).pool();
+      // The pool comes back newest first; the profile comes back in the order
+      // the person put it in. Theirs wins, or a photo dragged to the front
+      // would hold until the next load and then snap back.
+      final onProfile =
+          (await ref.read(profileRepositoryProvider).load()).photos;
+      state = state.copyWith(assets: _ordered(pool, onProfile), loading: false);
     } on ApiException {
       state = state.copyWith(loading: false);
+    }
+  }
+
+  /// The profile's photos in their order, then whatever else is in the pool.
+  static List<MediaAsset> _ordered(
+    List<MediaAsset> pool,
+    List<MediaAsset> onProfile,
+  ) {
+    final left = {for (final a in pool) a.id: a};
+    return [
+      for (final photo in onProfile)
+        if (left.remove(photo.id) case final a?) a,
+      ...pool.where((a) => left.containsKey(a.id)),
+    ];
+  }
+
+  /// Moves a photo, which is how the main one is chosen: the first slot is
+  /// what people see first, so dragging a photo there makes it the main one.
+  ///
+  /// The move shows at once and is written after. A refused write puts the
+  /// order back rather than leaving the screen disagreeing with the server.
+  Future<void> movePhoto(
+    int from,
+    int to, {
+    required void Function(String) onError,
+  }) async {
+    final assets = state.assets;
+    if (from == to || from < 0 || to < 0) return;
+    if (from >= assets.length || to >= assets.length) return;
+
+    final before = assets;
+    final moved = [...assets];
+    moved.insert(to, moved.removeAt(from));
+    state = state.copyWith(assets: moved);
+    try {
+      await ref.read(profileRepositoryProvider).setPhotos([
+        for (final a in moved.take(maxOnProfile)) a.id,
+      ]);
+      ref.invalidate(myProfileProvider);
+    } on ApiException catch (e) {
+      state = state.copyWith(assets: before);
+      onError(e.message);
     }
   }
 

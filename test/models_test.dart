@@ -245,4 +245,61 @@ void main() {
       expect(relativeTime(DateTime(2026, 9, 16, 10), now: now), 'now');
     });
   });
+  group('when a thin category is asked about', () {
+    PromptBank bank({
+      List<String> asked = const ['shopping', 'music'],
+      int below = 2,
+      List<String> questions = const ['shopping', 'shopping', 'music'],
+    }) =>
+        PromptBank.fromJson(<String, Object?>{
+          'prompts': [
+            for (var i = 0; i < questions.length; i++)
+              {
+                'key': 'q$i',
+                'category': questions[i],
+                'text': 'A question',
+                'kind': 'text',
+                'options': <Object>[],
+                'max_chars': 80,
+                'starter': i == 0,
+              },
+          ],
+          'answers': <Object>[],
+          'asked_categories': asked,
+          'ask_below_tiles': below,
+        });
+
+    test('a category with one computed tile is still asked about', () {
+      // One tile is a thin section of a profile. Nought and one both ask; two
+      // stands on its own.
+      expect(bank().asks(TileCategory.shopping, 0), isTrue);
+      expect(bank().asks(TileCategory.shopping, 1), isTrue);
+      expect(bank().asks(TileCategory.shopping, 2), isFalse);
+      expect(bank().asks(TileCategory.shopping, 9), isFalse);
+    });
+
+    test('a category no source fills is never asked about', () {
+      // Travel, going out and home have no source, so asking whenever they
+      // came back empty would ask everyone, forever, on every setup.
+      expect(bank().asks(TileCategory.travel, 0), isFalse);
+      expect(bank().asks(TileCategory.watching, 0), isFalse);
+    });
+
+    test('a category with no questions left is not asked about', () {
+      // Retiring a question is how copy changes. Retiring all of a category's
+      // would otherwise draw a screen that asks nothing.
+      final musicOnly = bank(questions: const ['music']);
+      expect(musicOnly.asks(TileCategory.shopping, 0), isFalse);
+    });
+
+    test('the server decides the rule, not the app', () {
+      // Both numbers come down the wire, so the rule can change without a
+      // release.
+      expect(bank(below: 3).asks(TileCategory.music, 2), isTrue);
+      expect(bank(asked: const []).asks(TileCategory.music, 0), isFalse);
+      // A category from a newer server is dropped rather than kept as
+      // `unknown`, which would match every category this build cannot name.
+      expect(bank(asked: const ['gaming']).askedCategories, isEmpty);
+    });
+  });
 }

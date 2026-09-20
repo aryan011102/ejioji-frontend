@@ -12,26 +12,34 @@ import '../../../data/providers.dart';
 import '../../../data/tile_media_controller.dart';
 import '../../../shared/models/enums.dart';
 import '../../../shared/models/media.dart';
+import '../../../shared/models/profile.dart';
 import '../../../shared/models/tile.dart';
 import '../../../shared/models/tile_look.dart';
 import '../../../shared/widgets/buttons.dart';
 import '../../../shared/widgets/controls.dart';
 import '../../../shared/widgets/layout.dart';
+import '../../../shared/widgets/pressable.dart';
 import '../../../shared/widgets/sheets.dart';
 import '../../../shared/widgets/states.dart';
 import '../../../shared/widgets/tiles.dart';
+import 'answer_sheet.dart';
 
 /// The categories the picker walks through, in a fixed order: every category
-/// with at least one computed tile or one answer. Order follows the enum, so
-/// an index means the same category on the way in and on the way back.
+/// with at least one computed tile or one answer, plus every category the bank
+/// asks about. An asked category is in the walk even when it holds nothing,
+/// because holding nothing is precisely when its questions are shown. Order
+/// follows the enum, so an index means the same category on the way in and on
+/// the way back.
 List<TileCategory> pickableCategories(
   List<Insight> candidates,
   List<PromptAnswer> answers,
+  PromptBank bank,
 ) =>
     [
       for (final c in TileCategory.values)
         if (c != TileCategory.unknown &&
-            (candidates.any((i) => i.category == c) ||
+            (bank.askedCategories.contains(c) ||
+                candidates.any((i) => i.category == c) ||
                 answers.any((a) => a.category == c)))
           c,
     ];
@@ -168,7 +176,8 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
     final insights = candidates.requireValue;
     final answers = bank.requireValue.answers;
     final current = profile.requireValue.tiles;
-    final categories = pickableCategories(insights, answers);
+    final categories =
+        pickableCategories(insights, answers, bank.requireValue);
 
     if (widget.index >= categories.length) {
       return AppScaffold(
@@ -192,6 +201,12 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
     final picked = _picked!;
     final inCategory = insights.where((i) => i.category == category).toList();
     final answered = answers.where((a) => a.category == category).toList();
+    // Thin: their data could not fill this category, so we ask instead. The
+    // questions are rows rather than tiles in the grid, so an answer reads as
+    // a question answered and never as something we worked out.
+    final asking = bank.requireValue.asks(category, inCategory.length);
+    final questions =
+        asking ? bank.requireValue.inCategory(category) : const <Prompt>[];
 
     return AppScaffold(
       navBar: AppNavBar(
@@ -200,16 +215,29 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
         trailingLabel: widget.editing ? null : 'Skip',
         onTrailing: widget.editing ? null : () => _advance(categories.length),
       ),
-      footer: PrimaryButton(
-        label: widget.editing
-            ? 'Save ${picked.length} on your profile'
-            : picked.isEmpty
-                ? 'Pick at least one'
-                : 'Continue with ${picked.length}',
-        busy: _saving,
-        onPressed: !widget.editing && picked.isEmpty
-            ? null
-            : () => _next(category, current, categories.length),
+      footer: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          PrimaryButton(
+            label: widget.editing
+                ? 'Save ${picked.length} on your profile'
+                : picked.isEmpty
+                    ? 'Pick at least one'
+                    : 'Continue with ${picked.length}',
+            busy: _saving,
+            onPressed: !widget.editing && picked.isEmpty
+                ? null
+                : () => _next(category, current, categories.length),
+          ),
+          // Only where we asked. Nothing was found and nothing was written, so
+          // leaving with nothing has to be one tap rather than a dead end.
+          if (asking && !widget.editing)
+            TextActionButton(
+              label: 'Skip ${category.label.toLowerCase()}',
+              dim: true,
+              onPressed: () => _advance(categories.length),
+            ),
+        ],
       ),
       child: Stack(
         children: [
@@ -257,8 +285,11 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                       widget.editing
                           ? '${picked.length} on your profile. Tap to add or '
                               'drop one.'
-                          : 'Pick up to three, and put a photo or video '
-                              'behind any of them.',
+                          : asking
+                              ? 'Not enough here to say anything true. So we '
+                                  'would rather ask.'
+                              : 'Pick up to three, and put a photo or video '
+                                  'behind any of them.',
                       style: AppText.callout.copyWith(fontSize: 14),
                     ),
                   ],
@@ -278,18 +309,27 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                       tone: ins.tone,
                       isTrack: ins.looksLikeTrack,
                     ),
-                  for (final a in answered)
-                    _item(
-                      (kind: TileKind.prompt, key: a.promptKey),
-                      media: media,
-                      serverMedia: saved[TileMedia.id(TileKind.prompt, a.promptKey)],
-                      size: TileSize.wide,
-                      prompt: a.question,
-                      answer: a.answer,
-                      tone: _toneOf(category),
-                    ),
+                  if (!asking)
+                    for (final a in answered)
+                      _item(
+                        (kind: TileKind.prompt, key: a.promptKey),
+                        media: media,
+                        serverMedia:
+                            saved[TileMedia.id(TileKind.prompt, a.promptKey)],
+                        size: TileSize.wide,
+                        prompt: a.question,
+                        answer: a.answer,
+                        tone: _toneOf(category),
+                      ),
                 ],
               ),
+              for (final prompt in questions)
+                _question(
+                  prompt,
+                  answers: answers,
+                  media: media,
+                  saved: saved,
+                ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(Insets.titleGutter, 16, Insets.titleGutter, 0),
                 child: Text(
@@ -367,6 +407,44 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
     );
   }
 
+  Widget _question(
+    Prompt prompt, {
+    required List<PromptAnswer> answers,
+    required TileMedia media,
+    required Map<String, MediaAsset> saved,
+  }) {
+    final choice = (kind: TileKind.prompt, key: prompt.key);
+    return _QuestionRow(
+      prompt: prompt,
+      answer: answers.where((a) => a.promptKey == prompt.key).firstOrNull,
+      picked: _picked!.contains(choice),
+      behind: media.resolve(
+        choice.kind,
+        choice.key,
+        saved[TileMedia.id(choice.kind, choice.key)],
+      ),
+      onOpen: () => _ask(prompt),
+      onToggle: () => _toggle(choice),
+    );
+  }
+
+  /// Opens one question, and ticks what comes back onto the profile. Answering
+  /// is choosing: they wrote it to be read.
+  Future<void> _ask(Prompt prompt) async {
+    final answers = ref.read(promptBankProvider).valueOrNull?.answers;
+    final existing =
+        answers?.where((a) => a.promptKey == prompt.key).firstOrNull;
+    final saved = await showAnswerSheet(
+      context,
+      prompt: prompt,
+      existing: existing,
+    );
+    if (!saved || !mounted) return;
+    final choice = (kind: TileKind.prompt, key: prompt.key);
+    if (_picked!.contains(choice)) return;
+    _toggle(choice);
+  }
+
   /// The sheet behind the camera on a tile.
   Future<void> _chooseMedia(_Choice choice, {required bool hasMedia}) async {
     final answer = choice.kind == TileKind.prompt;
@@ -410,4 +488,130 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
         key: '',
         category: category,
       ).tone;
+}
+
+/// One question on a thin category's screen: what it asks, what they wrote,
+/// and whether it is on the profile.
+///
+/// A question is a row, never a tile. A tile is something we worked out; this
+/// is something they said, and the two must not be told apart only by their
+/// words.
+class _QuestionRow extends StatelessWidget {
+  const _QuestionRow({
+    required this.prompt,
+    required this.answer,
+    required this.picked,
+    required this.behind,
+    required this.onOpen,
+    required this.onToggle,
+  });
+
+  final Prompt prompt;
+  final PromptAnswer? answer;
+  final bool picked;
+  final MediaAsset? behind;
+  final VoidCallback onOpen;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final written = answer;
+    final media = behind;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(Insets.gutter, 0, Insets.gutter, 10),
+      child: Pressable(
+        onTap: onOpen,
+        semanticLabel: written == null
+            ? 'Answer: ${prompt.text}'
+            : 'Change your answer to ${prompt.text}',
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+          decoration: BoxDecoration(
+            color: AppColors.row,
+            borderRadius: BorderRadius.circular(Radii.row),
+            border: Border.all(
+              color: picked ? AppColors.ok : AppColors.glassEdge,
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      prompt.text,
+                      style: AppText.body.copyWith(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15.5,
+                      ),
+                    ),
+                    if (written != null) ...[
+                      const SizedBox(height: 4),
+                      Text(written.answer, style: AppText.caption),
+                    ],
+                    if (media != null) ...[
+                      const SizedBox(height: 8),
+                      _behindChip(media),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              if (written == null)
+                const Icon(
+                  Icons.chevron_right,
+                  size: 20,
+                  color: AppColors.label3,
+                )
+              else
+                Pressable(
+                  onTap: onToggle,
+                  semanticLabel: picked
+                      ? 'Take this answer off your profile'
+                      : 'Put this answer on your profile',
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(
+                      picked
+                          ? Icons.check_circle
+                          : Icons.radio_button_unchecked,
+                      size: 22,
+                      color: picked ? AppColors.ok : AppColors.label3,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _behindChip(MediaAsset media) {
+    final label = switch (media.kind) {
+      MediaKind.video => 'Video attached',
+      MediaKind.livePhoto => 'Live photo attached',
+      _ => 'Photo attached',
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.fill2,
+        borderRadius: BorderRadius.circular(7),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.photo_camera_back_outlined,
+            size: 13,
+            color: AppColors.label2,
+          ),
+          const SizedBox(width: 5),
+          Text(label, style: AppText.caption.copyWith(fontSize: 11.5)),
+        ],
+      ),
+    );
+  }
 }

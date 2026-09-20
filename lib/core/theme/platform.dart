@@ -1,5 +1,3 @@
-import 'dart:io' show Platform;
-
 import 'package:flutter/foundation.dart';
 
 /// The two places this app is not the same app.
@@ -16,7 +14,12 @@ abstract final class AppPlatform {
   static bool get isAndroid {
     if (debugOverrideAndroid != null) return debugOverrideAndroid!;
     if (kIsWeb) return false;
-    return Platform.isAndroid;
+    // defaultTargetPlatform rather than dart:io's Platform, which does not
+    // exist on the web and so cannot be imported in a file the web build
+    // compiles. Same answer on a phone, and it keeps Chrome usable as a way to
+    // look at the iOS layout without a Mac (kIsWeb is false above, so web gets
+    // isIOS, which is the reading worth checking).
+    return defaultTargetPlatform == TargetPlatform.android;
   }
 
   static bool get isIOS => !isAndroid;

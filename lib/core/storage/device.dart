@@ -1,4 +1,3 @@
-import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -44,9 +43,12 @@ class DeviceIdentity {
   /// What the API calls this platform.
   static String get platform {
     if (kIsWeb) return 'unknown';
-    if (Platform.isIOS) return 'ios';
-    if (Platform.isAndroid) return 'android';
-    return 'unknown';
+    // As in theme/platform.dart: dart:io cannot be imported in a web build.
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.iOS => 'ios',
+      TargetPlatform.android => 'android',
+      _ => 'unknown',
+    };
   }
 }
 

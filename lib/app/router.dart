@@ -165,6 +165,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
 
       GoRoute(
+        path: Routes.person,
+        builder: (_, state) {
+          final args = state.extra as PersonArgs?;
+          return ProfilePage(
+            mode: ProfileMode.guest,
+            candidate: args?.person,
+            backLabel: args?.backLabel,
+          );
+        },
+      ),
+
+      GoRoute(
         path: Routes.feedEmptyFiltered,
         builder: (_, __) => const EmptyFeedPage(kind: EmptyFeedKind.filtered),
       ),

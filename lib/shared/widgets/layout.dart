@@ -75,6 +75,7 @@ class AppScaffold extends StatelessWidget {
 class AppNavBar extends StatelessWidget implements PreferredSizeWidget {
   const AppNavBar({
     this.title,
+    this.onTitle,
     this.backLabel,
     this.onBack,
     this.trailingLabel,
@@ -84,6 +85,11 @@ class AppNavBar extends StatelessWidget implements PreferredSizeWidget {
   });
 
   final String? title;
+
+  /// Makes the title itself the way to the thing it names, which on a
+  /// conversation is the person. Null leaves it as plain text.
+  final VoidCallback? onTitle;
+
   final String? backLabel;
   final VoidCallback? onBack;
   final String? trailingLabel;
@@ -136,11 +142,34 @@ class AppNavBar extends StatelessWidget implements PreferredSizeWidget {
                   ),
           ),
           Expanded(
-            child: Text(
-              title ?? '',
-              textAlign: TextAlign.center,
-              style: AppText.navTitle,
-            ),
+            child: onTitle == null
+                ? Text(
+                    title ?? '',
+                    textAlign: TextAlign.center,
+                    style: AppText.navTitle,
+                  )
+                : Pressable(
+                    onTap: onTitle,
+                    semanticLabel: 'Open ${title ?? 'this'} profile',
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            title ?? '',
+                            overflow: TextOverflow.ellipsis,
+                            style: AppText.navTitle,
+                          ),
+                        ),
+                        const Icon(
+                          Icons.chevron_right,
+                          size: 18,
+                          color: AppColors.label3,
+                        ),
+                      ],
+                    ),
+                  ),
           ),
           SizedBox(
             width: 112,

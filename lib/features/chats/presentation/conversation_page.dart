@@ -65,6 +65,7 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
   bool _hasMore = false;
   bool _loadingOlder = false;
   bool _ended = false;
+  bool _openingProfile = false;
   int _myRead = 0;
   int _theirRead = 0;
   bool _theyTyping = false;
@@ -296,6 +297,36 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
       .firstOrNull
       ?.person;
 
+  /// The full profile behind the name at the top.
+  ///
+  /// The chats list carries a name and one photo, so the profile itself comes
+  /// from the match this conversation is. Fetched on the tap rather than
+  /// watched: a conversation has no other use for it, and watching would keep a
+  /// request open for every chat anybody leaves on screen.
+  Future<void> _openProfile() async {
+    if (_openingProfile) return;
+    setState(() => _openingProfile = true);
+    try {
+      final matches = await ref.read(matchingRepositoryProvider).matches();
+      final match = matches.where((m) => m.id == _matchId).firstOrNull;
+      if (!mounted) return;
+      if (match == null) {
+        // Unmatched, blocked or taken down between opening the chat and the
+        // tap. The chat itself says so; this is just the door being shut.
+        showAppToast(context, 'That profile is no longer available.');
+        return;
+      }
+      await context.push(
+        Routes.person,
+        extra: PersonArgs(person: match.person, backLabel: 'Chat'),
+      );
+    } on ApiException catch (e) {
+      if (mounted) showAppToast(context, e.message);
+    } finally {
+      if (mounted) setState(() => _openingProfile = false);
+    }
+  }
+
   Future<void> _menu() async {
     final person = _person;
     final name = person?.firstName ?? 'them';
@@ -391,6 +422,8 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
     return AppScaffold(
       navBar: AppNavBar(
         title: name,
+        // No door once the match is over: there is nothing on the other side.
+        onTitle: _ended || _person == null ? null : _openProfile,
         backLabel: 'Chats',
         onBack: () => context.pop(),
         trailingLabel: _ended ? null : '···',

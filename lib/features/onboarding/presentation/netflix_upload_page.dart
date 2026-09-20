@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/routes.dart';
 import '../../../core/network/api_exception.dart';
@@ -33,20 +34,27 @@ class NetflixUploadPage extends ConsumerStatefulWidget {
 class _NetflixUploadPageState extends ConsumerState<NetflixUploadPage> {
   bool _busy = false;
 
+  /// Netflix redirects this through a sign-in carrying a `nextpage` back to
+  /// the same path, so signing in lands on the viewing activity itself. The
+  /// page is per profile, which is exactly the one file we will accept.
+  static final _viewingActivity = Uri.parse('https://www.netflix.com/viewingactivity');
+
+  Future<void> _openViewingActivity() async {
+    final opened = await launchUrl(_viewingActivity, mode: LaunchMode.externalApplication);
+    if (!opened && mounted) {
+      showAppToast(context, 'No browser would open Netflix.');
+    }
+  }
+
   static const _steps = [
     (
       '1',
-      'Open Netflix in a browser',
-      'On netflix.com, switch to your own profile first. The file is per '
-          'profile, and we only want yours.',
+      'Open your viewing activity',
+      'The button below goes straight there. Sign in with your own profile if '
+          'it asks: the file is per profile, and we only want yours.',
     ),
     (
       '2',
-      'Account, then Viewing activity',
-      'It is under your profile in the Account page.',
-    ),
-    (
-      '3',
       'Scroll down and press Download all',
       'That saves NetflixViewingHistory.csv. Do not use the full data '
           'download from Netflix support: it holds everyone on the account, '
@@ -120,6 +128,13 @@ class _NetflixUploadPageState extends ConsumerState<NetflixUploadPage> {
                   leading: Text(number, style: AppText.bodyStrong),
                 ),
             ],
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(Insets.gutter, 16, Insets.gutter, 0),
+            child: SecondaryButton(
+              label: 'Open Netflix viewing activity',
+              onPressed: _openViewingActivity,
+            ),
           ),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: Insets.gutter),

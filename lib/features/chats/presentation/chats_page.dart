@@ -333,60 +333,88 @@ class _RequestCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (photo != null)
-              AspectRatio(
-                aspectRatio: 4 / 3,
-                child: Image.network(
-                  photo.stillUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) =>
-                      const ColoredBox(color: AppColors.photoEmpty),
-                ),
+            // Everything above the two buttons opens the profile. A card is one
+            // tile and one line of a city: nobody should have to answer on that,
+            // and the buttons stay outside the tap so answering still takes aim.
+            Pressable(
+              onTap: () => context.push(
+                Routes.person,
+                extra: PersonArgs(person: person, backLabel: 'Requests'),
               ),
+              semanticLabel: "Open ${person.firstName}'s profile",
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (photo != null)
+                    AspectRatio(
+                      aspectRatio: 4 / 3,
+                      child: Image.network(
+                        photo.stillUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            const ColoredBox(color: AppColors.photoEmpty),
+                      ),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${person.firstName}, ${person.age}',
+                                style: AppText.title3.copyWith(fontSize: 19),
+                              ),
+                            ),
+                            const Icon(
+                              Icons.chevron_right,
+                              size: 20,
+                              color: AppColors.label3,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${person.city.label} · asked '
+                          '${relativeTime(request.requestedAt)} ago',
+                          style: AppText.footnote,
+                        ),
+                        if (person.tiles.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Text(
+                            person.tiles.first.isAnswer
+                                ? person.tiles.first.headline
+                                : '${person.tiles.first.headline} · '
+                                    '${person.tiles.first.body}',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppText.callout,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
             Padding(
               padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Text(
-                    '${person.firstName}, ${person.age}',
-                    style: AppText.title3.copyWith(fontSize: 19),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${person.city.label} · asked '
-                    '${relativeTime(request.requestedAt)} ago',
-                    style: AppText.footnote,
-                  ),
-                  if (person.tiles.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    Text(
-                      person.tiles.first.isAnswer
-                          ? person.tiles.first.headline
-                          : '${person.tiles.first.headline} · '
-                              '${person.tiles.first.body}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppText.callout,
+                  Expanded(
+                    child: SecondaryButton(
+                      label: 'Decline',
+                      onPressed: onDecline,
                     ),
-                  ],
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: SecondaryButton(
-                          label: 'Decline',
-                          onPressed: onDecline,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: PrimaryButton(
-                          label: 'Chat',
-                          onPressed: onAccept,
-                        ),
-                      ),
-                    ],
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: PrimaryButton(
+                      label: 'Chat',
+                      onPressed: onAccept,
+                    ),
                   ),
                 ],
               ),

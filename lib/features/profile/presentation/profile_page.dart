@@ -18,6 +18,7 @@ import '../../../shared/models/person.dart';
 import '../../../shared/models/profile.dart';
 import '../../../shared/models/tile.dart' as api;
 import '../../../shared/models/tile_look.dart';
+import '../../../shared/widgets/app_tab_bar.dart';
 import '../../../shared/widgets/buttons.dart';
 import '../../../shared/widgets/identity.dart';
 import '../../../shared/widgets/layout.dart';
@@ -37,6 +38,12 @@ enum ProfileMode {
 
   /// Somebody else's, which is what home is.
   viewer,
+
+  /// Somebody else's, reached by pushing rather than by the deck: from a
+  /// request waiting to be answered, or from the top of a conversation. The
+  /// same wall, with a way back and no pass or ask, because the answer to this
+  /// person is on the screen behind rather than on this one.
+  guest,
 }
 
 /// The profile, all three ways it is seen.
@@ -48,12 +55,21 @@ enum ProfileMode {
 /// home owns the deck, and a profile that fetched its own subject would fetch
 /// a different one from the card the person is looking at.
 class ProfilePage extends ConsumerStatefulWidget {
-  const ProfilePage({required this.mode, this.candidate, super.key});
+  const ProfilePage({
+    required this.mode,
+    this.candidate,
+    this.backLabel,
+    super.key,
+  });
 
   final ProfileMode mode;
 
-  /// Required in [ProfileMode.viewer]; ignored otherwise.
+  /// Required in [ProfileMode.viewer] and [ProfileMode.guest]; ignored
+  /// otherwise.
   final Candidate? candidate;
+
+  /// What the back button names on a guest profile: the screen behind it.
+  final String? backLabel;
 
   @override
   ConsumerState<ProfilePage> createState() => _ProfilePageState();
@@ -67,7 +83,12 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   /// server's order is what shows until somebody changes it.
   List<String>? _draftOrder;
 
+  /// The deck's reading: no way back, and the pass and ask over the wall.
   bool get _viewer => widget.mode == ProfileMode.viewer;
+
+  /// Either reading of somebody else's profile, which is the same wall built
+  /// from a candidate rather than from the person's own profile.
+  bool get _theirs => _viewer || widget.mode == ProfileMode.guest;
 
   bool get _dirty => _draftOrder != null;
 
@@ -168,7 +189,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_viewer) {
+    if (_theirs) {
       final person = widget.candidate;
       if (person == null) {
         return const AppScaffold(
@@ -228,11 +249,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
     return AppScaffold(
       navBar: _topBar(context, person),
-      footer: _viewer ? null : _foot(context, tiles, publish),
+      footer: _theirs ? null : _foot(context, tiles, publish),
       child: Stack(
         children: [
           ListView(
-            padding: EdgeInsets.only(bottom: _viewer ? 210 : 24),
+            padding: EdgeInsets.only(bottom: _viewer ? _actionsHeight : 24),
             children: [
               _header(name, subtitle, photos),
               if (!_viewer) ...[
@@ -343,9 +364,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       : ref.watch(tileMediaProvider).resolve(t.kind, t.key, t.media);
 
   PreferredSizeWidget _topBar(BuildContext context, Candidate? person) {
-    if (_viewer) {
+    if (_theirs) {
       return AppNavBar(
-        backLabel: null,
+        // The deck has nowhere to go back to; a pushed profile always does.
+        backLabel: _viewer ? null : (widget.backLabel ?? 'Back'),
+        onBack: _viewer ? null : () => context.pop(),
         trailingLabel: '···',
         onTrailing: person == null ? null : () => _moreSheet(person),
       );
@@ -518,6 +541,20 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     );
   }
 
+  /// The height of the buttons themselves, matched to the pass circle.
+  static const _actionsControl = 56.0;
+
+  /// The scrim above the buttons, long enough to fade a tile out under them.
+  static const _actionsFade = 60.0;
+
+  /// The gap between the buttons and the top of the tab bar.
+  static const _aboveTabBar = 16.0;
+
+  /// What the actions cover, which is what the wall scrolls clear of, so the
+  /// last tile can be read rather than sitting under the scrim for good.
+  static double get _actionsHeight =>
+      _actionsFade + _actionsControl + _aboveTabBar + AppTabBar.clearance;
+
   /// Pass, or ask to chat.
   ///
   /// There is no like and no gate: the ask goes straight out, and the other
@@ -529,11 +566,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       right: 0,
       bottom: 0,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(
+        padding: EdgeInsets.fromLTRB(
           Insets.gutter,
-          60,
+          _actionsFade,
           Insets.gutter,
-          100,
+          AppTabBar.clearance + _aboveTabBar,
         ),
         decoration: const BoxDecoration(
           gradient: LinearGradient(

@@ -235,6 +235,11 @@ enum ValueKind {
   duration('duration'),
   year('year'),
   entity('entity'),
+  /// An hour of the day, already written as "11 PM", and a day of the week.
+  /// Both arrive as short words, so they size like an entity rather than a
+  /// number, which `tileSize` works out from the string on its own.
+  time('time'),
+  weekday('weekday'),
   unknown('');
 
   const ValueKind(this.wire);

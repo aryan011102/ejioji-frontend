@@ -1,3 +1,7 @@
+import 'package:flutter/foundation.dart';
+
+import '../shared/models/person.dart';
+
 /// Every route in the app, named once.
 ///
 /// Paths are literal strings in one file rather than scattered through
@@ -39,6 +43,12 @@ abstract final class Routes {
 
   // Chats
   static const conversation = '/chats/:id';
+
+  /// Somebody else's profile, pushed rather than dealt by the deck: from a
+  /// request, or from the top of a conversation. The person travels as `extra`
+  /// because both callers already hold them, and refetching here would show a
+  /// different profile from the one that was tapped.
+  static const person = '/person';
   static String conversationWith(String id) => '/chats/$id';
   static const sharedFriends = '/shared/friends';
   static const sharedFamily = '/shared/family';
@@ -87,4 +97,17 @@ abstract final class Routes {
   static const takeBreak = '/you/settings/break';
   static const accountDeleted = '/you/settings/deleted';
   static const premium = '/premium';
+}
+
+/// What [Routes.person] is pushed with.
+///
+/// A class rather than the bare candidate so the back button can name the
+/// screen behind it: the same profile is reached from a request and from a
+/// conversation, and "Back" in both places would be the lazy answer.
+@immutable
+class PersonArgs {
+  const PersonArgs({required this.person, required this.backLabel});
+
+  final Candidate person;
+  final String backLabel;
 }

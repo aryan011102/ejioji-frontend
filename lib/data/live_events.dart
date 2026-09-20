@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,6 +11,7 @@ import '../core/network/endpoints.dart';
 import '../core/network/json.dart';
 import '../core/storage/token_store.dart';
 import 'providers.dart';
+import 'socket/app_socket.dart';
 
 /// One event from the chat socket.
 ///
@@ -47,7 +47,7 @@ class LiveEvents {
   final ApiClient _api;
 
   final _events = StreamController<LiveEvent>.broadcast();
-  WebSocket? _socket;
+  AppSocket? _socket;
   Timer? _retry;
   bool _connecting = false;
   bool _disposed = false;
@@ -64,6 +64,10 @@ class LiveEvents {
   }
 
   Future<void> _connect() async {
+    // A browser build has no transport to open (data/socket/app_socket.dart).
+    // Checked here rather than left to fail, so it does not sit in a retry loop
+    // against something that will never exist.
+    if (!socketsSupported) return;
     if (_disposed || _connecting || _socket != null) return;
     _connecting = true;
     try {
@@ -75,17 +79,18 @@ class LiveEvents {
         scheme: base.scheme == 'https' ? 'wss' : 'ws',
         path: Api.chatSocket,
       );
-      final socket = await WebSocket.connect(
+      final socket = await connectSocket(
         url.toString(),
         headers: {'Authorization': 'Bearer $token'},
-      ).timeout(const Duration(seconds: 15));
+        timeout: const Duration(seconds: 15),
+        pingInterval: const Duration(seconds: 25),
+      );
       if (_disposed) {
         await socket.close();
         return;
       }
 
-      _socket = socket
-        ..pingInterval = const Duration(seconds: 25);
+      _socket = socket;
       _failures = 0;
       _events.add(const LiveEvent(LiveEvent.resync, {}));
 
@@ -93,9 +98,8 @@ class LiveEvents {
         _onFrame,
         onDone: () => _onClosed(socket.closeCode),
         onError: (_) {},
-        cancelOnError: false,
       );
-    } on WebSocketException {
+    } on SocketRefused {
       // The server refuses a bad or expired token before accepting, which
       // reaches the phone as a refused upgrade (HTTP 403), not as close code
       // 4401. Refresh through one authenticated call, then try again.

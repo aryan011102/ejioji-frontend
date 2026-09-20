@@ -8,6 +8,15 @@ workflows:
   #                      (the same value as Buddy's: the certificate is the team's)
   #   APP_STORE_APP_ID   the app's Apple ID number (App Store Connect, App Information)
   #   API_BASE_URL       the backend, https only (the Railway test server for now)
+  #   FCM_PROJECT_ID     Firebase project id ("theonebytwo")
+  #   FCM_SENDER_ID      Firebase sender id, the project number
+  #   FCM_IOS_APP_ID     GOOGLE_APP_ID from GoogleService-Info.plist
+  #   FCM_IOS_API_KEY    API_KEY from the same file
+  #
+  # The four FCM values are not secrets (every app ships them), but they are not
+  # in the repository either: GoogleService-Info.plist is gitignored, and this
+  # build never needs the file itself. Leave them unset and the build still
+  # works, with push off.
   #
   # The bundle ID com.theonebytwo.app must already be registered with the
   # Associated Domains capability, or the profile made here will not carry
@@ -38,9 +47,25 @@ workflows:
           {
             "FLAVOR": "staging",
             "API_BASE_URL": "$API_BASE_URL",
-            "CERT_PINS": ""
+            "CERT_PINS": "",
+            "FCM_PROJECT_ID": "$FCM_PROJECT_ID",
+            "FCM_SENDER_ID": "$FCM_SENDER_ID",
+            "FCM_IOS_APP_ID": "$FCM_IOS_APP_ID",
+            "FCM_IOS_API_KEY": "$FCM_IOS_API_KEY"
           }
           EOF
+          # Not fatal: a build with push off is a valid build, and a silent one
+          # is worse than a noisy one.
+          test -n "$FCM_IOS_APP_ID" || echo "WARNING: no FCM_IOS_APP_ID. This build cannot receive notifications."
+      - name: Point the push entitlement at production APNs
+        script: |
+          set -e
+          # Runner.entitlements carries `development`, which is what a debug
+          # build on a cable needs. Anything signed for the App Store, TestFlight
+          # included, talks to production APNs instead, and a mismatch here is a
+          # build that installs and then never receives a push.
+          /usr/libexec/PlistBuddy -c "Set :aps-environment production" "$CM_BUILD_DIR/ios/Runner/Runner.entitlements"
+          /usr/libexec/PlistBuddy -c "Print :aps-environment" "$CM_BUILD_DIR/ios/Runner/Runner.entitlements"
       - name: Restore signing certificate private key
         script: |
           mkdir -p ~/private_keys

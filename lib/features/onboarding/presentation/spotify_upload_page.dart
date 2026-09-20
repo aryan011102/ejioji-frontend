@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/routes.dart';
 import '../../../core/network/api_exception.dart';
@@ -38,6 +39,18 @@ class _SpotifyUploadPageState extends ConsumerState<SpotifyUploadPage> {
   /// app says so instead of uploading 40 MB to be told no.
   static const _maxBytes = 32 * 1024 * 1024;
 
+  /// Spotify redirects this through a sign-in that carries a `continue` back
+  /// to the same page, so signing in lands on the download form itself rather
+  /// than on an account home the person then has to navigate.
+  static final _privacy = Uri.parse('https://www.spotify.com/account/privacy/');
+
+  Future<void> _openPrivacySettings() async {
+    final opened = await launchUrl(_privacy, mode: LaunchMode.externalApplication);
+    if (!opened && mounted) {
+      showAppToast(context, 'No browser would open Spotify.');
+    }
+  }
+
   static final _historyFile = RegExp(
     r'^(StreamingHistory_music_\d+|Streaming_History_Audio_.+)\.json$',
   );
@@ -46,9 +59,9 @@ class _SpotifyUploadPageState extends ConsumerState<SpotifyUploadPage> {
     (
       '1',
       'Ask Spotify for your data',
-      'In Spotify, go to Account, then Privacy settings, then Download your '
-          'data. Tick Account data. It usually arrives by email in about five '
-          'days.',
+      'The button below opens the page. Sign in, scroll down to Download your '
+          'data and tick Account data. It usually arrives by email in about '
+          'five days.',
     ),
     (
       '2',
@@ -178,6 +191,13 @@ class _SpotifyUploadPageState extends ConsumerState<SpotifyUploadPage> {
                   leading: Text(number, style: AppText.bodyStrong),
                 ),
             ],
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(Insets.gutter, 16, Insets.gutter, 0),
+            child: SecondaryButton(
+              label: 'Open Spotify privacy settings',
+              onPressed: _openPrivacySettings,
+            ),
           ),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: Insets.gutter),

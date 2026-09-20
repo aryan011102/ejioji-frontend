@@ -217,8 +217,8 @@ class _FiltersFormState extends ConsumerState<_FiltersForm> {
           _group(
             'Gender',
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: 7,
+              runSpacing: 7,
               children: [
                 AppChip(
                   label: 'Everyone',
@@ -330,8 +330,8 @@ class _FiltersFormState extends ConsumerState<_FiltersForm> {
       );
 
   Widget _chipWrap(List<(String, bool, VoidCallback)> chips) => Wrap(
-        spacing: 8,
-        runSpacing: 8,
+        spacing: 7,
+        runSpacing: 7,
         children: [
           for (final (label, selected, onTap) in chips)
             AppChip(label: label, selected: selected, onTap: onTap),
@@ -340,7 +340,7 @@ class _FiltersFormState extends ConsumerState<_FiltersForm> {
 
   Widget _group(String label, Widget child, {String? note}) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(Insets.gutter, 0, Insets.gutter, 22),
+      padding: const EdgeInsets.fromLTRB(Insets.gutter, 0, Insets.gutter, 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

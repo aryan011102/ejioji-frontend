@@ -1,6 +1,7 @@
 import 'package:ejioji/core/network/json.dart';
 import 'package:ejioji/shared/format.dart';
 import 'package:ejioji/shared/models/enums.dart';
+import 'package:ejioji/shared/models/person.dart';
 import 'package:ejioji/shared/models/profile.dart';
 import 'package:ejioji/shared/models/tile.dart';
 import 'package:ejioji/shared/models/tile_look.dart';
@@ -49,6 +50,77 @@ void main() {
       }
       expect(SourceProvider.gmail.purpose, ConsentPurpose.gmailReceipts);
       expect(SourceProvider.netflix.purpose, ConsentPurpose.netflixUpload);
+    });
+  });
+
+  group('the filters added 2026-09-20', () {
+    test('an empty filter parses as empty, not as null', () {
+      // Empty means "narrows nothing" everywhere, and empty cities means your
+      // own city. A null slipping through here would be a crash on a screen
+      // that iterates them.
+      final prefs = MatchPreferences.fromJson(const {
+        'show_genders': ['woman'],
+        'age_min': 24,
+        'age_max': 32,
+        'age_is_default': false,
+      });
+      expect(prefs.cities, isEmpty);
+      expect(prefs.languages, isEmpty);
+      expect(prefs.educationLevels, isEmpty);
+    });
+
+    test('a value the app has never heard of is dropped, not fatal', () {
+      // Same rule as the enums above: the server can add a language without
+      // waiting for a release, and the chip for it simply does not show.
+      final prefs = MatchPreferences.fromJson(const {
+        'show_genders': ['woman'],
+        'age_is_default': true,
+        'cities': ['mumbai', 'atlantis'],
+        'languages': ['tamil', 'klingon'],
+        'education_levels': ['masters', 'gcse'],
+      });
+      expect(prefs.cities, [City.mumbai]);
+      expect(prefs.languages, [Language.tamil]);
+      expect(prefs.educationLevels, [Education.masters]);
+    });
+
+    test('the wire format is sent for the new lists too', () {
+      expect(Language.odia.wire, 'odia');
+      expect(Education.bachelors.wire, 'bachelors');
+      expect(Education.bachelors.label, "Bachelor's");
+      expect(City.jaipur.wire, 'jaipur');
+    });
+  });
+
+  group('a profile with an optional name and background', () {
+    test('a missing last name is null and the name is just the first', () {
+      final profile = Profile.fromJson({
+        'first_name': 'Priya',
+        'birth_date': '1998-04-12',
+        'age': 27,
+        'gender': 'woman',
+        'city': 'bengaluru',
+      });
+      expect(profile.lastName, isNull);
+      expect(profile.displayName, 'Priya');
+      expect(profile.languages, isEmpty);
+      expect(profile.education, isNull);
+    });
+
+    test('a last name joins the first with one space', () {
+      final profile = Profile.fromJson({
+        'first_name': 'Priya',
+        'last_name': 'Nair',
+        'birth_date': '1998-04-12',
+        'age': 27,
+        'gender': 'woman',
+        'city': 'bengaluru',
+        'languages': ['hindi', 'tamil'],
+        'education': 'masters',
+      });
+      expect(profile.displayName, 'Priya Nair');
+      expect(profile.languages, [Language.hindi, Language.tamil]);
+      expect(profile.education, Education.masters);
     });
   });
 

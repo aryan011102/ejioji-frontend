@@ -21,22 +21,34 @@ class ProfileRepository {
   Future<ProfileOptions> options() async =>
       ProfileOptions.fromJson(await _api.getJson(Api.profileOptions));
 
-  /// Saves the four fields. There is no surname, no bio, no occupation and no
-  /// employer: asking people to describe themselves first is what produces a
-  /// conventional profile, and the derived tiles then have to argue with it.
+  /// Saves the whole profile at once, because that is what the endpoint takes.
+  /// A field left out of this call is a field erased, so every optional one is
+  /// sent explicitly, even when it is null or empty.
+  ///
+  /// There is still no bio, no occupation and no employer: asking people to
+  /// describe themselves first is what produces a conventional profile, and
+  /// the derived tiles then have to argue with it. A last name is the one
+  /// exception, added 2026-09-20 on Aryan's call; see the model for what that
+  /// reversed.
   Future<Profile> save({
     required String firstName,
     required DateTime birthDate,
     required Gender gender,
     required City city,
+    String? lastName,
+    List<Language> languages = const [],
+    Education? education,
   }) async {
     final body = await _api.put(
       Api.profile,
       body: {
         'first_name': firstName,
+        'last_name': lastName,
         'birth_date': _isoDate(birthDate),
         'gender': gender.wire,
         'city': city.wire,
+        'languages': [for (final l in languages) l.wire],
+        'education': education?.wire,
       },
     );
     return Profile.fromJson(body);

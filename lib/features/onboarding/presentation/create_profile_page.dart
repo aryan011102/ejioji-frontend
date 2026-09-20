@@ -24,9 +24,14 @@ import '../../../shared/widgets/sheets.dart';
 /// derived tiles then have to argue with it. We ask less precisely because we
 /// promise more.
 ///
-/// There is no surname field anywhere in this product. Surname next to
-/// purchase history is how caste gets inferred, and the cheapest way not to
-/// infer it is not to hold it.
+/// A last name is asked for from 2026-09-20 and is optional. It was left out
+/// until then because a surname next to purchase history is how caste gets
+/// inferred, and this product holds the purchase history; the backend decision
+/// log for that date carries the reversal. It is shown to nobody in the feed:
+/// a card carries a first name and a city.
+///
+/// Languages and education are optional too, and both are filters as well as
+/// facts, so leaving them blank is what keeps them out of matching entirely.
 class CreateProfilePage extends ConsumerStatefulWidget {
   const CreateProfilePage({super.key});
 
@@ -36,9 +41,12 @@ class CreateProfilePage extends ConsumerStatefulWidget {
 
 class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
   final _name = TextEditingController();
+  final _lastName = TextEditingController();
   DateTime? _birthDate;
   Gender? _gender;
   City? _city;
+  final _languages = <Language>{};
+  Education? _education;
   bool _saving = false;
   bool _seeded = false;
 
@@ -49,6 +57,7 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
   @override
   void dispose() {
     _name.dispose();
+    _lastName.dispose();
     super.dispose();
   }
 
@@ -71,6 +80,45 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
       helpText: 'Your date of birth',
     );
     if (picked != null) setState(() => _birthDate = picked);
+  }
+
+  Future<void> _pickLanguages() async {
+    final options = ref.read(profileOptionsProvider).valueOrNull;
+    final offered = options?.languages ?? const [];
+    if (offered.isEmpty) return;
+
+    final chosen = await showMultiChoiceSheet(
+      context,
+      title: 'Languages',
+      subtitle: 'Select every language you speak comfortably.',
+      options: [for (final o in offered) (o.key, o.label)],
+      initial: {for (final l in _languages) l.wire},
+    );
+    if (chosen == null) return;
+    setState(() {
+      _languages
+        ..clear()
+        ..addAll([
+          for (final o in offered)
+            if (chosen.contains(o.key))
+              if (Language.parse(o.key) case final l?) l,
+        ]);
+    });
+  }
+
+  Future<void> _pickEducation() async {
+    final options = ref.read(profileOptionsProvider).valueOrNull;
+    final offered = options?.educations ?? const [];
+    if (offered.isEmpty) return;
+
+    final choice = await showAppActionSheet(
+      context,
+      title: 'Education',
+      actions: [for (final e in offered) SheetAction(e.label)],
+    );
+    if (choice != null) {
+      setState(() => _education = Education.parse(offered[choice].key));
+    }
   }
 
   Future<void> _pickGender() async {
@@ -106,9 +154,17 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
     try {
       await ref.read(profileRepositoryProvider).save(
             firstName: _name.text.trim(),
+            lastName: _lastName.text.trim().isEmpty
+                ? null
+                : _lastName.text.trim(),
             birthDate: _birthDate!,
             gender: _gender!,
             city: _city!,
+            languages: [
+              for (final l in Language.values)
+                if (_languages.contains(l)) l,
+            ],
+            education: _education,
           );
       final profile = await ref.read(profileRepositoryProvider).load();
       if (!mounted) return;
@@ -133,9 +189,12 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
     if (!_seeded && existing != null) {
       _seeded = true;
       _name.text = existing.firstName;
+      _lastName.text = existing.lastName ?? '';
       _birthDate = existing.birthDate;
       _gender = existing.gender;
       _city = existing.city;
+      _languages.addAll(existing.languages);
+      _education = existing.education;
     }
 
     return AppScaffold(
@@ -201,13 +260,19 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
           const SizedBox(height: 22),
           SectionGroup(
             header: 'About you',
-            footer: 'Your age is shown, your date of birth is not. There is no '
-                'surname field, on purpose.',
+            footer: 'Your age is shown, your date of birth is not. A last name '
+                'is optional and is never used to match you with anyone.',
             children: [
               FieldRow(
                 label: 'First name',
                 value: _name.text.isEmpty ? null : _name.text,
                 onTap: _editName,
+              ),
+              FieldRow(
+                label: 'Last name',
+                value: _lastName.text.isEmpty ? null : _lastName.text,
+                placeholder: 'Optional',
+                onTap: _editLastName,
               ),
               FieldRow(
                 label: 'Date of birth',
@@ -217,8 +282,34 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
               FieldRow(
                 label: 'Gender',
                 value: _gender?.label,
+                last: true,
                 onTap: _pickGender,
               ),
+            ],
+          ),
+          SectionGroup(
+            header: 'Background',
+            footer: 'Both are optional. Left blank, neither is used to narrow '
+                'who you see or who sees you.',
+            children: [
+              FieldRow(
+                label: 'Languages',
+                value: _languages.isEmpty ? null : _languageSummary,
+                placeholder: 'Optional',
+                onTap: _pickLanguages,
+              ),
+              FieldRow(
+                label: 'Education',
+                value: _education?.label,
+                placeholder: 'Optional',
+                last: true,
+                onTap: _pickEducation,
+              ),
+            ],
+          ),
+          SectionGroup(
+            header: 'Location',
+            children: [
               FieldRow(
                 label: 'City',
                 value: _city == null || _city == City.unknown
@@ -248,6 +339,27 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
           .read(photoPoolProvider.notifier)
           .remove(mediaId, onError: _toast);
     }
+  }
+
+  /// Two names, then a count. Twelve labels in a row would not fit the row.
+  String get _languageSummary {
+    final chosen = [
+      for (final l in Language.values)
+        if (_languages.contains(l)) l.label,
+    ];
+    if (chosen.length <= 2) return chosen.join(', ');
+    return '${chosen.take(2).join(', ')} +${chosen.length - 2}';
+  }
+
+  Future<void> _editLastName() async {
+    final typed = await showTextEntrySheet(
+      context,
+      title: 'Last name',
+      hint: 'Optional',
+      initial: _lastName.text,
+      maxLength: 40,
+    );
+    if (typed != null) setState(() => _lastName.text = typed);
   }
 
   Future<void> _editName() async {

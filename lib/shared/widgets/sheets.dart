@@ -190,6 +190,134 @@ Future<T?> showAppSheet<T>(
   );
 }
 
+/// Several answers to one question, kept open until Done.
+///
+/// The design draws this as a pushed screen with its own Back and Done. It is a
+/// sheet here because every other one-question step in this form is one, and a
+/// form that pushes for one answer and slides up for the next reads as two
+/// different apps.
+///
+/// Options are (key, label) in the order they should appear, which is the order
+/// the server sent. Returns the chosen keys, or null if they backed out.
+Future<Set<String>?> showMultiChoiceSheet(
+  BuildContext context, {
+  required String title,
+  required List<(String, String)> options,
+  required Set<String> initial,
+  String? subtitle,
+  String saveLabel = 'Done',
+}) {
+  return showAppSheet<Set<String>>(
+    context,
+    builder: (sheetContext) => _MultiChoice(
+      title: title,
+      subtitle: subtitle,
+      options: options,
+      initial: initial,
+      saveLabel: saveLabel,
+    ),
+  );
+}
+
+class _MultiChoice extends StatefulWidget {
+  const _MultiChoice({
+    required this.title,
+    required this.options,
+    required this.initial,
+    required this.saveLabel,
+    this.subtitle,
+  });
+
+  final String title;
+  final String? subtitle;
+  final List<(String, String)> options;
+  final Set<String> initial;
+  final String saveLabel;
+
+  @override
+  State<_MultiChoice> createState() => _MultiChoiceState();
+}
+
+class _MultiChoiceState extends State<_MultiChoice> {
+  late final Set<String> _chosen = {...widget.initial};
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(widget.title, style: AppText.title3),
+        if (widget.subtitle != null) ...[
+          const SizedBox(height: 6),
+          Text(widget.subtitle!, style: AppText.caption),
+        ],
+        const SizedBox(height: 12),
+        // Half the screen at most: twelve languages do not fit, and a sheet
+        // that grows past the top edge cannot be dismissed.
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.45,
+          ),
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              for (final (key, label) in widget.options)
+                Pressable(
+                  onTap: () => setState(
+                    () => _chosen.contains(key)
+                        ? _chosen.remove(key)
+                        : _chosen.add(key),
+                  ),
+                  child: Container(
+                    height: 46,
+                    alignment: Alignment.centerLeft,
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: AppColors.separator,
+                          width: 0.5,
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(child: Text(label, style: AppText.body)),
+                        if (_chosen.contains(key))
+                          const Icon(
+                            Icons.check,
+                            size: 18,
+                            color: AppColors.accent,
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Pressable(
+          // Choosing nothing is a real answer here: it means not stated.
+          onTap: () => Navigator.of(context).pop(_chosen),
+          child: Container(
+            height: 50,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.fill,
+              borderRadius: BorderRadius.circular(Radii.row),
+            ),
+            child: Text(
+              widget.saveLabel,
+              style: AppText.button.copyWith(color: AppColors.onAccent),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// One field, asked for on its own.
 ///
 /// Used for a first name and for a written prompt answer. It is a sheet rather

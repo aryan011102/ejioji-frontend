@@ -21,32 +21,36 @@ class NumericKeypad extends StatelessWidget {
   final ValueChanged<String> onDigit;
   final VoidCallback onDelete;
 
+  /// Digit, then the letters under it. The letters are what make this read
+  /// as the phone keypad rather than as five rows of buttons.
   static const _keys = [
-    '1', '2', '3', //
-    '4', '5', '6', //
-    '7', '8', '9', //
-    '', '0', 'del', //
+    ('1', ''), ('2', 'ABC'), ('3', 'DEF'), //
+    ('4', 'GHI'), ('5', 'JKL'), ('6', 'MNO'), //
+    ('7', 'PQRS'), ('8', 'TUV'), ('9', 'WXYZ'), //
+    ('', ''), ('0', '+'), ('del', ''), //
   ];
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppColors.fill3,
+      // The screen's own colour, not a plate of its own: the keypad is the
+      // bottom of this screen, not a keyboard that slid up over it.
+      color: AppColors.group,
       padding: EdgeInsets.fromLTRB(
-        4,
-        6,
-        4,
-        4 + MediaQuery.paddingOf(context).bottom,
+        14,
+        8,
+        14,
+        6 + MediaQuery.paddingOf(context).bottom,
       ),
       child: GridView.count(
         crossAxisCount: 3,
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        mainAxisSpacing: 6,
-        crossAxisSpacing: 6,
-        childAspectRatio: 2.5,
+        mainAxisSpacing: 7,
+        crossAxisSpacing: 8,
+        childAspectRatio: 2.65,
         children: [
-          for (final key in _keys)
+          for (final (key, letters) in _keys)
             if (key.isEmpty)
               const SizedBox.shrink()
             else
@@ -59,15 +63,7 @@ class NumericKeypad extends StatelessWidget {
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     color: key == 'del' ? null : AppColors.row,
-                    borderRadius: BorderRadius.circular(7),
-                    boxShadow: key == 'del'
-                        ? null
-                        : const [
-                            BoxShadow(
-                              color: Color(0x99000000),
-                              offset: Offset(0, 1),
-                            ),
-                          ],
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Center(
                     child: key == 'del'
@@ -76,12 +72,30 @@ class NumericKeypad extends StatelessWidget {
                             size: 22,
                             color: AppColors.label,
                           )
-                        : Text(
-                            key,
-                            style: AppText.title1.copyWith(
-                              fontSize: 23,
-                              fontWeight: FontWeight.w400,
-                            ),
+                        : Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                key,
+                                style: AppText.title1.copyWith(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w400,
+                                  letterSpacing: 0,
+                                  height: 1.1,
+                                ),
+                              ),
+                              if (letters.isNotEmpty)
+                                Text(
+                                  letters,
+                                  style: AppText.caption.copyWith(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w500,
+                                    letterSpacing: 1.4,
+                                    color: AppColors.label,
+                                    height: 1.1,
+                                  ),
+                                ),
+                            ],
                           ),
                   ),
                 ),

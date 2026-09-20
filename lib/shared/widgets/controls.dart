@@ -128,13 +128,14 @@ class AppChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
+      // No `alignment` here: a Container that aligns its child takes all the
+      // width a Wrap offers it, which put every chip on a line of its own.
       child: Container(
-        height: 36,
-        padding: const EdgeInsets.symmetric(horizontal: 15),
-        alignment: Alignment.center,
+        height: 34,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
           color: selected ? AppColors.fill : AppColors.row,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(17),
           border: Border.all(
             color: selected ? const Color(0x00000000) : AppColors.hairline,
           ),

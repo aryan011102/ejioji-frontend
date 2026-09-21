@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../shared/models/enums.dart';
 import '../shared/models/person.dart';
 
 /// Every route in the app, named once.
@@ -87,7 +88,11 @@ abstract final class Routes {
   static const editInfo = '/you/profile/info';
   static const editSources = '/you/profile/insights';
   static const editCategory = '/you/profile/insights/:index';
-  static String editCategoryAt(int i) => '/you/profile/insights/$i';
+  /// [source] makes this a walk through one app's categories rather than a
+  /// single category: Gmail lands on food delivery and steps on to going out,
+  /// travel and moving, instead of stopping at the first one.
+  static String editCategoryAt(int i, {SourceProvider? source}) =>
+      '/you/profile/insights/$i${source == null ? '' : '?source=${source.wire}'}';
 
   static const settings = '/you/settings';
   static const profileViews = '/you/settings/views';

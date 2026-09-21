@@ -38,6 +38,7 @@ class ProfileRepository {
     String? lastName,
     List<Language> languages = const [],
     Education? education,
+    Pronouns? pronouns,
   }) async {
     final body = await _api.put(
       Api.profile,
@@ -49,6 +50,7 @@ class ProfileRepository {
         'city': city.wire,
         'languages': [for (final l in languages) l.wire],
         'education': education?.wire,
+        'pronouns': pronouns?.wire,
       },
     );
     return Profile.fromJson(body);

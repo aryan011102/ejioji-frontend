@@ -182,6 +182,34 @@ enum TileOrigin {
 /// The backend has two enums here: insight categories, and the wider prompt
 /// set that adds the two only a written answer can fill. One enum covers both,
 /// because a profile tile is either kind and the UI groups them together.
+/// How to refer to someone, from the server's closed list.
+///
+/// A list rather than a free field for the same reason gender and city are:
+/// there is no moderation queue, and a text box on a profile becomes a place to
+/// write things that are not pronouns. Nothing derives these from gender, and
+/// [unknown] means not stated, which shows nothing rather than a guess.
+enum Pronouns {
+  sheHer('she_her', 'she/her'),
+  heHim('he_him', 'he/him'),
+  theyThem('they_them', 'they/them'),
+  sheThey('she_they', 'she/they'),
+  heThey('he_they', 'he/they'),
+  unknown('', '');
+
+  const Pronouns(this.wire, this.label);
+
+  final String wire;
+  final String label;
+
+  static Pronouns? parse(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    for (final value in values) {
+      if (value.wire == raw) return value;
+    }
+    return null;
+  }
+}
+
 enum TileCategory {
   foodDelivery('food_delivery', 'Food delivery', '🍜'),
   goingOut('going_out', 'Going out', '🎟️'),

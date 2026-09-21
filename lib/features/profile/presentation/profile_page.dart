@@ -202,7 +202,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       }
       return _wall(
         name: person.firstName,
-        subtitle: '${person.age} · ${person.city.label}',
+        pronouns: person.pronouns,
+        chips: _chips(
+          age: person.age,
+          city: person.city,
+          languages: person.languages,
+          education: person.education,
+        ),
         photos: person.photos,
         tiles: person.tiles,
         person: person,
@@ -224,9 +230,15 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         final details = profile.profile;
         return _wall(
           name: details?.firstName ?? '',
-          subtitle: details == null
-              ? ''
-              : '${details.age} · ${details.city.label}',
+          pronouns: details?.pronouns,
+          chips: details == null
+              ? const []
+              : _chips(
+                  age: details.age,
+                  city: details.city,
+                  languages: details.languages,
+                  education: details.education,
+                ),
           photos: profile.photos,
           tiles: profile.tiles,
           publish: profile.publish,
@@ -237,7 +249,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
   Widget _wall({
     required String name,
-    required String subtitle,
+    required List<_Fact> chips,
+    Pronouns? pronouns,
     required List<MediaAsset> photos,
     required List<api.ProfileTile> tiles,
     Candidate? person,
@@ -255,7 +268,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           ListView(
             padding: EdgeInsets.only(bottom: _viewer ? _actionsHeight : 24),
             children: [
-              _header(name, subtitle, photos),
+              _header(name, pronouns, chips, photos),
               if (!_viewer) ...[
                 if (publish != null) _publishState(publish),
                 Padding(
@@ -381,34 +394,92 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     );
   }
 
-  Widget _header(String name, String subtitle, List<MediaAsset> photos) {
+  /// The facts under a name, in the order the design draws them.
+  ///
+  /// Languages collapse to "Hindi, English +1" rather than wrapping: the row
+  /// scrolls, so a long list would push the rest out of reach. Anything the
+  /// person has not stated is left out entirely instead of showing an empty
+  /// chip, which is the same rule as pronouns.
+  List<_Fact> _chips({
+    required int age,
+    required City city,
+    required List<Language> languages,
+    required Education? education,
+  }) {
+    return [
+      _Fact('📍', city.label),
+      _Fact('🎂', '$age'),
+      if (languages.isNotEmpty)
+        _Fact(
+          '🗣',
+          languages.length <= 2
+              ? [for (final l in languages) l.label].join(', ')
+              : '${languages[0].label}, ${languages[1].label} '
+                  '+${languages.length - 2}',
+        ),
+      if (education != null) _Fact('💻', education.label),
+    ];
+  }
+
+  Widget _header(
+    String name,
+    Pronouns? pronouns,
+    List<_Fact> chips,
+    List<MediaAsset> photos,
+  ) {
+    // Their profile shows what they stated and nothing else. Your own offers the
+    // way in, because a field nobody can find is a field nobody fills.
+    final pronounLine = pronouns?.label ?? (_viewer ? null : 'Add pronouns');
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(Insets.gutter, 4, Insets.gutter, 0),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Avatar(
-            seedColor: AppColors.fill,
-            size: 74,
-            imageUrl: photos.isEmpty ? null : photos.first.stillUrl,
+          Row(
+            children: [
+              Avatar(
+                seedColor: AppColors.fill,
+                size: 74,
+                imageUrl: photos.isEmpty ? null : photos.first.stillUrl,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.title1.copyWith(fontSize: 26),
+                    ),
+                    if (pronounLine != null) ...[
+                      const SizedBox(height: 3),
+                      _PronounLine(
+                        text: pronounLine,
+                        editable: !_viewer,
+                        onTap: () => context.push(Routes.editInfo),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppText.title1.copyWith(fontSize: 26),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  subtitle,
-                  style: AppText.footnote.copyWith(fontSize: 14),
-                ),
-              ],
+          if (chips.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final fact in chips) ...[
+                    _FactChip(fact: fact),
+                    const SizedBox(width: 8),
+                  ],
+                ],
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -628,5 +699,78 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     } on ApiException catch (e) {
       if (mounted) showAppToast(context, e.message);
     }
+  }
+}
+
+
+/// One fact under the name: a glyph and a word.
+@immutable
+class _Fact {
+  const _Fact(this.glyph, this.label);
+
+  final String glyph;
+  final String label;
+}
+
+class _FactChip extends StatelessWidget {
+  const _FactChip({required this.fact});
+
+  final _Fact fact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+      decoration: BoxDecoration(
+        color: AppColors.fill,
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(fact.glyph, style: const TextStyle(fontSize: 14)),
+          const SizedBox(width: 7),
+          Text(fact.label, style: AppText.body.copyWith(fontSize: 15)),
+        ],
+      ),
+    );
+  }
+}
+
+/// The pronouns under the name, and on your own profile the way to set them.
+class _PronounLine extends StatelessWidget {
+  const _PronounLine({
+    required this.text,
+    required this.editable,
+    required this.onTap,
+  });
+
+  final String text;
+  final bool editable;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = Text(
+      text,
+      overflow: TextOverflow.ellipsis,
+      style: AppText.footnote.copyWith(
+        fontSize: 14,
+        color: editable ? AppColors.accent : null,
+      ),
+    );
+    if (!editable) return label;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(child: label),
+          const SizedBox(width: 5),
+          const Icon(Icons.edit_outlined, size: 14, color: AppColors.accent),
+        ],
+      ),
+    );
   }
 }

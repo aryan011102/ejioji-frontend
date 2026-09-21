@@ -41,6 +41,7 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
   City? _city;
   final _languages = <Language>{};
   Education? _education;
+  Pronouns? _pronouns;
 
   bool _dirty = false;
   bool _saving = false;
@@ -89,6 +90,7 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
                 if (_languages.contains(l)) l,
             ],
             education: _education,
+            pronouns: _pronouns,
           );
       final profile = await ref.read(profileRepositoryProvider).load();
       if (!mounted) return;
@@ -176,6 +178,29 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
     }
   }
 
+  Future<void> _pickPronouns() async {
+    final offered = ref.read(profileOptionsProvider).valueOrNull?.pronouns ?? [];
+    if (offered.isEmpty) return;
+    // Clearing has to be reachable: somebody who set these by accident, or who
+    // stops wanting them shown, cannot be left with no way back to not stated.
+    final choice = await showAppActionSheet(
+      context,
+      title: 'Pronouns',
+      actions: [
+        for (final p in offered) SheetAction(p.label),
+        if (_pronouns != null) const SheetAction('Not stated', destructive: true),
+      ],
+    );
+    if (choice != null) {
+      setState(() {
+        _pronouns = choice < offered.length
+            ? Pronouns.parse(offered[choice].key)
+            : null;
+        _dirty = true;
+      });
+    }
+  }
+
   Future<void> _pickDate() async {
     final now = DateTime.now();
     final picked = await showDatePicker(
@@ -252,6 +277,7 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
       _city = details.city;
       _languages.addAll(details.languages);
       _education = details.education;
+      _pronouns = details.pronouns;
     }
 
     return AppScaffold(
@@ -373,8 +399,14 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
                   label: 'Education',
                   value: _education?.label,
                   placeholder: 'Optional',
-                  last: true,
                   onTap: _pickEducation,
+                ),
+                FieldRow(
+                  label: 'Pronouns',
+                  value: _pronouns?.label,
+                  placeholder: 'Optional',
+                  last: true,
+                  onTap: _pickPronouns,
                 ),
               ],
             ),

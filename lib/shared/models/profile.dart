@@ -23,6 +23,7 @@ class Profile {
     this.lastName,
     this.languages = const [],
     this.education,
+    this.pronouns,
   });
 
   final String firstName;
@@ -40,6 +41,9 @@ class Profile {
   final List<Language> languages;
   final Education? education;
 
+  /// Null means not stated. Shown as nothing, never guessed from gender.
+  final Pronouns? pronouns;
+
   /// The name as it is shown. A person with no last name is just their first.
   String get displayName =>
       lastName == null || lastName!.isEmpty ? firstName : '$firstName $lastName';
@@ -56,6 +60,7 @@ class Profile {
             if (Language.parse(raw) case final l?) l,
         ],
         education: Education.parse(j.strOrNull('education')),
+        pronouns: Pronouns.parse(j.strOrNull('pronouns')),
       );
 }
 
@@ -164,6 +169,7 @@ class ProfileOptions {
     required this.cities,
     required this.languages,
     required this.educations,
+    required this.pronouns,
   });
 
   final List<PromptOption> genders;
@@ -171,11 +177,16 @@ class ProfileOptions {
   final List<PromptOption> languages;
   final List<PromptOption> educations;
 
+  /// The closed list the server will accept. Not offered as a text field, and
+  /// not defaulted from gender.
+  final List<PromptOption> pronouns;
+
   static ProfileOptions fromJson(Json j) => ProfileOptions(
         genders: PromptOption.listFrom(j.objects('genders')),
         cities: PromptOption.listFrom(j.objects('cities')),
         languages: PromptOption.listFrom(j.objects('languages')),
         educations: PromptOption.listFrom(j.objects('educations')),
+        pronouns: PromptOption.listFrom(j.objects('pronouns')),
       );
 }
 

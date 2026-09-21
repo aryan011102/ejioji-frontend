@@ -302,4 +302,58 @@ void main() {
       expect(bank(asked: const ['gaming']).askedCategories, isEmpty);
     });
   });
+
+  group('pronouns', () {
+    test('are null when the server says nothing, never guessed from gender', () {
+      final profile = Profile.fromJson({
+        'first_name': 'Priya',
+        'birth_date': '1998-04-12',
+        'age': 27,
+        'gender': 'woman',
+        'city': 'bengaluru',
+      });
+      // The whole reason the field exists is people whose pronouns do not follow
+      // their gender. A default would mislabel them on every profile that never
+      // opened the editor.
+      expect(profile.pronouns, isNull);
+    });
+
+    test('are read from the closed list', () {
+      final profile = Profile.fromJson({
+        'first_name': 'Alex',
+        'birth_date': '1998-04-12',
+        'age': 27,
+        'gender': 'non_binary',
+        'city': 'bengaluru',
+        'pronouns': 'they_them',
+      });
+      expect(profile.pronouns, Pronouns.theyThem);
+      expect(profile.pronouns!.label, 'they/them');
+    });
+
+    test('a value this build has never heard of is not stated, not a crash', () {
+      expect(Pronouns.parse('ze_zir'), isNull);
+      expect(Pronouns.parse(''), isNull);
+      expect(Pronouns.parse(null), isNull);
+    });
+
+    test('a card carries what the header shows, and never a surname', () {
+      final card = Candidate.fromJson({
+        'user_id': '11111111-1111-1111-1111-111111111111',
+        'first_name': 'Ananya',
+        'last_name': 'Garg',
+        'age': 28,
+        'city': 'bengaluru',
+        'languages': ['hindi', 'english'],
+        'education': 'bachelors',
+        'pronouns': 'she_her',
+      });
+      expect(card.pronouns, Pronouns.sheHer);
+      expect(card.languages, [Language.hindi, Language.english]);
+      expect(card.education, Education.bachelors);
+      // A surname beside purchase history is the caste inference, so a card has
+      // no field for one however much the server sends.
+      expect(card.firstName, 'Ananya');
+    });
+  });
 }

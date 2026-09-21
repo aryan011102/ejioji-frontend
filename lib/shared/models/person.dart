@@ -18,6 +18,9 @@ class Candidate {
     required this.firstName,
     required this.age,
     required this.city,
+    this.languages = const [],
+    this.education,
+    this.pronouns,
     required this.photos,
     required this.tiles,
   });
@@ -26,6 +29,13 @@ class Candidate {
   final String firstName;
   final int age;
   final City city;
+
+  /// The same three the header shows on your own profile, so a card reads the
+  /// same way. The surname is deliberately not here: it is shown to its owner
+  /// alone, because a surname beside purchase history is the caste inference.
+  final List<Language> languages;
+  final Education? education;
+  final Pronouns? pronouns;
   final List<MediaAsset> photos;
   final List<ProfileTile> tiles;
 
@@ -36,6 +46,12 @@ class Candidate {
         firstName: j.str('first_name'),
         age: j.intOr('age', 0),
         city: City.parse(j.strOrNull('city')),
+        languages: [
+          for (final raw in j.strings('languages'))
+            if (Language.parse(raw) case final l?) l,
+        ],
+        education: Education.parse(j.strOrNull('education')),
+        pronouns: Pronouns.parse(j.strOrNull('pronouns')),
         photos: MediaAsset.listFrom(j.objects('photos')),
         tiles: ProfileTile.listFrom(j.objects('tiles')),
       );

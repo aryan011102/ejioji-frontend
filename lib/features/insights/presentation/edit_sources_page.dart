@@ -191,18 +191,19 @@ class _EditSourcesPageState extends ConsumerState<EditSourcesPage> {
     );
   }
 
-  /// A source opens the first category its tiles land in. Gmail feeds two
-  /// (food and shopping); the category page steps through to the next one.
+  /// A source opens the first category its tiles land in, and the category page
+  /// then steps through the rest of that source's categories rather than
+  /// stopping there. Gmail feeds four now (food delivery, going out, travel and
+  /// moving), and until this it opened food delivery and had no way onward, so
+  /// the other three were unreachable from here.
   VoidCallback? _opener(
     SourceProvider provider,
     List<Insight> candidates,
     List<TileCategory> categories,
   ) {
-    final index = categories.indexWhere(
-      (c) => candidates.any((i) => i.category == c && i.providers.contains(provider)),
-    );
-    if (index < 0) return null;
-    return () => context.push(Routes.editCategoryAt(index));
+    final walk = categoriesOf(provider, candidates, categories);
+    if (walk.isEmpty) return null;
+    return () => context.push(Routes.editCategoryAt(0, source: provider));
   }
 }
 

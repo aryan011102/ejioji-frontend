@@ -266,10 +266,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.editCategory,
-        builder: (_, state) => CategoryPage(
-          index: int.tryParse(state.pathParameters['index'] ?? '0') ?? 0,
-          editing: true,
-        ),
+        builder: (_, state) {
+          final source = SourceProvider.parse(state.uri.queryParameters['source']);
+          return CategoryPage(
+            index: int.tryParse(state.pathParameters['index'] ?? '0') ?? 0,
+            editing: true,
+            source: source == SourceProvider.unknown ? null : source,
+          );
+        },
       ),
 
       GoRoute(path: Routes.settings, builder: (_, __) => const SettingsPage()),

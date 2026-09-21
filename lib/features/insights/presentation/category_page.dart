@@ -44,6 +44,21 @@ List<TileCategory> pickableCategories(
           c,
     ];
 
+/// The categories one app's tiles land in, in the same order as the full walk.
+///
+/// This is what a source card opens: the walk is that app's categories rather
+/// than every category, so Gmail steps food delivery, going out, travel and
+/// moving and stops, without wandering into Netflix.
+List<TileCategory> categoriesOf(
+  SourceProvider source,
+  List<Insight> candidates,
+  List<TileCategory> categories,
+) =>
+    [
+      for (final c in categories)
+        if (candidates.any((i) => i.category == c && i.providers.contains(source))) c,
+    ];
+
 /// One category of tiles, on the way in and on the way back.
 ///
 /// Editing is this screen re-entered, not a different one. Three things differ
@@ -57,10 +72,19 @@ List<TileCategory> pickableCategories(
 /// replaces that category's tiles in the list and leaves every other one where
 /// the person put it.
 class CategoryPage extends ConsumerStatefulWidget {
-  const CategoryPage({required this.index, required this.editing, super.key});
+  const CategoryPage({
+    required this.index,
+    required this.editing,
+    this.source,
+    super.key,
+  });
 
   final int index;
   final bool editing;
+
+  /// Set when this was opened from one app's card, which makes the walk that
+  /// app's categories instead of all of them. [index] counts within the walk.
+  final SourceProvider? source;
 
   @override
   ConsumerState<CategoryPage> createState() => _CategoryPageState();
@@ -124,7 +148,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
       await _save(category, current);
       if (!mounted) return;
       if (widget.editing) {
-        context.pop();
+        _leave(count);
         return;
       }
       _advance(count);
@@ -132,6 +156,23 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
       if (mounted) showAppToast(context, e.message);
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  /// Where saving goes in edit mode. A single category returns the way it came;
+  /// a walk through one app's categories goes on to the next, and `go`es back to
+  /// the source list at the end rather than popping, which would land on the
+  /// previous category instead.
+  void _leave(int count) {
+    final source = widget.source;
+    if (source == null) {
+      context.pop();
+    } else if (widget.index >= count - 1) {
+      context.go(Routes.editSources);
+    } else {
+      unawaited(
+        context.push<void>(Routes.editCategoryAt(widget.index + 1, source: source)),
+      );
     }
   }
 
@@ -176,8 +217,10 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
     final insights = candidates.requireValue;
     final answers = bank.requireValue.answers;
     final current = profile.requireValue.tiles;
+    final walkable = pickableCategories(insights, answers, bank.requireValue);
+    final source = widget.source;
     final categories =
-        pickableCategories(insights, answers, bank.requireValue);
+        source == null ? walkable : categoriesOf(source, insights, walkable);
 
     if (widget.index >= categories.length) {
       return AppScaffold(
@@ -212,15 +255,25 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
       navBar: AppNavBar(
         backLabel: 'Back',
         onBack: () => context.pop(),
-        trailingLabel: widget.editing ? null : 'Skip',
-        onTrailing: widget.editing ? null : () => _advance(categories.length),
+        trailingLabel: !widget.editing
+            ? 'Skip'
+            : widget.source != null && widget.index < categories.length - 1
+                ? 'Next'
+                : null,
+        onTrailing: !widget.editing
+            ? () => _advance(categories.length)
+            : widget.source != null && widget.index < categories.length - 1
+                ? () => _leave(categories.length)
+                : null,
       ),
       footer: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           PrimaryButton(
             label: widget.editing
-                ? 'Save ${picked.length} on your profile'
+                ? widget.source != null && widget.index < categories.length - 1
+                    ? 'Save ${picked.length} and next'
+                    : 'Save ${picked.length} on your profile'
                 : picked.isEmpty
                     ? 'Pick at least one'
                     : 'Continue with ${picked.length}',

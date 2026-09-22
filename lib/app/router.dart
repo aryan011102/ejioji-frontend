@@ -21,7 +21,6 @@ import '../features/home/presentation/filters_page.dart';
 import '../features/home/presentation/home_page.dart';
 import '../features/home/presentation/notifications_page.dart';
 import '../features/insights/presentation/category_page.dart';
-import '../features/insights/presentation/edit_sources_page.dart';
 import '../features/onboarding/presentation/connect_accounts_page.dart';
 import '../features/onboarding/presentation/consent_page.dart';
 import '../features/onboarding/presentation/create_profile_page.dart';
@@ -113,9 +112,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.connect,
-        builder: (_, state) => ConnectAccountsPage(
-          onboarding: state.uri.queryParameters['more'] == null,
-        ),
+        builder: (_, __) => const ConnectAccountsPage(),
       ),
       GoRoute(
         path: Routes.netflixUpload,
@@ -264,7 +261,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: Routes.editInfo, builder: (_, __) => const EditInfoPage()),
       GoRoute(
         path: Routes.editSources,
-        builder: (_, __) => const EditSourcesPage(),
+        // Edit tiles is the connect screen again, not a page of its own.
+        builder: (_, __) => const ConnectAccountsPage(editing: true),
       ),
       GoRoute(
         path: Routes.editCategory,

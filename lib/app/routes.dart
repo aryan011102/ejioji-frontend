@@ -18,6 +18,9 @@ abstract final class Routes {
   static const createProfile = '/onboarding/about-you';
   static const consent = '/onboarding/permissions';
   static const connect = '/onboarding/connect';
+  /// The same screen opened from "Your insights" to link one more app: no
+  /// category walk after it, just back.
+  static const linkMore = '/onboarding/connect?more=1';
   static const netflixUpload = '/onboarding/connect/netflix';
   static const spotifyUpload = '/onboarding/connect/spotify';
 

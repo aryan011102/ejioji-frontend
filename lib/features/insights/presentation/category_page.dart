@@ -231,7 +231,9 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
           body: 'Connect an app or answer a question, and your tiles appear '
               'here.',
           primaryLabel: 'Connect an app',
-          onPrimary: () => context.push(Routes.connect),
+          onPrimary: () => context.push(
+            widget.editing ? Routes.linkMore : Routes.connect,
+          ),
         ),
       );
     }

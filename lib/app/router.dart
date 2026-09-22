@@ -113,7 +113,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.connect,
-        builder: (_, __) => const ConnectAccountsPage(),
+        builder: (_, state) => ConnectAccountsPage(
+          onboarding: state.uri.queryParameters['more'] == null,
+        ),
       ),
       GoRoute(
         path: Routes.netflixUpload,

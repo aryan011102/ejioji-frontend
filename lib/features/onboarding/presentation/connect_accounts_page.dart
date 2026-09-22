@@ -28,8 +28,17 @@ import '../../../shared/widgets/states.dart';
 /// background sync: the access token lives in the server's memory for the
 /// couple of minutes the read takes and is revoked when it finishes, so there
 /// is never a stored credential to leak.
+///
+/// It is the only screen in onboarding that deals with sources. Nothing here
+/// shows tiles: once something is connected, Next walks the categories, and a
+/// category the sources could not fill asks its questions there instead.
+///
+/// [onboarding] is false when "Your insights" opens this to link one more app.
+/// Then there is no walk to start, so the foot just goes back.
 class ConnectAccountsPage extends ConsumerWidget {
-  const ConnectAccountsPage({super.key});
+  const ConnectAccountsPage({this.onboarding = true, super.key});
+
+  final bool onboarding;
 
   static const _sources = <(SourceProvider, String, String)>[
     (
@@ -109,10 +118,27 @@ class ConnectAccountsPage extends ConsumerWidget {
 
     return AppScaffold(
       navBar: AppNavBar(backLabel: 'Back', onBack: () => context.pop()),
-      footer: PrimaryButton(
-        label: linked.isEmpty ? 'Skip for now' : 'Continue',
-        onPressed: () => context.push(Routes.editSources),
-      ),
+      footer: !onboarding
+          ? PrimaryButton(label: 'Done', onPressed: () => context.pop())
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                PrimaryButton(
+                  label: 'Next',
+                  onPressed: linked.isEmpty
+                      ? null
+                      : () => context.push(Routes.pickCategoryAt(0)),
+                ),
+                // Nothing connected still has a way on: every category comes
+                // back thin, so the walk is all questions.
+                if (linked.isEmpty)
+                  TextActionButton(
+                    label: "I'll do this later",
+                    dim: true,
+                    onPressed: () => context.push(Routes.pickCategoryAt(0)),
+                  ),
+              ],
+            ),
       child: connections.when(
         loading: () => const LoadingView(),
         error: (e, _) => ErrorView(

@@ -71,6 +71,14 @@ class _ReadingPageState extends ConsumerState<ReadingPage> {
     }
   }
 
+  void _back() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go(Routes.home);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final error = _error;
@@ -95,18 +103,13 @@ class _ReadingPageState extends ConsumerState<ReadingPage> {
     return AppScaffold(
       // Nothing is blocked on this. Someone who wants to get on with it can,
       // and the tiles appear when the read lands.
+      // Either way it goes back to the list it came from. Tiles are picked
+      // after connecting, not per app: in onboarding that is the connect
+      // screen's Next, and from "Your insights" it is the app's own card.
       navBar: _watching
-          ? AppNavBar(
-              trailingLabel: 'Later',
-              onTrailing: () => context.go(Routes.home),
-            )
+          ? AppNavBar(trailingLabel: 'Later', onTrailing: _back)
           : const AppNavBar(),
-      footer: finished
-          ? PrimaryButton(
-              label: run.status == RunStatus.empty ? 'Carry on' : 'Pick tiles',
-              onPressed: () => context.go(Routes.editSources),
-            )
-          : null,
+      footer: finished ? PrimaryButton(label: 'Done', onPressed: _back) : null,
       child: finished ? _result(run) : _reading(run),
     );
   }

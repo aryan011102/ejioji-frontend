@@ -167,7 +167,7 @@ class _EditSourcesPageState extends ConsumerState<EditSourcesPage> {
               onOpen: _opener(provider, candidates, categories),
               onRefresh: () => _refresh(provider),
               onUnlink: () => _unlink(provider),
-              onLink: () => context.push(Routes.connect),
+              onLink: () => context.push(Routes.linkMore),
             ),
           ),
         if (categories.isNotEmpty)

@@ -18,9 +18,6 @@ abstract final class Routes {
   static const createProfile = '/onboarding/about-you';
   static const consent = '/onboarding/permissions';
   static const connect = '/onboarding/connect';
-  /// The same screen opened from "Your insights" to link one more app: no
-  /// category walk after it, just back.
-  static const linkMore = '/onboarding/connect?more=1';
   static const netflixUpload = '/onboarding/connect/netflix';
   static const spotifyUpload = '/onboarding/connect/spotify';
 
@@ -89,11 +86,12 @@ abstract final class Routes {
   // You
   static const editProfile = '/you/profile';
   static const editInfo = '/you/profile/info';
+  /// Edit tiles: the connect screen, opened from the profile.
   static const editSources = '/you/profile/insights';
   static const editCategory = '/you/profile/insights/:index';
-  /// [source] makes this a walk through one app's categories rather than a
-  /// single category: Gmail lands on food delivery and steps on to going out,
-  /// travel and moving, instead of stopping at the first one.
+  /// A walk through every category, from Next on Edit tiles. [source] narrows
+  /// it to one app's categories: Gmail steps food delivery, going out, travel
+  /// and moving.
   static String editCategoryAt(int i, {SourceProvider? source}) =>
       '/you/profile/insights/$i${source == null ? '' : '?source=${source.wire}'}';
 

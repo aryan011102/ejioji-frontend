@@ -67,6 +67,20 @@ abstract final class AppColors {
   );
 }
 
+/// The apps' own colours, for the small square each source sits on in the
+/// connect list. A source is recognised by its colour before its name is
+/// read, so these are theirs rather than ours.
+abstract final class BrandColors {
+  static const spotify = Color(0xFF1DB954);
+  static const youtube = Color(0xFFFF0033);
+  static const netflix = Color(0xFFE50914);
+  static const gmail = Color(0xFFFFFFFF);
+  static const gmailRed = Color(0xFFEA4335);
+
+  /// The hairline round each square, so a dark one still reads on a dark row.
+  static const edge = Color(0x29FFFFFF); // .16
+}
+
 /// The twelve tile gradients, at their dark values.
 ///
 /// Plum is deliberately absent: it is chrome, and a wall of tiles in the brand
@@ -149,6 +163,9 @@ abstract final class Insets {
 
 abstract final class Radii {
   static const row = 14.0;
+  /// The connect screen's cards and groups, which the design draws a little
+  /// tighter than a settings group.
+  static const panel = 12.0;
   static const card = 16.0;
   static const tile = 20.0;
   static const control = 26.0;

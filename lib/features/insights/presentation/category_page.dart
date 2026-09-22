@@ -46,9 +46,9 @@ List<TileCategory> pickableCategories(
 
 /// The categories one app's tiles land in, in the same order as the full walk.
 ///
-/// This is what a source card opens: the walk is that app's categories rather
-/// than every category, so Gmail steps food delivery, going out, travel and
-/// moving and stops, without wandering into Netflix.
+/// A walk opened with a source is that app's categories rather than every
+/// category, so Gmail steps food delivery, going out, travel and moving and
+/// stops, without wandering into Netflix. Edit tiles walks every category.
 List<TileCategory> categoriesOf(
   SourceProvider source,
   List<Insight> candidates,
@@ -65,7 +65,8 @@ List<TileCategory> categoriesOf(
 /// in [editing]:
 ///
 ///  * the heading says where you are rather than what to do,
-///  * the foot saves and returns instead of promising a next category,
+///  * the foot saves as it goes, and the last one returns to the connect
+///    screen instead of going on to the profile review,
 ///  * the setup progress bar is hidden.
 ///
 /// What is on the profile is one ordered list on the server. Saving a category
@@ -159,21 +160,23 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
     }
   }
 
-  /// Where saving goes in edit mode. A single category returns the way it came;
-  /// a walk through one app's categories goes on to the next, and `go`es back to
-  /// the source list at the end rather than popping, which would land on the
-  /// previous category instead.
+  /// Where saving goes in edit mode: on to the next category, and at the end
+  /// back to the connect screen the walk started from. Every step of the walk
+  /// was pushed, so the way back is one pop per step, which leaves the connect
+  /// screen with its own back button to the profile.
   void _leave(int count) {
-    final source = widget.source;
-    if (source == null) {
-      context.pop();
-    } else if (widget.index >= count - 1) {
-      context.go(Routes.editSources);
-    } else {
-      unawaited(
-        context.push<void>(Routes.editCategoryAt(widget.index + 1, source: source)),
-      );
+    if (widget.index >= count - 1) {
+      final nav = Navigator.of(context);
+      for (var i = 0; i <= widget.index; i++) {
+        nav.pop();
+      }
+      return;
     }
+    unawaited(
+      context.push<void>(
+        Routes.editCategoryAt(widget.index + 1, source: widget.source),
+      ),
+    );
   }
 
   void _advance(int count) {
@@ -231,9 +234,10 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
           body: 'Connect an app or answer a question, and your tiles appear '
               'here.',
           primaryLabel: 'Connect an app',
-          onPrimary: () => context.push(
-            widget.editing ? Routes.linkMore : Routes.connect,
-          ),
+          // In edit mode the connect screen is the one this walk came from.
+          onPrimary: () => widget.editing
+              ? context.pop()
+              : context.push(Routes.connect),
         ),
       );
     }
@@ -259,12 +263,12 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
         onBack: () => context.pop(),
         trailingLabel: !widget.editing
             ? 'Skip'
-            : widget.source != null && widget.index < categories.length - 1
+            : widget.index < categories.length - 1
                 ? 'Next'
                 : null,
         onTrailing: !widget.editing
             ? () => _advance(categories.length)
-            : widget.source != null && widget.index < categories.length - 1
+            : widget.index < categories.length - 1
                 ? () => _leave(categories.length)
                 : null,
       ),
@@ -273,7 +277,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
         children: [
           PrimaryButton(
             label: widget.editing
-                ? widget.source != null && widget.index < categories.length - 1
+                ? widget.index < categories.length - 1
                     ? 'Save ${picked.length} and next'
                     : 'Save ${picked.length} on your profile'
                 : picked.isEmpty

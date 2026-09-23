@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../app/in_app_banner.dart';
 import '../../../app/routes.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/json.dart';
@@ -78,12 +79,15 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
   @override
   void initState() {
     super.initState();
+    // While this is on screen, a push about this conversation gets no banner.
+    OpenConversations.opened(_matchId);
     _events = ref.read(liveEventsProvider).events.listen(_onEvent);
     unawaited(_load());
   }
 
   @override
   void dispose() {
+    OpenConversations.closed(_matchId);
     unawaited(_events?.cancel());
     _typingClear?.cancel();
     _composer.dispose();

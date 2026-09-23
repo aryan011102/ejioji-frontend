@@ -11,9 +11,9 @@ import '../config/env.dart';
 ///
 /// Three things are pushed, all of them from the backend's
 /// `notifications/push.py`: a chat message, a chat request, and a request
-/// accepted. A push carries the other person's first name, a fixed line of
-/// copy, and ids. What somebody actually wrote never leaves the server, so it
-/// cannot appear on a lock screen.
+/// accepted. A push carries the other person's first name, and ids. A chat
+/// message's push also carries the start of what was written (the backend's
+/// `chat/notify.py`, since 2026-09-23); the other two carry fixed copy.
 ///
 /// Every method here is a no-op unless this build was given a Firebase
 /// project ([Env.pushConfigured]) on a platform Firebase Messaging covers.
@@ -22,10 +22,11 @@ import '../config/env.dart';
 /// exists, including in the browser, where there is no Firebase project and
 /// no service worker.
 ///
-/// A message that arrives while the app is open is not shown as a banner on
-/// Android. The chat socket already has the message by then and the screen
-/// updates itself, which is the better answer while the app is in front of
-/// you; iOS is asked to show its banner anyway, because it costs one call.
+/// A push that arrives while the app is open is never shown by the system, on
+/// either platform. It comes out of [arrivals] instead, and the app draws its
+/// own banner (`app/in_app_banner.dart`), which it can leave out when the
+/// person is already reading that conversation. The system banner could not:
+/// it knows nothing about which screen is open.
 abstract final class Push {
   static bool _ready = false;
 
@@ -62,11 +63,12 @@ abstract final class Push {
     if (_ready || !supported) return;
     try {
       await Firebase.initializeApp(options: _options);
+      // Off while the app is open: [arrivals] and the in-app banner take over.
       await FirebaseMessaging.instance
           .setForegroundNotificationPresentationOptions(
-        alert: true,
-        badge: true,
-        sound: true,
+        alert: false,
+        badge: false,
+        sound: false,
       );
       _ready = true;
     } on Object catch (error) {
@@ -119,6 +121,15 @@ abstract final class Push {
     return PushOpen.from(await FirebaseMessaging.instance.getInitialMessage());
   }
 
+  /// Pushes that arrived while the app was open, which the system did not
+  /// show. Only ones this build knows how to open come out.
+  static Stream<PushShown> get arrivals => _ready
+      ? FirebaseMessaging.onMessage
+          .map(PushShown.from)
+          .where((shown) => shown != null)
+          .cast<PushShown>()
+      : const Stream.empty();
+
   /// Notifications tapped while the app was running in the background.
   static Stream<PushOpen> get taps => _ready
       ? FirebaseMessaging.onMessageOpenedApp
@@ -159,5 +170,27 @@ class PushOpen {
         ),
       _ => null,
     };
+  }
+}
+
+/// A push that arrived while the app was open: what it said, and what tapping
+/// it opens.
+@immutable
+class PushShown {
+  const PushShown({required this.open, required this.title, required this.body});
+
+  final PushOpen open;
+  final String title;
+  final String body;
+
+  /// Null for a push this build cannot open, or one with nothing to say.
+  static PushShown? from(RemoteMessage? message) {
+    final open = PushOpen.from(message);
+    final notification = message?.notification;
+    if (open == null || notification == null) return null;
+    final title = notification.title?.trim() ?? '';
+    final body = notification.body?.trim() ?? '';
+    if (title.isEmpty && body.isEmpty) return null;
+    return PushShown(open: open, title: title, body: body);
   }
 }

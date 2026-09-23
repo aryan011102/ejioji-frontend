@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/push/push.dart';
 import '../core/session/session.dart';
 import '../core/theme/app_theme.dart';
+import 'in_app_banner.dart';
 import 'router.dart';
 import 'routes.dart';
 
@@ -19,6 +20,9 @@ class EjiojiApp extends ConsumerStatefulWidget {
 
 class _EjiojiAppState extends ConsumerState<EjiojiApp> {
   StreamSubscription<PushOpen>? _taps;
+
+  /// Read once: `Push.arrivals` is a new stream on every read.
+  final Stream<PushShown> _arrivals = Push.arrivals;
 
   @override
   void initState() {
@@ -57,6 +61,19 @@ class _EjiojiAppState extends ConsumerState<EjiojiApp> {
     }
   }
 
+  /// Whether a push that arrived while the app was open gets a banner. Not
+  /// one about the conversation already on screen, which shows the message
+  /// itself, and nothing at all while signed out.
+  bool _shouldShow(PushShown shown) {
+    if (!ref.read(sessionProvider).isSignedIn) return false;
+    final open = shown.open;
+    return switch (open.kind) {
+      PushKind.message || PushKind.match =>
+        open.id == null || open.id != OpenConversations.top,
+      PushKind.request => true,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -81,7 +98,12 @@ class _EjiojiAppState extends ConsumerState<EjiojiApp> {
           );
           return MediaQuery(
             data: MediaQuery.of(context).copyWith(textScaler: scale),
-            child: child ?? const SizedBox.shrink(),
+            child: InAppBanner(
+              arrivals: _arrivals,
+              shouldShow: _shouldShow,
+              onTap: _open,
+              child: child ?? const SizedBox.shrink(),
+            ),
           );
         },
       ),

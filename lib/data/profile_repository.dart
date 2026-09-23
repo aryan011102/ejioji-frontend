@@ -1,8 +1,10 @@
 import '../core/network/api_client.dart';
 import '../core/network/endpoints.dart';
+import '../core/network/json.dart';
 import '../shared/models/enums.dart';
 import '../shared/models/media.dart';
 import '../shared/models/profile.dart';
+import '../shared/models/social.dart';
 import '../shared/models/tile.dart';
 
 /// The person's own profile: the four manual fields, their photos, the tiles
@@ -139,6 +141,26 @@ class ProfileRepository {
       PublishState.fromJson(await _api.post(Api.publish));
 
   Future<void> unpublish() => _api.deleteEmpty(Api.publish);
+
+  /// Your Instagram, X and LinkedIn, each with its switch.
+  Future<List<SocialLink>> socials() async => SocialLink.listFrom(
+        (await _api.getJson(Api.socials)).objects('links'),
+      );
+
+  /// A username or a pasted profile link. The server keeps only the handle,
+  /// and says in its error what is wrong when it is not an account.
+  Future<SocialLink> saveSocial(SocialNetwork network, String value) async =>
+      SocialLink.fromJson(
+        await _api.put(Api.social(network.wire), body: {'value': value}),
+      );
+
+  Future<SocialLink> setSocialShown(SocialNetwork network, bool shown) async =>
+      SocialLink.fromJson(
+        await _api.put(Api.socialShown(network.wire), body: {'shown': shown}),
+      );
+
+  Future<void> deleteSocial(SocialNetwork network) =>
+      _api.deleteEmpty(Api.social(network.wire));
 
   /// A plain calendar date, with no timezone attached to it.
   static String _isoDate(DateTime d) =>

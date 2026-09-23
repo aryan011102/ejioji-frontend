@@ -77,6 +77,12 @@ abstract final class BrandColors {
   static const gmail = Color(0xFFFFFFFF);
   static const gmailRed = Color(0xFFEA4335);
   static const appleMusic = Color(0xFFFA2D48);
+  static const linkedin = Color(0xFF0A66C2);
+  static const x = Color(0xFF000000);
+  // Instagram's mark sits on its gradient, corner to corner.
+  static const instagramFrom = Color(0xFFFEDA75);
+  static const instagramVia = Color(0xFFD62976);
+  static const instagramTo = Color(0xFF4F5BD5);
 
   /// The hairline round each square, so a dark one still reads on a dark row.
   static const edge = Color(0x29FFFFFF); // .16

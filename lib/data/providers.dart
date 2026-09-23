@@ -10,6 +10,7 @@ import '../shared/models/consent.dart';
 import '../shared/models/media.dart';
 import '../shared/models/person.dart';
 import '../shared/models/profile.dart';
+import '../shared/models/social.dart';
 import '../shared/models/tile.dart';
 import 'auth_repository.dart';
 import 'chat_repository.dart';
@@ -95,6 +96,11 @@ final sharingRepositoryProvider = Provider<SharingRepository>(
 
 final myProfileProvider = FutureProvider.autoDispose<MyProfile>(
   (ref) => ref.watch(profileRepositoryProvider).load(),
+);
+
+/// Your own social links, switches included. Only matches ever see them.
+final mySocialsProvider = FutureProvider.autoDispose<List<SocialLink>>(
+  (ref) => ref.watch(profileRepositoryProvider).socials(),
 );
 
 final profileOptionsProvider = FutureProvider<ProfileOptions>(

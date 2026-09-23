@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/native/apple_music_kit.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
@@ -55,12 +56,19 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
     ConsentPurpose.gmailReceipts,
     ConsentPurpose.netflixUpload,
     ConsentPurpose.spotifyImport,
+    ConsentPurpose.appleMusicImport,
     ConsentPurpose.aiProcessing,
     ConsentPurpose.matching,
   ];
 
+  /// Apple Music is only asked about where it can be connected: agreeing to
+  /// read a library the phone has no way to reach would be a grant for nothing.
   List<ConsentPurpose> get _asking =>
-      widget.purposes ?? _order;
+      widget.purposes ??
+      [
+        for (final p in _order)
+          if (p != ConsentPurpose.appleMusicImport || AppleMusicKit.isAvailable) p,
+      ];
 
   /// What each purpose means in one line, above the full notice.
   ///
@@ -68,8 +76,9 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
   /// and is what the grant records.
   String _summary(ConsentPurpose purpose) => switch (purpose) {
         ConsentPurpose.youtubeImport =>
-          'The channels you subscribe to and the videos you liked. Not your '
-              'watch history, and not your playlists.',
+          'The channels you subscribe to, the videos you liked and the videos '
+              'in your playlists. Not your watch history, and not the names of '
+              'your playlists.',
         ConsentPurpose.gmailReceipts =>
           'Zomato and Swiggy food receipts and Myntra delivery emails only, '
               'found by searching for those senders. No other mail is read, '
@@ -81,6 +90,9 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
           'The listening history you download from your own Spotify '
               'account and upload here. Podcasts and private sessions are left '
               'out.',
+        ConsentPurpose.appleMusicImport =>
+          'The songs and albums saved in your Apple Music library, read once. '
+              'Not your playlists, and Apple has no listening history to give.',
         ConsentPurpose.aiProcessing =>
           'Lets an AI suggest what is worth counting, and write the captions. '
               'It never invents a number: every value is computed here.',

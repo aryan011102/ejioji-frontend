@@ -76,6 +76,7 @@ abstract final class BrandColors {
   static const netflix = Color(0xFFE50914);
   static const gmail = Color(0xFFFFFFFF);
   static const gmailRed = Color(0xFFEA4335);
+  static const appleMusic = Color(0xFFFA2D48);
 
   /// The hairline round each square, so a dark one still reads on a dark row.
   static const edge = Color(0x29FFFFFF); // .16

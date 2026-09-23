@@ -53,6 +53,31 @@ class SourcesRepository {
     return ConnectResult.fromJson(body);
   }
 
+  /// Apple Music, step one: a short-lived developer token for MusicKit. The
+  /// same consent rule as a Google source: a 403 until apple_music_import is
+  /// open, so nobody sees Apple's prompt before ours.
+  Future<String> appleMusicDeveloperToken() async {
+    final body = await _api.post(Api.authorize(SourceProvider.appleMusic.wire));
+    return body.str('developer_token');
+  }
+
+  /// Apple Music, step two: the Music User Token MusicKit gave back, or
+  /// [error] when it gave none. The server opens a run and reads the library
+  /// once; there is no redirect and so no state to carry.
+  Future<ConnectResult> completeAppleMusic({
+    String? userToken,
+    String? error,
+  }) async {
+    final body = await _api.post(
+      Api.complete(SourceProvider.appleMusic.wire),
+      body: {
+        if (userToken != null) 'music_user_token': userToken,
+        if (error != null) 'error': error,
+      },
+    );
+    return ConnectResult.fromJson(body);
+  }
+
   /// Netflix has no API. The person downloads their own per-profile viewing
   /// activity and the CSV is posted as the request body: it is parsed in
   /// memory and never written to storage.

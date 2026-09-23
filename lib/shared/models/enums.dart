@@ -100,13 +100,14 @@ enum Education {
   }
 }
 
-/// The six things a person can consent to: one per source, plus the two that
-/// cut across them.
+/// The things a person can consent to: one per source, plus the two that cut
+/// across them.
 enum ConsentPurpose {
   spotifyImport('spotify_import', 'Spotify'),
   youtubeImport('youtube_import', 'YouTube'),
   gmailReceipts('gmail_receipts', 'Order emails in Gmail'),
   netflixUpload('netflix_upload', 'Netflix history'),
+  appleMusicImport('apple_music_import', 'Apple Music library'),
   aiProcessing('ai_processing', 'AI suggestions'),
   matching('matching', 'Matching'),
   unknown('', '');
@@ -127,6 +128,7 @@ enum SourceProvider {
   spotify('spotify', 'Spotify'),
   gmail('gmail', 'Gmail receipts'),
   netflix('netflix', 'Netflix'),
+  appleMusic('apple_music', 'Apple Music'),
   unknown('', '');
 
   const SourceProvider(this.wire, this.label);
@@ -140,6 +142,7 @@ enum SourceProvider {
         SourceProvider.spotify => ConsentPurpose.spotifyImport,
         SourceProvider.gmail => ConsentPurpose.gmailReceipts,
         SourceProvider.netflix => ConsentPurpose.netflixUpload,
+        SourceProvider.appleMusic => ConsentPurpose.appleMusicImport,
         SourceProvider.unknown => ConsentPurpose.unknown,
       };
 

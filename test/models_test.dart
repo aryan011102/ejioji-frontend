@@ -50,6 +50,15 @@ void main() {
       }
       expect(SourceProvider.gmail.purpose, ConsentPurpose.gmailReceipts);
       expect(SourceProvider.netflix.purpose, ConsentPurpose.netflixUpload);
+      expect(SourceProvider.appleMusic.purpose, ConsentPurpose.appleMusicImport);
+    });
+
+    test('Apple Music reads the wire names the server sends', () {
+      expect(SourceProvider.parse('apple_music'), SourceProvider.appleMusic);
+      expect(
+        ConsentPurpose.parse('apple_music_import'),
+        ConsentPurpose.appleMusicImport,
+      );
     });
   });
 

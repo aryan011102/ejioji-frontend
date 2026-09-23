@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/routes.dart';
+import '../../../core/native/apple_music_kit.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
@@ -21,12 +22,12 @@ import '../../../shared/widgets/states.dart';
 
 /// What the profile is actually made of, and the one screen that deals with it.
 ///
-/// Four sources, and only four. The original design offered nine, including
-/// several that have no way in at all: Instagram's basic display API is gone,
-/// LinkedIn work history needs partner access nobody gets, and Apple Health's
-/// terms forbid what we would do with it. Offering a connect button for those
-/// is a promise the product cannot keep. The layout is the design's; the list
-/// is what exists.
+/// Five sources, and only five, Apple Music only on an iPhone. The original
+/// design offered nine, including several that have no way in at all:
+/// Instagram's basic display API is gone, LinkedIn work history needs partner
+/// access nobody gets, and Apple Health's terms forbid what we would do with
+/// it. Offering a connect button for those is a promise the product cannot
+/// keep. The layout is the design's; the list is what exists.
 ///
 /// Every source is read exactly once, when it is connected. There is no
 /// background sync: the access token lives in the server's memory for the
@@ -53,12 +54,19 @@ class ConnectAccountsPage extends ConsumerStatefulWidget {
 typedef _Source = ({SourceProvider provider, String name, String note});
 
 class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
-  /// The design's groups, holding only the sources that exist. Spotify is an
-  /// upload here rather than a sign-in, and says so.
-  static const _groups = <(String, List<_Source>)>[
+  /// The design's groups, holding only the sources that exist on this phone.
+  /// Spotify is an upload here rather than a sign-in, and says so. Apple Music
+  /// is a sign-in, and only where MusicKit is (an iPhone).
+  static final _groups = <(String, List<_Source>)>[
     (
       'Music',
       [
+        if (AppleMusicKit.isAvailable)
+          (
+            provider: SourceProvider.appleMusic,
+            name: 'Apple Music',
+            note: 'Your library · no listening history',
+          ),
         (
           provider: SourceProvider.spotify,
           name: 'Spotify',
@@ -125,8 +133,8 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
     await _read(provider, declined: 'No problem. Nothing was read.');
   }
 
-  /// Reads a source: Google's screen for the two sign-ins, the file for the
-  /// two uploads. Reading again is the same thing under a fresh permission,
+  /// Reads a source: Google's screen or Apple's prompt for the sign-ins, the
+  /// file for the two uploads. Reading again is the same thing under a fresh permission,
   /// never a sync.
   Future<void> _read(SourceProvider provider, {String? declined}) async {
     switch (provider) {
@@ -400,8 +408,9 @@ class _ReadOnceCard extends StatelessWidget {
 /// How much there is to match on: a word, six segments and a line.
 ///
 /// It counts connected sources, since that is what this screen changes. With
-/// four sources the segments go 0, 2, 3, 5, 6, so each source visibly moves
-/// the bar and the last one fills it.
+/// five sources (an iPhone) the segments go 0, 1, 2, 4, 5, 6, and with four
+/// 0, 2, 3, 5, 6, so each source visibly moves the bar and the last one fills
+/// it.
 class _StrengthCard extends StatelessWidget {
   const _StrengthCard({required this.linked, required this.of});
 
@@ -670,6 +679,14 @@ class _BrandMark extends StatelessWidget {
             Icons.mail_rounded,
             size: 18,
             color: BrandColors.gmailRed,
+          ),
+        ),
+      SourceProvider.appleMusic => (
+          BrandColors.appleMusic,
+          const Icon(
+            Icons.music_note_rounded,
+            size: 19,
+            color: AppColors.label,
           ),
         ),
       SourceProvider.unknown => (

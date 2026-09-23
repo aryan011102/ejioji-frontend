@@ -1,4 +1,5 @@
 import 'package:ejioji/core/native/apple_music_kit.dart';
+import 'package:ejioji/data/connect_controller.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -72,5 +73,41 @@ void main() {
       AppleMusicKit.userToken('dev-token'),
       throwsA(isA<AppleMusicUnavailable>()),
     );
+  });
+
+  test("Apple's reason comes through with the failure", () async {
+    answer(
+      (_) => PlatformException(
+        code: 'token_failed',
+        details: 'privacy_acknowledgement',
+      ),
+    );
+    await expectLater(
+      AppleMusicKit.userToken('dev-token'),
+      throwsA(
+        isA<AppleMusicUnavailable>()
+            .having((e) => e.detail, 'detail', 'privacy_acknowledgement'),
+      ),
+    );
+  });
+
+  test('MusicKit refusing after the prompt points at Settings', () async {
+    answer(
+      (_) => PlatformException(code: 'token_failed', details: 'permission_denied'),
+    );
+    await expectLater(
+      AppleMusicKit.userToken('dev-token'),
+      throwsA(isA<AppleMusicDenied>().having((e) => e.inSettings, 'inSettings', true)),
+    );
+  });
+
+  test('each reason gets its own advice, and says which it was', () {
+    expect(appleMusicTrouble('privacy_acknowledgement'), contains('Open the Music app'));
+    expect(appleMusicTrouble('not_signed_in'), contains('Sign in to Apple Music'));
+    expect(appleMusicTrouble('developer_token'), contains('That is on us'));
+    for (final reason in ['privacy_acknowledgement', 'not_signed_in', 'user_token']) {
+      expect(appleMusicTrouble(reason), endsWith('($reason)'));
+    }
+    expect(appleMusicTrouble(null), endsWith('(no reason)'));
   });
 }

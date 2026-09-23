@@ -66,9 +66,25 @@ enum AppleMusicBridge {
     do {
       return try await MusicUserTokenProvider().userToken(
         for: developerToken, options: .ignoreCache)
+    } catch let error as MusicTokenRequestError {
+      // Which of Apple's reasons, as a fixed word, so the app can say what to
+      // do about it. Never the error's own text.
+      return FlutterError(code: "token_failed", message: nil, details: reason(error))
     } catch {
-      // Only the kind of failure goes back, never the error's own text.
-      return FlutterError(code: "token_failed", message: nil, details: nil)
+      return FlutterError(code: "token_failed", message: nil, details: "other")
+    }
+  }
+
+  /// Only the cases Apple's documentation lists are named. Anything else is read
+  /// by its case name, which compiles whatever this SDK's list holds.
+  private static func reason(_ error: MusicTokenRequestError) -> String {
+    switch error {
+    case .developerTokenRequestFailed: return "developer_token"
+    case .permissionDenied: return "permission_denied"
+    case .privacyAcknowledgementRequired: return "privacy_acknowledgement"
+    case .userTokenRequestFailed: return "user_token"
+    default:
+      return String(describing: error) == "userNotSignedIn" ? "not_signed_in" : "unknown"
     }
   }
 }

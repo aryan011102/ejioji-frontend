@@ -115,9 +115,8 @@ class ConnectController extends Notifier<SourceProvider?> {
       );
     } on AppleMusicUnavailable catch (e) {
       throw ValidationFailure(
-        'Apple Music did not answer. Check this phone is signed in to Apple '
-        'Music, then try again.',
-        code: 'apple_music_unavailable:${e.reason}',
+        appleMusicTrouble(e.detail),
+        code: 'apple_music_unavailable:${e.reason}:${e.detail ?? '-'}',
       );
     }
 
@@ -146,3 +145,19 @@ class ConnectController extends Notifier<SourceProvider?> {
 
 final connectProvider =
     NotifierProvider<ConnectController, SourceProvider?>(ConnectController.new);
+
+/// What to tell someone when MusicKit would not hand over a token, by Apple's
+/// reason. Each ends with the reason in brackets, so a screenshot says which.
+String appleMusicTrouble(String? detail) => switch (detail) {
+      'privacy_acknowledgement' =>
+        "Open the Music app once and accept Apple's welcome screen there, "
+            'then try again. (privacy_acknowledgement)',
+      'not_signed_in' =>
+        'Sign in to Apple Music on this iPhone, in the Music app, then try '
+            'again. (not_signed_in)',
+      'developer_token' =>
+        "Apple did not accept theonebytwo's Apple Music setup. That is on us, "
+            'not you. (developer_token)',
+      _ => 'Apple Music did not answer. Check this phone is signed in to '
+          'Apple Music, then try again. (${detail ?? 'no reason'})',
+    };

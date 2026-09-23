@@ -35,13 +35,19 @@ class AppleMusicKit {
       }
       return token;
     } on PlatformException catch (e) {
+      final detail = e.details is String ? e.details as String : null;
       switch (e.code) {
         case 'denied':
           throw const AppleMusicDenied();
         case 'denied_in_settings':
           throw const AppleMusicDenied(inSettings: true);
       }
-      throw AppleMusicUnavailable(e.code);
+      // MusicKit saying no after the prompt said yes means access is off for
+      // this app somewhere only Settings reaches.
+      if (detail == 'permission_denied') {
+        throw const AppleMusicDenied(inSettings: true);
+      }
+      throw AppleMusicUnavailable(e.code, detail: detail);
     } on MissingPluginException {
       throw const AppleMusicUnavailable('not on this platform');
     }
@@ -60,10 +66,15 @@ class AppleMusicDenied implements Exception {
 /// MusicKit could not produce a token: no Apple ID signed in, a network
 /// failure, or a platform without MusicKit. [reason] is for logs only.
 class AppleMusicUnavailable implements Exception {
-  const AppleMusicUnavailable(this.reason);
+  const AppleMusicUnavailable(this.reason, {this.detail});
 
   final String reason;
 
+  /// Apple's own reason, as one of the Swift side's fixed words:
+  /// `developer_token`, `privacy_acknowledgement`, `not_signed_in`,
+  /// `user_token`, `unknown` or `other`. Null when Swift did not say.
+  final String? detail;
+
   @override
-  String toString() => 'AppleMusicUnavailable($reason)';
+  String toString() => 'AppleMusicUnavailable($reason, $detail)';
 }

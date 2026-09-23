@@ -46,6 +46,29 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
   }
 
+  /// Waiting on the server for the stealth switch.
+  bool _stealthBusy = false;
+
+  /// Out of every feed while still browsing and asking, or back in. Free for
+  /// now: there is no premium to check against yet.
+  Future<void> _setStealth(bool on) async {
+    setState(() => _stealthBusy = true);
+    final repo = ref.read(profileRepositoryProvider);
+    final session = ref.read(sessionProvider.notifier);
+    try {
+      if (on) {
+        session.onPublishChanged(await repo.enterStealth());
+      } else {
+        await repo.leaveStealth();
+        session.onProfileChanged(await repo.load());
+      }
+    } on ApiException catch (e) {
+      if (mounted) showAppToast(context, e.message);
+    } finally {
+      if (mounted) setState(() => _stealthBusy = false);
+    }
+  }
+
   /// Instagram, X and LinkedIn: a switch where there is a link, and the way
   /// to add one where there is not.
   Widget _socials() {
@@ -160,26 +183,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
               AppRow(
                 label: 'Stealth mode',
-                subtitle: 'Browse without being found',
+                subtitle: 'Only people you ask can see you',
                 leading: const Icon(
                   Icons.visibility_off_outlined,
                   size: 18,
                   color: AppColors.label2,
                 ),
-                premium: true,
-                onTap: () async {
-                  final c = await showAppActionSheet(
-                    context,
-                    title: 'Stealth mode is not built yet',
-                    message: 'The idea is to browse without appearing in '
-                        "anyone's feed. Nothing supports it yet. Taking a "
-                        'break hides your profile completely in the meantime.',
-                    actions: const [SheetAction('Take a break instead')],
-                  );
-                  if (c == 0 && context.mounted) {
-                    context.push(Routes.takeBreak);
-                  }
-                },
+                control: AppSwitch(
+                  value: ref.watch(sessionProvider).publish?.stealth ?? false,
+                  onChanged: _stealthBusy ? null : _setStealth,
+                ),
               ),
               AppRow(
                 label: 'Blocked users',

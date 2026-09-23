@@ -101,6 +101,7 @@ class PublishState {
     required this.visible,
     required this.blocking,
     required this.underReview,
+    this.stealth = false,
   });
 
   final bool published;
@@ -111,12 +112,17 @@ class PublishState {
   /// nothing is happening.
   final bool underReview;
 
+  /// Out of every feed, seen only by the people this person asks. Does not
+  /// change [visible]: whoever they ask still sees the profile.
+  final bool stealth;
+
   bool get canPublish => blocking.isEmpty;
 
   static PublishState fromJson(Json j) => PublishState(
         published: j.flag('published'),
         visible: j.flag('visible'),
         underReview: j.flag('under_review'),
+        stealth: j.flag('stealth'),
         blocking: j
             .objects('blocking')
             .map(

@@ -4,6 +4,7 @@ import '../core/network/api_client.dart';
 import '../core/session/session.dart';
 import '../core/storage/device.dart';
 import '../core/storage/token_store.dart';
+import '../shared/models/activity.dart';
 import '../shared/models/chat.dart';
 import '../shared/models/connection.dart';
 import '../shared/models/consent.dart';
@@ -12,6 +13,7 @@ import '../shared/models/person.dart';
 import '../shared/models/profile.dart';
 import '../shared/models/social.dart';
 import '../shared/models/tile.dart';
+import 'activity_repository.dart';
 import 'auth_repository.dart';
 import 'chat_repository.dart';
 import 'consent_repository.dart';
@@ -70,6 +72,10 @@ final mediaRepositoryProvider = Provider<MediaRepository>(
 
 final matchingRepositoryProvider = Provider<MatchingRepository>(
   (ref) => MatchingRepository(ref.watch(apiClientProvider)),
+);
+
+final activityRepositoryProvider = Provider<ActivityRepository>(
+  (ref) => ActivityRepository(ref.watch(apiClientProvider)),
 );
 
 final chatRepositoryProvider = Provider<ChatRepository>(
@@ -159,4 +165,10 @@ final blockedProvider = FutureProvider.autoDispose<List<BlockedPerson>>(
 
 final conversationsProvider = FutureProvider.autoDispose<List<Conversation>>(
   (ref) => ref.watch(chatRepositoryProvider).conversations(),
+);
+
+/// The Notifications page. Home watches it for the bell's dot, and the shell
+/// reloads it on every live event, so the dot moves without a pull to refresh.
+final activityProvider = FutureProvider.autoDispose<ActivityPage>(
+  (ref) => ref.watch(activityRepositoryProvider).load(),
 );

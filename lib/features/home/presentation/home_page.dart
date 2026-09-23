@@ -8,6 +8,7 @@ import '../../../core/session/session.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
 import '../../../data/feed_controller.dart';
+import '../../../data/providers.dart';
 import '../../../shared/models/enums.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/pressable.dart';
@@ -156,11 +157,15 @@ class HomePage extends ConsumerWidget {
   };
 }
 
-class _HomeBar extends StatelessWidget {
+class _HomeBar extends ConsumerWidget {
   const _HomeBar();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Something new on the Notifications page. A dot rather than a count: the
+    // page is for catching up, and a number on a bell reads like a debt.
+    final fresh =
+        (ref.watch(activityProvider).valueOrNull?.newCount ?? 0) > 0;
     return SizedBox(
       height: 44,
       child: Row(
@@ -189,13 +194,33 @@ class _HomeBar extends StatelessWidget {
           const Spacer(),
           Pressable(
             onTap: () => context.push(Routes.notifications),
-            semanticLabel: 'Notifications',
-            child: const Padding(
-              padding: EdgeInsets.fromLTRB(6, 6, 14, 2),
-              child: Icon(
-                Icons.notifications_none,
-                size: 22,
-                color: AppColors.accent,
+            semanticLabel: fresh ? 'Notifications, something new' : 'Notifications',
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(6, 6, 14, 2),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Icon(
+                    Icons.notifications_none,
+                    size: 22,
+                    color: AppColors.accent,
+                  ),
+                  if (fresh)
+                    Positioned(
+                      key: const ValueKey('bell-dot'),
+                      top: 0,
+                      right: 0,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: AppColors.pink,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppColors.group, width: 1.5),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),

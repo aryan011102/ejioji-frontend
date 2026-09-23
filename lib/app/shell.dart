@@ -48,19 +48,25 @@ class _AppShellState extends ConsumerState<AppShell> {
   void _onEvent(LiveEvent event) {
     switch (event.type) {
       case 'message.new' || 'messages.read' || 'conversation.ended':
-        ref.invalidate(conversationsProvider);
+        ref
+          ..invalidate(conversationsProvider)
+          ..invalidate(activityProvider);
       case 'request.new':
-        ref.invalidate(incomingRequestsProvider);
+        ref
+          ..invalidate(incomingRequestsProvider)
+          ..invalidate(activityProvider);
       case 'match.new':
         ref
           ..invalidate(conversationsProvider)
           ..invalidate(outgoingRequestsProvider)
-          ..invalidate(incomingRequestsProvider);
+          ..invalidate(incomingRequestsProvider)
+          ..invalidate(activityProvider);
       case LiveEvent.resync:
         ref
           ..invalidate(conversationsProvider)
           ..invalidate(incomingRequestsProvider)
-          ..invalidate(outgoingRequestsProvider);
+          ..invalidate(outgoingRequestsProvider)
+          ..invalidate(activityProvider);
     }
   }
 

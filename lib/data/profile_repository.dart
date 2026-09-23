@@ -142,6 +142,13 @@ class ProfileRepository {
 
   Future<void> unpublish() => _api.deleteEmpty(Api.publish);
 
+  /// Out of every feed, still browsing and asking. Answers with the state.
+  Future<PublishState> enterStealth() async =>
+      PublishState.fromJson(await _api.post(Api.stealth));
+
+  /// Back in feeds, each at its next rebuild (a few hours at most).
+  Future<void> leaveStealth() => _api.deleteEmpty(Api.stealth);
+
   /// Your Instagram, X and LinkedIn, each with its switch.
   Future<List<SocialLink>> socials() async => SocialLink.listFrom(
         (await _api.getJson(Api.socials)).objects('links'),

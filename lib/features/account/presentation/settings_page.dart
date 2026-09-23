@@ -8,12 +8,18 @@ import '../../../core/session/session.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
 import '../../../data/providers.dart';
+import '../../../shared/models/social.dart';
+import '../../../shared/widgets/controls.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/sheets.dart';
+import '../../../shared/widgets/social_mark.dart';
+import '../../profile/presentation/social_link_sheet.dart';
 
-/// Four groups: your account, appearance, help, and the one that ends things.
+/// Five groups: your account, your socials, appearance, help, and the one that
+/// ends things.
 ///
-/// No group carries a footnote. The rules that need stating are stated where
+/// Only Socials carries a footnote, because its switches are where the rule is
+/// acted on. Otherwise the rules that need stating are stated where
 /// they are acted on — inside the sheet that deletes, or on the page that
 /// blocks — rather than as encouragement under a list.
 class SettingsPage extends ConsumerStatefulWidget {
@@ -24,6 +30,65 @@ class SettingsPage extends ConsumerStatefulWidget {
 }
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
+  /// A switch waiting on the server, so a second tap cannot race the first.
+  SocialNetwork? _switching;
+
+  /// Share a link with matches, or keep it saved and show it to nobody.
+  Future<void> _setShown(SocialNetwork network, bool shown) async {
+    setState(() => _switching = network);
+    try {
+      await ref.read(profileRepositoryProvider).setSocialShown(network, shown);
+      ref.invalidate(mySocialsProvider);
+    } on ApiException catch (e) {
+      if (mounted) showAppToast(context, e.message);
+    } finally {
+      if (mounted) setState(() => _switching = null);
+    }
+  }
+
+  /// Instagram, X and LinkedIn: a switch where there is a link, and the way
+  /// to add one where there is not.
+  Widget _socials() {
+    final links = {
+      for (final l in ref.watch(mySocialsProvider).valueOrNull ??
+          const <SocialLink>[])
+        l.network: l,
+    };
+    return SectionGroup(
+      header: 'Socials',
+      footer: 'Shown only to people you match with, and only while the '
+          'switch is on. Never on your profile card or in the feed.',
+      children: [
+        for (final n in SocialNetwork.shown)
+          if (links[n] case final link?)
+            AppRow(
+              label: n.label,
+              subtitle: link.display,
+              leading: SocialMark(n, size: 26),
+              last: n == SocialNetwork.shown.last,
+              onTap: () => showSocialLinkSheet(
+                context,
+                network: n,
+                existing: link,
+              ),
+              control: AppSwitch(
+                value: link.shown,
+                onChanged: _switching == null
+                    ? (v) => _setShown(n, v)
+                    : null,
+              ),
+            )
+          else
+            AppRow(
+              label: n.label,
+              subtitle: 'Not added',
+              leading: SocialMark(n, size: 26),
+              last: n == SocialNetwork.shown.last,
+              onTap: () => showSocialLinkSheet(context, network: n),
+            ),
+      ],
+    );
+  }
 
   Future<void> _delete() async {
     final choice = await showAppActionSheet(
@@ -138,6 +203,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
             ],
           ),
+          _socials(),
           // Dark-only, so the control is present and honest about it rather
           // than absent and unexplained.
           const SectionGroup(

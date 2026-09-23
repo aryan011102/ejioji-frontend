@@ -14,11 +14,14 @@ import '../../../data/providers.dart';
 import '../../../shared/models/connection.dart';
 import '../../../shared/models/consent.dart';
 import '../../../shared/models/enums.dart';
+import '../../../shared/models/social.dart';
 import '../../../shared/widgets/buttons.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/pressable.dart';
 import '../../../shared/widgets/sheets.dart';
+import '../../../shared/widgets/social_mark.dart';
 import '../../../shared/widgets/states.dart';
+import '../../profile/presentation/social_link_sheet.dart';
 
 /// What the profile is actually made of, and the one screen that deals with it.
 ///
@@ -28,6 +31,11 @@ import '../../../shared/widgets/states.dart';
 /// access nobody gets, and Apple Health's terms forbid what we would do with
 /// it. Offering a connect button for those is a promise the product cannot
 /// keep. The layout is the design's; the list is what exists.
+///
+/// Instagram, X and LinkedIn are here too, as the design draws them, but they
+/// are not sources: nothing is read from them. They are a handle the person
+/// types or pastes, handed only to people they match with, so they sit in their
+/// own group below the sources and never count towards profile strength.
 ///
 /// Every source is read exactly once, when it is connected. There is no
 /// background sync: the access token lives in the server's memory for the
@@ -229,6 +237,11 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
         if (c.isActive) c.provider: c,
     };
     final locked = connecting != null || _busy != null || !consent.hasValue;
+    final socials = {
+      for (final l in ref.watch(mySocialsProvider).valueOrNull ??
+          const <SocialLink>[])
+        l.network: l,
+    };
 
     return AppScaffold(
       navBar: widget.editing
@@ -283,6 +296,22 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
                     ),
                 ],
               ),
+            _Group(
+              header: 'Social · only your matches see these',
+              children: [
+                for (final n in SocialNetwork.shown)
+                  _SocialRow(
+                    network: n,
+                    link: socials[n],
+                    last: n == SocialNetwork.shown.last,
+                    onTap: () => showSocialLinkSheet(
+                      context,
+                      network: n,
+                      existing: socials[n],
+                    ),
+                  ),
+              ],
+            ),
             if (!widget.editing)
               Padding(
                 padding: const EdgeInsets.fromLTRB(
@@ -638,6 +667,92 @@ class _SourceRow extends StatelessWidget {
         ),
       _ => ('Nothing found here', AppColors.label3),
     };
+  }
+}
+
+/// A social link's row: the network, then its handle and whether matches see
+/// it, or what it is for when there is none yet.
+class _SocialRow extends StatelessWidget {
+  const _SocialRow({
+    required this.network,
+    required this.link,
+    required this.last,
+    required this.onTap,
+  });
+
+  final SocialNetwork network;
+  final SocialLink? link;
+  final bool last;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = link;
+    final (String line, Color tone) = switch (l) {
+      null => (
+          network == SocialNetwork.linkedin
+              ? 'Your profile link · for matches only'
+              : 'Your handle · for matches only',
+          AppColors.label3,
+        ),
+      _ when l.shown => ('${l.display} · shown to matches', AppColors.ok),
+      _ => ('${l.display} · hidden from matches', AppColors.label3),
+    };
+    return Column(
+      children: [
+        PressableRow(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+            child: Row(
+              children: [
+                SocialMark(network),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        network.label,
+                        style: AppText.body.copyWith(
+                          fontSize: 17,
+                          height: 25.5 / 17,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        line,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.caption.copyWith(
+                          fontSize: 12.5,
+                          height: 16 / 12.5,
+                          color: tone,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Icon(
+                  Icons.chevron_right,
+                  size: 18,
+                  color: AppColors.label3,
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (!last)
+          const Padding(
+            padding: EdgeInsets.only(left: 58),
+            child: Divider(
+              height: 1,
+              thickness: 1,
+              color: AppColors.separator,
+            ),
+          ),
+      ],
+    );
   }
 }
 

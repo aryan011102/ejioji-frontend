@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../core/network/json.dart';
 import 'enums.dart';
 import 'media.dart';
+import 'social.dart';
 import 'tile.dart';
 
 /// Someone as the feed shows them.
@@ -23,6 +24,7 @@ class Candidate {
     this.pronouns,
     required this.photos,
     required this.tiles,
+    this.socials = const [],
   });
 
   final String userId;
@@ -38,6 +40,23 @@ class Candidate {
   final Pronouns? pronouns;
   final List<MediaAsset> photos;
   final List<ProfileTile> tiles;
+
+  /// Their Instagram, X and LinkedIn. Empty for everyone but a match: the
+  /// server hands these over only with a match, never on a card or a request.
+  final List<SocialLink> socials;
+
+  Candidate withSocials(List<SocialLink> socials) => Candidate(
+        userId: userId,
+        firstName: firstName,
+        age: age,
+        city: city,
+        languages: languages,
+        education: education,
+        pronouns: pronouns,
+        photos: photos,
+        tiles: tiles,
+        socials: socials,
+      );
 
   MediaAsset? get leadPhoto => photos.isEmpty ? null : photos.first;
 
@@ -160,7 +179,8 @@ class Match {
   static Match fromJson(Json j) => Match(
         id: j.str('id'),
         matchedAt: j.time('matched_at'),
-        person: Candidate.fromJson(j.object('person')),
+        person: Candidate.fromJson(j.object('person'))
+            .withSocials(SocialLink.listFrom(j.objects('socials'))),
       );
 
   static List<Match> listFrom(List<Json> items) =>

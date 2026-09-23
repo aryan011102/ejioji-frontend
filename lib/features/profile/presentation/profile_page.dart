@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/routes.dart';
 import '../../../core/network/api_exception.dart';
@@ -16,6 +17,7 @@ import '../../../shared/models/enums.dart';
 import '../../../shared/models/media.dart';
 import '../../../shared/models/person.dart';
 import '../../../shared/models/profile.dart';
+import '../../../shared/models/social.dart';
 import '../../../shared/models/tile.dart' as api;
 import '../../../shared/models/tile_look.dart';
 import '../../../shared/widgets/app_tab_bar.dart';
@@ -24,6 +26,7 @@ import '../../../shared/widgets/identity.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/pressable.dart';
 import '../../../shared/widgets/sheets.dart';
+import '../../../shared/widgets/social_mark.dart';
 import '../../../shared/widgets/states.dart';
 import '../../../shared/widgets/tiles.dart';
 import 'arrange_wall.dart';
@@ -203,12 +206,17 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       return _wall(
         name: person.firstName,
         pronouns: person.pronouns,
-        chips: _chips(
-          age: person.age,
-          city: person.city,
-          languages: person.languages,
-          education: person.education,
-        ),
+        chips: [
+          ..._chips(
+            age: person.age,
+            city: person.city,
+            languages: person.languages,
+            education: person.education,
+          ),
+          // Only a match's card carries any: the server hands socials over with
+          // a match and never with a feed card or a request.
+          ..._socialChips(person.socials),
+        ],
         photos: person.photos,
         tiles: person.tiles,
         person: person,
@@ -216,6 +224,12 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     }
 
     final mine = ref.watch(myProfileProvider);
+    // Your own wall shows what your matches would see: the links that are on.
+    final mySocials = [
+      for (final l
+          in ref.watch(mySocialsProvider).valueOrNull ?? const <SocialLink>[])
+        if (l.shown) l,
+    ];
 
     return mine.when(
       loading: () => const AppScaffold(child: LoadingView()),
@@ -233,12 +247,15 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           pronouns: details?.pronouns,
           chips: details == null
               ? const []
-              : _chips(
-                  age: details.age,
-                  city: details.city,
-                  languages: details.languages,
-                  education: details.education,
-                ),
+              : [
+                  ..._chips(
+                    age: details.age,
+                    city: details.city,
+                    languages: details.languages,
+                    education: details.education,
+                  ),
+                  ..._socialChips(mySocials),
+                ],
           photos: profile.photos,
           tiles: profile.tiles,
           publish: profile.publish,
@@ -360,6 +377,34 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                       ),
                   ],
                 ),
+              // The design's closing line on your own wall: what a stranger
+              // does not see, and who sees the socials.
+              if (!_viewer && shown.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(top: 1),
+                        child: Icon(
+                          Icons.lock,
+                          size: 13,
+                          color: AppColors.label3,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Anything left unpicked stays off this page. '
+                          'Socials appear only if their switch is on, and '
+                          'only to people you match with.',
+                          style: AppText.caption.copyWith(height: 17 / 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
           if (_viewer && person != null) _viewerActions(context, person),
@@ -421,6 +466,26 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     ];
   }
 
+  /// A chip per link, which opens the profile in its own app or the browser.
+  List<_Fact> _socialChips(List<SocialLink> links) => [
+        for (final l in links)
+          _Fact(
+            '',
+            l.display,
+            mark: SocialMark(l.network, size: 18),
+            onTap: () => _openSocial(l),
+          ),
+      ];
+
+  Future<void> _openSocial(SocialLink link) async {
+    final uri = Uri.tryParse(link.url);
+    final opened = uri != null &&
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && mounted) {
+      showAppToast(context, 'Could not open ${link.network.label}.');
+    }
+  }
+
   Widget _header(
     String name,
     Pronouns? pronouns,
@@ -432,51 +497,58 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final pronounLine = pronouns?.label ?? (_viewer ? null : 'Add pronouns');
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(Insets.gutter, 4, Insets.gutter, 0),
+      padding: const EdgeInsets.only(top: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Avatar(
-                seedColor: AppColors.fill,
-                size: 74,
-                imageUrl: photos.isEmpty ? null : photos.first.stillUrl,
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppText.title1.copyWith(fontSize: 26),
-                    ),
-                    if (pronounLine != null) ...[
-                      const SizedBox(height: 3),
-                      _PronounLine(
-                        text: pronounLine,
-                        editable: !_viewer,
-                        onTap: () => context.push(Routes.editInfo),
-                      ),
-                    ],
-                  ],
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: Insets.gutter),
+            child: Row(
+              children: [
+                Avatar(
+                  seedColor: AppColors.fill,
+                  size: 84,
+                  imageUrl: photos.isEmpty ? null : photos.first.stillUrl,
                 ),
-              ),
-            ],
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.title1.copyWith(
+                          fontSize: 29,
+                          letterSpacing: -1,
+                        ),
+                      ),
+                      if (pronounLine != null) ...[
+                        const SizedBox(height: 3),
+                        _PronounLine(
+                          text: pronounLine,
+                          editable: !_viewer,
+                          onTap: () => context.push(Routes.editInfo),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
           if (chips.isNotEmpty) ...[
             const SizedBox(height: 14),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  for (final fact in chips) ...[
-                    _FactChip(fact: fact),
-                    const SizedBox(width: 8),
-                  ],
-                ],
+            // Edge to edge, so a chip scrolls off the screen rather than
+            // being cut at the gutter; the gutter is the scroll's padding.
+            SizedBox(
+              height: 34,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: Insets.gutter),
+                itemCount: chips.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 7),
+                itemBuilder: (_, i) => _FactChip(fact: chips[i]),
               ),
             ),
           ],
@@ -703,13 +775,16 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 }
 
 
-/// One fact under the name: a glyph and a word.
+/// One fact under the name: a glyph and a word. A social link draws its
+/// network's mark instead of a glyph, and opens when tapped.
 @immutable
 class _Fact {
-  const _Fact(this.glyph, this.label);
+  const _Fact(this.glyph, this.label, {this.mark, this.onTap});
 
   final String glyph;
   final String label;
+  final Widget? mark;
+  final VoidCallback? onTap;
 }
 
 class _FactChip extends StatelessWidget {
@@ -719,21 +794,38 @@ class _FactChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+    // The design's pill: the quiet system fill, not the brand plum, 34 high.
+    final chip = Container(
+      height: 34,
+      padding: const EdgeInsets.symmetric(horizontal: 13),
       decoration: BoxDecoration(
-        color: AppColors.fill,
-        borderRadius: BorderRadius.circular(22),
+        color: AppColors.fill2,
+        borderRadius: BorderRadius.circular(17),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(fact.glyph, style: const TextStyle(fontSize: 14)),
-          const SizedBox(width: 7),
-          Text(fact.label, style: AppText.body.copyWith(fontSize: 15)),
+          fact.mark ??
+              Text(
+                fact.glyph,
+                style: const TextStyle(fontSize: 14, height: 1.5),
+              ),
+          const SizedBox(width: 6),
+          Text(
+            fact.label,
+            style: AppText.body.copyWith(
+              fontSize: 14,
+              height: 21 / 14,
+              letterSpacing: 0,
+              color: AppColors.label,
+            ),
+          ),
         ],
       ),
     );
+    final onTap = fact.onTap;
+    if (onTap == null) return chip;
+    return Pressable(onTap: onTap, semanticLabel: fact.label, child: chip);
   }
 }
 
@@ -755,7 +847,9 @@ class _PronounLine extends StatelessWidget {
       text,
       overflow: TextOverflow.ellipsis,
       style: AppText.footnote.copyWith(
-        fontSize: 14,
+        fontSize: 15,
+        height: 22.5 / 15,
+        fontWeight: FontWeight.w500,
         color: editable ? AppColors.accent : null,
       ),
     );
@@ -768,7 +862,7 @@ class _PronounLine extends StatelessWidget {
         children: [
           Flexible(child: label),
           const SizedBox(width: 5),
-          const Icon(Icons.edit_outlined, size: 14, color: AppColors.accent),
+          const Icon(Icons.edit_outlined, size: 13, color: AppColors.accent),
         ],
       ),
     );

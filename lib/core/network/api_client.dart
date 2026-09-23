@@ -54,6 +54,10 @@ class ApiClient {
   Future<List<Json>> putList(String path, {Object? body}) async =>
       asJsonList(await _body(() => _dio.put<Object?>(path, data: body)));
 
+  /// A DELETE that answers with the state it left behind.
+  Future<Json> delete(String path) async =>
+      asJson(await _body(() => _dio.delete<Object?>(path)));
+
   /// For the endpoints that answer 204. Calling one of the body-returning
   /// methods on these would throw on the empty body, which is why they are
   /// separate rather than nullable.

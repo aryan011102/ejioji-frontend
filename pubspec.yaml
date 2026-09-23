@@ -42,6 +42,10 @@ dependencies:
   # A WebView we control must not see somebody's Google password.
   url_launcher: ^6.3.0
 
+  # The system share sheet, for a shared-profile link: most families will get
+  # it on WhatsApp, and the sheet is how a link reaches WhatsApp.
+  share_plus: ^12.0.2
+
   # Receiving the OAuth redirect back. The provider sends the browser to an
   # App Link / Universal Link and this is how the app hears about it.
   app_links: ^6.3.2

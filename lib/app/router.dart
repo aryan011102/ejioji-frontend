@@ -30,7 +30,7 @@ import '../features/onboarding/presentation/spotify_upload_page.dart';
 import '../features/profile/presentation/edit_info_page.dart';
 import '../features/profile/presentation/profile_page.dart';
 import '../features/safety/presentation/report_page.dart';
-import '../features/sharing/presentation/shared_profile_page.dart';
+import '../features/sharing/presentation/share_page.dart';
 import '../features/verification/presentation/digilocker_page.dart';
 import '../features/verification/presentation/selfie_page.dart';
 import '../features/verification/presentation/verify_hub_page.dart';
@@ -244,14 +244,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
 
       GoRoute(
-        path: Routes.sharedFriends,
-        builder: (_, __) =>
-            const SharedProfilePage(audience: SharedAudience.friends),
-      ),
-      GoRoute(
-        path: Routes.sharedFamily,
-        builder: (_, __) =>
-            const SharedProfilePage(audience: SharedAudience.family),
+        path: Routes.share,
+        builder: (_, state) => SharePage(
+          matchId: state.pathParameters['id'] ?? '',
+          name: state.uri.queryParameters['name'],
+        ),
       ),
 
       GoRoute(

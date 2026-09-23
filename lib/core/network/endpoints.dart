@@ -77,7 +77,9 @@ abstract final class Api {
   static String chatUpload(String matchId) => '$prefix/chat/$matchId/uploads';
   static const chatSocket = '$prefix/chat/ws';
 
-  // Notifications.
+  // Notifications: the page, and push.
+  static const activity = '$prefix/activity';
+  static const activitySeen = '$prefix/activity/seen';
   static const pushToken = '$prefix/notifications/push-token';
   static const pushTokenClear = '$prefix/notifications/push-token/clear';
 

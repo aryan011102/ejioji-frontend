@@ -51,8 +51,14 @@ abstract final class Routes {
   /// different profile from the one that was tapped.
   static const person = '/person';
   static String conversationWith(String id) => '/chats/$id';
-  static const sharedFriends = '/shared/friends';
-  static const sharedFamily = '/shared/family';
+
+  /// Sharing the other person's profile with friends and family, from the
+  /// conversation's menu. [name] is theirs, for the copy.
+  static const share = '/chats/:id/share';
+  static String shareFor(String matchId, {String? name}) => Uri(
+        path: '/chats/$matchId/share',
+        queryParameters: {if (name != null) 'name': name},
+      ).toString();
 
   // Safety
   static const reportReason = '/report/:id';

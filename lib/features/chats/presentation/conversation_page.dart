@@ -350,7 +350,9 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
     if (!mounted || choice == null) return;
     switch (choice) {
       case 0:
-        showAppToast(context, 'Sharing with friends and family is coming soon.');
+        unawaited(
+          context.push<void>(Routes.shareFor(_matchId, name: person?.firstName)),
+        );
       case 1:
         await _unmatch(name);
       case 2:

@@ -18,6 +18,7 @@ import 'matching_repository.dart';
 import 'media_repository.dart';
 import 'profile_repository.dart';
 import 'push_controller.dart';
+import 'sharing_repository.dart';
 import 'sources_repository.dart';
 import 'trust_repository.dart';
 
@@ -76,6 +77,10 @@ final chatRepositoryProvider = Provider<ChatRepository>(
 
 final trustRepositoryProvider = Provider<TrustRepository>(
   (ref) => TrustRepository(ref.watch(apiClientProvider)),
+);
+
+final sharingRepositoryProvider = Provider<SharingRepository>(
+  (ref) => SharingRepository(ref.watch(apiClientProvider)),
 );
 
 // The reads.

@@ -81,6 +81,13 @@ abstract final class Api {
   static const pushToken = '$prefix/notifications/push-token';
   static const pushTokenClear = '$prefix/notifications/push-token/clear';
 
+  // Sharing a match's profile with friends and family. Both say ready first;
+  // a link's address is sent once, when it is made.
+  static String sharing(String matchId) => '$prefix/sharing/$matchId';
+  static String sharingReady(String matchId) => '$prefix/sharing/$matchId/ready';
+  static String sharingLinks(String matchId) => '$prefix/sharing/$matchId/links';
+  static String sharingLink(String linkId) => '$prefix/sharing/links/$linkId';
+
   // Safety. Reporting always blocks; blocking works on its own.
   static const reports = '$prefix/trust/reports';
 

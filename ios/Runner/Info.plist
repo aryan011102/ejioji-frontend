@@ -87,7 +87,7 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>To record sound with a video you send.</string>
 	<key>NSAppleMusicUsageDescription</key>
-	<string>To pick a file you choose to share. We only receive the one you pick.</string>
+	<string>If you connect Apple Music, to read the songs and albums in your library once for your music insights. Also to pick a file you choose to share.</string>
 
 	<!-- url_launcher checks whether it can open a link before opening it, and
 	     on iOS that check needs the scheme declared. Only https: the consent

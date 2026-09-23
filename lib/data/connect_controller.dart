@@ -4,6 +4,7 @@ import 'package:app_links/app_links.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../core/native/apple_music_kit.dart';
 import '../core/network/api_exception.dart';
 import '../shared/models/connection.dart';
 import '../shared/models/enums.dart';
@@ -51,6 +52,7 @@ class ConnectController extends Notifier<SourceProvider?> {
 
     try {
       final sources = ref.read(sourcesRepositoryProvider);
+      if (provider == SourceProvider.appleMusic) return await _appleMusic();
       final authorization = await sources.authorize(provider);
 
       // Start listening before opening the browser. On a fast redirect the
@@ -91,6 +93,38 @@ class ConnectController extends Notifier<SourceProvider?> {
     } finally {
       state = null;
     }
+  }
+
+  /// Apple Music has no browser and no redirect. Apple's own prompt appears
+  /// over the app, and MusicKit hands back a token for the server to read the
+  /// library with once. Apple offers no way for us to end that token, which
+  /// the notice says, along with how the person can end it themselves.
+  Future<IngestionRun?> _appleMusic() async {
+    final sources = ref.read(sourcesRepositoryProvider);
+    final developerToken = await sources.appleMusicDeveloperToken();
+
+    final String userToken;
+    try {
+      userToken = await AppleMusicKit.userToken(developerToken);
+    } on AppleMusicDenied catch (e) {
+      if (!e.inSettings) return null;
+      throw const ValidationFailure(
+        'Apple Music access is off for theonebytwo. Turn it on in Settings, '
+        'under Privacy & Security, Media & Apple Music, then try again.',
+        code: 'apple_music_denied',
+      );
+    } on AppleMusicUnavailable catch (e) {
+      throw ValidationFailure(
+        'Apple Music did not answer. Check this phone is signed in to Apple '
+        'Music, then try again.',
+        code: 'apple_music_unavailable:${e.reason}',
+      );
+    }
+
+    final result = await sources.completeAppleMusic(userToken: userToken);
+    if (result.declined) return null;
+    ref.invalidate(connectionsProvider);
+    return result.run;
   }
 
   /// Waits for the redirect that belongs to this attempt.

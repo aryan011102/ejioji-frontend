@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../core/network/json.dart';
+import '../format.dart';
 import 'enums.dart';
 
 /// One step of a pull, as the client-polled checklist shows it.
@@ -117,6 +118,59 @@ class IngestionRun {
       );
 }
 
+/// What one Gmail inbox held when it was last read: how many receipts, the
+/// span of the emails they came in, and which kinds of thing they were about.
+/// The server counts; this only words it.
+@immutable
+class ReceiptSummary {
+  const ReceiptSummary({
+    required this.receipts,
+    required this.groups,
+    this.firstAt,
+    this.lastAt,
+  });
+
+  final int receipts;
+  final DateTime? firstAt;
+  final DateTime? lastAt;
+
+  /// Insight category wire names: food_delivery, shopping, travel, going_out,
+  /// fitness.
+  final List<String> groups;
+
+  static const _groupWords = {
+    'food_delivery': 'food',
+    'shopping': 'shopping',
+    'travel': 'travel',
+    'going_out': 'going out',
+    'fitness': 'fitness',
+  };
+
+  /// The line under an inbox: "312 receipts · Jan 2024 → today", or
+  /// "88 receipts · travel only" when everything in it was one kind of thing,
+  /// which is what tells a work inbox from a personal one. Null when it held
+  /// nothing, which the row words itself.
+  String? line({DateTime? now}) {
+    if (receipts == 0) return null;
+    final count = '$receipts ${receipts == 1 ? 'receipt' : 'receipts'}';
+    if (groups.length == 1) {
+      final word = _groupWords[groups.single];
+      if (word != null) return '$count · $word only';
+    }
+    final first = firstAt;
+    final last = lastAt;
+    if (first == null || last == null) return count;
+    return '$count · ${monthSpan(first.toLocal(), last.toLocal(), now: now)}';
+  }
+
+  static ReceiptSummary fromJson(Json j) => ReceiptSummary(
+        receipts: j.intOr('receipts', 0),
+        firstAt: j.timeOrNull('first_at'),
+        lastAt: j.timeOrNull('last_at'),
+        groups: j.strings('groups'),
+      );
+}
+
 /// A linked provider account.
 @immutable
 class Connection {
@@ -128,6 +182,8 @@ class Connection {
     required this.connectedAt,
     this.disconnectedAt,
     this.latestRun,
+    this.address,
+    this.receipts,
   });
 
   final String id;
@@ -138,10 +194,18 @@ class Connection {
   final DateTime? disconnectedAt;
   final IngestionRun? latestRun;
 
+  /// The Gmail address, so two inboxes can be told apart. Null for every
+  /// other source, and until an inbox's first read finishes.
+  final String? address;
+
+  /// Gmail only, once its latest read has finished.
+  final ReceiptSummary? receipts;
+
   bool get isActive => status == ProviderStatus.active;
 
   static Connection fromJson(Json j) {
     final run = j.objectOrNull('latest_run');
+    final receipts = j.objectOrNull('receipts');
     return Connection(
       id: j.str('id'),
       provider: SourceProvider.parse(j.strOrNull('provider')),
@@ -150,6 +214,8 @@ class Connection {
       connectedAt: j.time('connected_at'),
       disconnectedAt: j.timeOrNull('disconnected_at'),
       latestRun: run == null ? null : IngestionRun.fromJson(run),
+      address: j.strOrNull('address'),
+      receipts: receipts == null ? null : ReceiptSummary.fromJson(receipts),
     );
   }
 

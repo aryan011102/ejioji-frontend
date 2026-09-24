@@ -20,6 +20,13 @@ class SourcesRepository {
   Future<List<Connection>> connections() async =>
       Connection.listFrom(await _api.getList(Api.connections));
 
+  /// Removes one linked account: what was read from it is deleted and the
+  /// tiles are rebuilt without it. The source's permission stays, so the
+  /// person's other inboxes are untouched. Withdrawing the permission is still
+  /// how every account of a source goes at once.
+  Future<void> removeConnection(String id) =>
+      _api.deleteEmpty(Api.connection(id));
+
   /// Step one of a Google source: ask for a URL to send the person to.
   ///
   /// This fails with a 403 if the matching consent purpose is not open, which

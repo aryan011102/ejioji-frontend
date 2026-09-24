@@ -46,6 +46,11 @@ import '../../profile/presentation/social_link_sheet.dart';
 /// Next walks the categories, and a category the sources could not fill asks
 /// its questions there instead. A connected row opens what can be done to it,
 /// reading it again or disconnecting it.
+///
+/// Gmail can be more than one inbox: a personal address and a work one hold
+/// different receipts. Each connected inbox is its own row, under its address,
+/// with what was read from it, and "Add another account" connects the next.
+/// Removing one inbox deletes what was read from it and leaves the others.
 class ConnectAccountsPage extends ConsumerStatefulWidget {
   const ConnectAccountsPage({this.editing = false, super.key});
 
@@ -116,9 +121,16 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
 
   static final _sourceCount = _groups.fold(0, (n, g) => n + g.$2.length);
 
+  /// How many inboxes the server lets one person connect. It refuses past this
+  /// anyway; stopping here only spares a trip through Google's screens.
+  static const _maxInboxes = 5;
+
   /// A read again or a disconnect in progress. Connecting has its own state in
   /// [connectProvider].
   SourceProvider? _busy;
+
+  /// The one inbox being refreshed or removed, when there are several.
+  String? _busyInbox;
 
   void _refetch() {
     ref
@@ -222,6 +234,115 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
     }
   }
 
+  /// What a connected inbox opens. With several, removing one is its own
+  /// action and the permission stays for the rest. With one, it is the same
+  /// disconnect every other source has.
+  Future<void> _manageInbox(Connection inbox, {required bool only}) async {
+    final name = inbox.address ?? 'Gmail';
+    final choice = await showAppActionSheet(
+      context,
+      title: '$name · connected',
+      message: only
+          ? 'Disconnecting deletes everything we derived from it, not just '
+              'the link.'
+          : 'Removing this inbox deletes everything we read from it. Your '
+              'other inboxes stay connected.',
+      actions: [
+        const SheetAction('What we read', icon: Icons.visibility_outlined),
+        const SheetAction('Refresh data', icon: Icons.refresh),
+        SheetAction(
+          only ? 'Disconnect' : 'Remove this inbox',
+          icon: Icons.remove_circle_outline,
+          destructive: true,
+        ),
+      ],
+    );
+    if (choice == null || !mounted) return;
+    switch (choice) {
+      case 0:
+        await context.push(
+          '${Routes.consent}?purpose=${SourceProvider.gmail.purpose.wire}',
+        );
+      case 1:
+        // Google's account chooser opens first: picking this inbox again
+        // refreshes it, and picking another connects that one instead.
+        setState(() => _busyInbox = inbox.id);
+        try {
+          await _read(SourceProvider.gmail);
+        } finally {
+          if (mounted) setState(() => _busyInbox = null);
+        }
+      case 2:
+        if (only) {
+          await _disconnect(SourceProvider.gmail, 'Gmail');
+        } else {
+          await _removeInbox(inbox, name);
+        }
+    }
+  }
+
+  Future<void> _removeInbox(Connection inbox, String name) async {
+    setState(() => _busyInbox = inbox.id);
+    try {
+      await ref.read(sourcesRepositoryProvider).removeConnection(inbox.id);
+      if (!mounted) return;
+      _refetch();
+      showAppToast(context, '$name is removed.');
+    } on ApiException catch (e) {
+      if (mounted) showAppToast(context, e.message);
+    } finally {
+      if (mounted) setState(() => _busyInbox = null);
+    }
+  }
+
+  /// The rows for one source. Gmail is one row per connected inbox and a way
+  /// to add the next; every other source is one row.
+  List<Widget> _rows(
+    _Source s, {
+    required Map<SourceProvider, Connection> linked,
+    required List<Connection> inboxes,
+    required SourceProvider? connecting,
+    required ConsentState? consent,
+    required bool locked,
+  }) {
+    if (s.provider == SourceProvider.gmail && inboxes.isNotEmpty) {
+      return [
+        for (final inbox in inboxes)
+          _SourceRow(
+            source: s,
+            title: inbox.address,
+            connection: inbox,
+            busy: _busyInbox == inbox.id ||
+                (_busy == SourceProvider.gmail && inboxes.length == 1),
+            last: false,
+            onTap: locked
+                ? null
+                : () => _manageInbox(inbox, only: inboxes.length == 1),
+          ),
+        if (inboxes.length < _maxInboxes)
+          _AddAccountRow(
+            busy: connecting == SourceProvider.gmail && _busyInbox == null,
+            onTap: locked
+                ? null
+                : () => _connect(SourceProvider.gmail, consent!),
+          ),
+      ];
+    }
+    return [
+      _SourceRow(
+        source: s,
+        connection: linked[s.provider],
+        busy: connecting == s.provider || _busy == s.provider,
+        last: false,
+        onTap: locked
+            ? null
+            : linked.containsKey(s.provider)
+                ? () => _manage(s.provider, s.name)
+                : () => _connect(s.provider, consent!),
+      ),
+    ];
+  }
+
   void _next() => context.push(
         widget.editing ? Routes.editCategoryAt(0) : Routes.pickCategoryAt(0),
       );
@@ -232,11 +353,23 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
     final connections = ref.watch(connectionsProvider);
     final connecting = ref.watch(connectProvider);
 
-    final linked = <SourceProvider, Connection>{
+    final active = [
       for (final c in connections.valueOrNull ?? const <Connection>[])
-        if (c.isActive) c.provider: c,
+        if (c.isActive) c,
+    ];
+    // By source, the first account of each: what the strength card and Next
+    // count. Several inboxes are still one source.
+    final linked = <SourceProvider, Connection>{
+      for (final c in active.reversed) c.provider: c,
     };
-    final locked = connecting != null || _busy != null || !consent.hasValue;
+    final inboxes = [
+      for (final c in active)
+        if (c.provider == SourceProvider.gmail) c,
+    ];
+    final locked = connecting != null ||
+        _busy != null ||
+        _busyInbox != null ||
+        !consent.hasValue;
     final socials = {
       for (final l in ref.watch(mySocialsProvider).valueOrNull ??
           const <SocialLink>[])
@@ -278,23 +411,17 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
             for (final (header, sources) in _groups)
               _Group(
                 header: header,
-                children: [
+                children: _lastMarked([
                   for (final s in sources)
-                    _SourceRow(
-                      source: s,
-                      connection: linked[s.provider],
-                      busy: connecting == s.provider || _busy == s.provider,
-                      last: s == sources.last,
-                      onTap: locked
-                          ? null
-                          : linked.containsKey(s.provider)
-                              ? () => _manage(s.provider, s.name)
-                              : () => _connect(
-                                    s.provider,
-                                    consent.requireValue,
-                                  ),
+                    ..._rows(
+                      s,
+                      linked: linked,
+                      inboxes: inboxes,
+                      connecting: connecting,
+                      consent: consent.valueOrNull,
+                      locked: locked,
                     ),
-                ],
+                ]),
               ),
             _Group(
               header: 'Social · only your matches see these',
@@ -554,6 +681,18 @@ class _Group extends StatelessWidget {
   }
 }
 
+/// The rows of a group, the last one told it is last so it draws no
+/// divider. A row only knows it is last once the group's rows are all known,
+/// which for Gmail depends on how many inboxes there are.
+List<Widget> _lastMarked(List<Widget> rows) => [
+      for (var i = 0; i < rows.length; i++)
+        switch (rows[i]) {
+          final _SourceRow r when i == rows.length - 1 => r.asLast(),
+          final _AddAccountRow r when i == rows.length - 1 => r.asLast(),
+          final row => row,
+        },
+    ];
+
 class _SourceRow extends StatelessWidget {
   const _SourceRow({
     required this.source,
@@ -561,6 +700,7 @@ class _SourceRow extends StatelessWidget {
     required this.busy,
     required this.last,
     required this.onTap,
+    this.title,
   });
 
   final _Source source;
@@ -568,6 +708,18 @@ class _SourceRow extends StatelessWidget {
   final bool busy;
   final bool last;
   final VoidCallback? onTap;
+
+  /// In place of the source's name: a Gmail inbox's address.
+  final String? title;
+
+  _SourceRow asLast() => _SourceRow(
+        source: source,
+        connection: connection,
+        busy: busy,
+        last: true,
+        onTap: onTap,
+        title: title,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -582,7 +734,7 @@ class _SourceRow extends StatelessWidget {
       null => (source.note, AppColors.label3),
       _ when reading => ('Reading now…', AppColors.label3),
       _ when problem != null => (problem, AppColors.destructive),
-      _ => _found(run),
+      _ => _found(c),
     };
 
     return Column(
@@ -600,7 +752,9 @@ class _SourceRow extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        source.name,
+                        title ?? source.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: AppText.body.copyWith(
                           fontSize: 17,
                           height: 25.5 / 17,
@@ -609,6 +763,8 @@ class _SourceRow extends StatelessWidget {
                       const SizedBox(height: 1),
                       Text(
                         line,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: AppText.caption.copyWith(
                           fontSize: 12.5,
                           height: 16 / 12.5,
@@ -655,8 +811,14 @@ class _SourceRow extends StatelessWidget {
 
   /// What a finished read found. Green when it found enough to say something,
   /// quiet when it did not, because a green "found 3" would overclaim.
-  (String, Color) _found(IngestionRun? run) {
+  ///
+  /// A Gmail inbox says what it held instead ("88 receipts · travel only"),
+  /// which is what tells two inboxes apart at a glance.
+  (String, Color) _found(Connection c) {
+    final run = c.latestRun;
     if (run == null) return ('Connected', AppColors.ok);
+    final receipts = c.receipts?.line();
+    if (receipts != null) return (receipts, AppColors.ok);
     return switch (run.sufficiency) {
       Sufficiency.strong ||
       Sufficiency.moderate =>
@@ -667,6 +829,85 @@ class _SourceRow extends StatelessWidget {
         ),
       _ => ('Nothing found here', AppColors.label3),
     };
+  }
+}
+
+/// "Add another account", under the inboxes already connected.
+class _AddAccountRow extends StatelessWidget {
+  const _AddAccountRow({
+    required this.busy,
+    required this.onTap,
+    this.last = false,
+  });
+
+  final bool busy;
+  final VoidCallback? onTap;
+  final bool last;
+
+  _AddAccountRow asLast() => _AddAccountRow(busy: busy, onTap: onTap, last: true);
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        PressableRow(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+            child: Row(
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: AppColors.fill3,
+                    borderRadius: BorderRadius.circular(8.4),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Icon(Icons.add, size: 20, color: AppColors.accent),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    busy ? 'Connecting…' : 'Add another account',
+                    style: AppText.body.copyWith(
+                      fontSize: 17,
+                      height: 25.5 / 17,
+                      color: busy ? AppColors.label3 : AppColors.accent,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                if (busy)
+                  const SizedBox(
+                    width: 17,
+                    height: 17,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1.6,
+                      color: AppColors.label3,
+                    ),
+                  )
+                else
+                  const Icon(
+                    Icons.chevron_right,
+                    size: 18,
+                    color: AppColors.label3,
+                  ),
+              ],
+            ),
+          ),
+        ),
+        if (!last)
+          const Padding(
+            padding: EdgeInsets.only(left: 58),
+            child: Divider(
+              height: 1,
+              thickness: 1,
+              color: AppColors.separator,
+            ),
+          ),
+      ],
+    );
   }
 }
 

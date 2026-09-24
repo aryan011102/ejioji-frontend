@@ -59,6 +59,20 @@ String timeUntil(DateTime at, {DateTime? now}) {
   return 'in ${gap.inHours} hours';
 }
 
+/// A span of months, for how far back something reaches: "Jan 2024 → today",
+/// or "Mar 2025 → Aug 2026". An end within the last month reads "today",
+/// because a receipt from three weeks ago means the inbox is current.
+String monthSpan(DateTime from, DateTime to, {DateTime? now}) {
+  final current = now ?? DateTime.now();
+  String month(DateTime d) => '${_months[d.month - 1]} ${d.year}';
+  final recent = current.difference(to).inDays <= 31;
+  final end = recent ? 'today' : month(to);
+  if (!recent && from.year == to.year && from.month == to.month) {
+    return month(from);
+  }
+  return '${month(from)} → $end';
+}
+
 DateTime _midnight(DateTime d) => DateTime(d.year, d.month, d.day);
 
 const _months = [

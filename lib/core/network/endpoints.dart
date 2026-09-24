@@ -26,6 +26,7 @@ abstract final class Api {
 
   // Connections and the ingestion run the client polls.
   static const connections = '$prefix/connections';
+  static String connection(String id) => '$prefix/connections/$id';
   static String authorize(String source) => '$prefix/connections/$source/authorize';
   static String complete(String source) => '$prefix/connections/$source/complete';
   static const netflixUpload = '$prefix/connections/netflix/upload';

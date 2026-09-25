@@ -49,6 +49,12 @@ abstract final class Api {
       '$prefix/profile/tiles/$kind/${Uri.encodeComponent(key)}/media';
   static const publish = '$prefix/profile/publish';
   static const stealth = '$prefix/profile/stealth';
+  // Verification: a DigiLocker check of the profile's first name and birth date.
+  static const verification = '$prefix/profile/verification';
+  static const digilockerAuthorize =
+      '$prefix/profile/verification/digilocker/authorize';
+  static const digilockerComplete =
+      '$prefix/profile/verification/digilocker/complete';
   // Instagram, X and LinkedIn: handles for matches only, each with a switch.
   static const socials = '$prefix/profile/socials';
   static String social(String network) => '$prefix/profile/socials/$network';

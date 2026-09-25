@@ -24,6 +24,7 @@ import 'push_controller.dart';
 import 'sharing_repository.dart';
 import 'sources_repository.dart';
 import 'trust_repository.dart';
+import 'verification_repository.dart';
 
 /// One client for the whole app.
 ///
@@ -90,6 +91,10 @@ final sharingRepositoryProvider = Provider<SharingRepository>(
   (ref) => SharingRepository(ref.watch(apiClientProvider)),
 );
 
+final verificationRepositoryProvider = Provider<VerificationRepository>(
+  (ref) => VerificationRepository(ref.watch(apiClientProvider)),
+);
+
 // The reads.
 //
 // One provider per thing the server holds, so two screens showing the same
@@ -120,6 +125,12 @@ final promptBankProvider = FutureProvider.autoDispose<PromptBank>(
 /// The notices and this person's grants, together. Read before any connect
 /// screen, because the server refuses to authorize a source whose purpose is
 /// not open.
+/// Where this person's DigiLocker verification stands, derived by the server
+/// from their profile on every read.
+final verificationProvider = FutureProvider.autoDispose<Verification>(
+  (ref) => ref.watch(verificationRepositoryProvider).load(),
+);
+
 final consentProvider = FutureProvider.autoDispose<ConsentState>(
   (ref) => ref.watch(consentRepositoryProvider).load(),
 );

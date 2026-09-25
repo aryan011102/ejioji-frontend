@@ -63,15 +63,17 @@ class AccountPage extends ConsumerWidget {
                 onTap: () => context.push(Routes.editProfile),
               ),
             ),
-            // Verification has no backend yet. The invitation still points at
-            // the hub, which says so plainly; what it must not do is claim a
-            // tick nobody issued, or gate chat on one.
+            // The tick is the server's; this only says whether it is there.
             _Invitation(
               icon: Icons.check,
               tint: AppColors.blueSoft,
               iconColor: AppColors.blue,
-              title: 'Verification is coming',
-              body: 'An ID check and a selfie check, neither switched on yet.',
+              title: profile.valueOrNull?.verified ?? false
+                  ? 'You are verified'
+                  : 'Get verified',
+              body: profile.valueOrNull?.verified ?? false
+                  ? 'Your profile carries the blue tick.'
+                  : 'Check your name and age with DigiLocker, about a minute.',
               onTap: () => context.push(Routes.verify),
             ),
             _PremiumPromo(onTap: () => context.push(Routes.premium)),

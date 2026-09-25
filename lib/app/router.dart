@@ -216,8 +216,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.verifyFailed,
-        builder: (_, __) =>
-            const VerifyErrorPage(route: VerifyRoute.digilocker),
+        builder: (_, state) => VerifyErrorPage(
+          failure: state.extra is VerifyFailure
+              ? state.extra! as VerifyFailure
+              : null,
+        ),
       ),
 
       GoRoute(

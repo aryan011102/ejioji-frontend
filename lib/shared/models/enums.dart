@@ -110,6 +110,7 @@ enum ConsentPurpose {
   appleMusicImport('apple_music_import', 'Apple Music library'),
   aiProcessing('ai_processing', 'AI suggestions'),
   matching('matching', 'Matching'),
+  identityVerification('identity_verification', 'DigiLocker verification'),
   unknown('', '');
 
   const ConsentPurpose(this.wire, this.label);

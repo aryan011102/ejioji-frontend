@@ -25,6 +25,7 @@ class Candidate {
     required this.photos,
     required this.tiles,
     this.socials = const [],
+    this.verified = false,
   });
 
   final String userId;
@@ -45,6 +46,10 @@ class Candidate {
   /// server hands these over only with a match, never on a card or a request.
   final List<SocialLink> socials;
 
+  /// DigiLocker agreed with their name and age. Only the tick, never what was
+  /// checked.
+  final bool verified;
+
   Candidate withSocials(List<SocialLink> socials) => Candidate(
         userId: userId,
         firstName: firstName,
@@ -56,6 +61,7 @@ class Candidate {
         photos: photos,
         tiles: tiles,
         socials: socials,
+        verified: verified,
       );
 
   MediaAsset? get leadPhoto => photos.isEmpty ? null : photos.first;
@@ -73,6 +79,7 @@ class Candidate {
         pronouns: Pronouns.parse(j.strOrNull('pronouns')),
         photos: MediaAsset.listFrom(j.objects('photos')),
         tiles: ProfileTile.listFrom(j.objects('tiles')),
+        verified: j.flag('verified'),
       );
 
   static List<Candidate> listFrom(List<Json> items) =>

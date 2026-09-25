@@ -99,6 +99,9 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
         ConsentPurpose.matching =>
           'Lets us suggest people to you and show you to them. Tiles you hide '
               'from your profile still count towards who you are matched with.',
+        ConsentPurpose.identityVerification =>
+          'Checks your first name and date of birth against DigiLocker, once, '
+              'for the verified tick. Your Aadhaar number is never shared.',
         ConsentPurpose.unknown => '',
       };
 

@@ -144,6 +144,7 @@ class MyProfile {
     required this.tiles,
     required this.publish,
     this.profile,
+    this.verified = false,
   });
 
   /// Null until the person has filled the four fields in.
@@ -152,6 +153,10 @@ class MyProfile {
   final List<MediaAsset> photos;
   final List<ProfileTile> tiles;
   final PublishState publish;
+
+  /// The blue tick others see: DigiLocker agreed with this first name and
+  /// birth date. The server works it out on every read.
+  final bool verified;
 
   bool get isComplete => profile != null;
 
@@ -162,6 +167,7 @@ class MyProfile {
       photos: MediaAsset.listFrom(j.objects('photos')),
       tiles: ProfileTile.listFrom(j.objects('tiles')),
       publish: PublishState.fromJson(j.object('publish')),
+      verified: j.flag('verified'),
     );
   }
 }

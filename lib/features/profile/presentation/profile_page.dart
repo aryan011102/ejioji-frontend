@@ -206,6 +206,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       return _wall(
         name: person.firstName,
         pronouns: person.pronouns,
+        verified: person.verified,
         chips: [
           ..._chips(
             age: person.age,
@@ -245,6 +246,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         return _wall(
           name: details?.firstName ?? '',
           pronouns: details?.pronouns,
+          verified: profile.verified,
           chips: details == null
               ? const []
               : [
@@ -268,6 +270,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     required String name,
     required List<_Fact> chips,
     Pronouns? pronouns,
+    bool verified = false,
     required List<MediaAsset> photos,
     required List<api.ProfileTile> tiles,
     Candidate? person,
@@ -285,7 +288,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           ListView(
             padding: EdgeInsets.only(bottom: _viewer ? _actionsHeight : 24),
             children: [
-              _header(name, pronouns, chips, photos),
+              _header(name, pronouns, chips, photos, verified: verified),
               if (!_viewer) ...[
                 if (publish != null) _publishState(publish),
                 Padding(
@@ -490,8 +493,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     String name,
     Pronouns? pronouns,
     List<_Fact> chips,
-    List<MediaAsset> photos,
-  ) {
+    List<MediaAsset> photos, {
+    bool verified = false,
+  }) {
     // Their profile shows what they stated and nothing else. Your own offers the
     // way in, because a field nobody can find is a field nobody fills.
     final pronounLine = pronouns?.label ?? (_viewer ? null : 'Add pronouns');
@@ -515,13 +519,30 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        name,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppText.title1.copyWith(
-                          fontSize: 29,
-                          letterSpacing: -1,
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              name,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppText.title1.copyWith(
+                                fontSize: 29,
+                                letterSpacing: -1,
+                              ),
+                            ),
+                          ),
+                          // The server's tick, never the app's: DigiLocker
+                          // agreed with this first name and age.
+                          if (verified) ...[
+                            const SizedBox(width: 6),
+                            const Icon(
+                              Icons.verified,
+                              size: 22,
+                              color: AppColors.blue,
+                              semanticLabel: 'Verified',
+                            ),
+                          ],
+                        ],
                       ),
                       if (pronounLine != null) ...[
                         const SizedBox(height: 3),

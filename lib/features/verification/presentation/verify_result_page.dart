@@ -12,42 +12,31 @@ enum VerifyRoute { digilocker, selfie }
 
 /// Two outcomes, one screen.
 ///
-/// DigiLocker is instant; the selfie is with a person for a day. The pending
-/// version says what still works meanwhile, because the worst reading of
-/// "under review" is that the account has been suspended.
-class VerifyResultPage extends ConsumerStatefulWidget {
+/// DigiLocker is instant, and this screen is only reached after the server
+/// said `verified`: the tick is the server's, never something awarded here.
+/// The selfie version describes a review that is not built yet; nothing links
+/// to it until the selfie check exists.
+class VerifyResultPage extends ConsumerWidget {
   const VerifyResultPage({required this.route, super.key});
 
   final VerifyRoute route;
 
   @override
-  ConsumerState<VerifyResultPage> createState() => _VerifyResultPageState();
-}
-
-class _VerifyResultPageState extends ConsumerState<VerifyResultPage> {
-  // Nothing is recorded here any more. There is no verification endpoint, so
-  // the previous version awarded a tick purely in local state: the app said
-  // "verified" and the server had never heard of it. A badge that means
-  // nothing is worse than no badge, so the screen now only describes what
-  // would happen. See `verify_hub_page.dart`.
-
-  @override
-  Widget build(BuildContext context) {
-    final instant = widget.route == VerifyRoute.digilocker;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final instant = route == VerifyRoute.digilocker;
 
     return AppScaffold(
       navBar: const AppNavBar(),
       footer: Column(
         children: [
           PrimaryButton(
-            label: instant ? 'Add the selfie check' : 'Back to browsing',
-            onPressed: () => instant
-                ? context.pushReplacement(Routes.selfie)
-                : context.go(Routes.home),
+            label: instant ? 'See your profile' : 'Back to browsing',
+            onPressed: () =>
+                instant ? context.go(Routes.editProfile) : context.go(Routes.home),
           ),
           const SizedBox(height: 8),
           SecondaryButton(
-            label: instant ? 'Not now' : 'Done',
+            label: 'Done',
             onPressed: () => context.go(Routes.home),
           ),
         ],
@@ -59,16 +48,15 @@ class _VerifyResultPageState extends ConsumerState<VerifyResultPage> {
         ),
         title: instant ? 'Verified.' : 'Under review.',
         body: instant
-            ? 'Your name and date of birth match your ID. Your profile carries '
-                'a blue tick, and chat is open.'
+            ? 'Your name and date of birth match your Aadhaar. Your profile '
+                'now carries a blue tick.'
             : "Usually within 24 hours, and we'll tell you either way. Nothing "
-                'else changes meanwhile — you can browse, and people can still '
+                'else changes meanwhile: you can browse, and people can still '
                 'write to you.',
         note: instant
             ? const NoteCard(
-                tone: NoteTone.gold,
-                text: 'Add a selfie check for the gold tick. Two minutes, and '
-                    'it says both an ID and a photo were verified.',
+                text: 'Change the first name or date of birth on your profile '
+                    'and the tick goes until you verify again.',
               )
             : null,
       ),
@@ -76,59 +64,76 @@ class _VerifyResultPageState extends ConsumerState<VerifyResultPage> {
   }
 }
 
-/// One error screen, two wordings.
-///
-/// Neither failure is the person's fault — a DigiLocker outage, or bad light —
-/// so neither is red, and both offer the *other route* rather than only a
-/// retry.
-class VerifyErrorPage extends ConsumerWidget {
-  const VerifyErrorPage({required this.route, super.key});
+/// Why a check did not end in a tick, handed to [VerifyErrorPage].
+class VerifyFailure {
+  const VerifyFailure({
+    required this.title,
+    required this.body,
+    this.fixable = false,
+  });
 
-  final VerifyRoute route;
+  final String title;
+
+  /// The server's own words where it gave some, so the app never guesses at
+  /// what DigiLocker said.
+  final String body;
+
+  /// DigiLocker answered and something on the profile did not agree, so the
+  /// way forward is to edit the profile, not to wait for DigiLocker.
+  final bool fixable;
+}
+
+/// One error screen for DigiLocker.
+///
+/// Neither kind of failure is the person's fault, so neither is red. When the
+/// profile disagreed with Aadhaar the way out is editing it; when DigiLocker
+/// did not answer, it is trying again.
+class VerifyErrorPage extends ConsumerWidget {
+  const VerifyErrorPage({this.failure, super.key});
+
+  final VerifyFailure? failure;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final digi = route == VerifyRoute.digilocker;
+    final f = failure ??
+        const VerifyFailure(
+          title: "DigiLocker didn't respond.",
+          body: 'The site was unreachable, or the sign-in was cancelled '
+              'before it finished.',
+        );
 
     return AppScaffold(
       navBar: AppNavBar(
-        title: digi ? 'DigiLocker' : 'Selfie check',
+        title: 'DigiLocker',
         backLabel: 'Verify',
         onBack: () => context.pop(),
       ),
       footer: Column(
         children: [
-          PrimaryButton(
-            label: 'Try again',
-            onPressed: () => context.pop(),
-          ),
+          if (f.fixable)
+            PrimaryButton(
+              label: 'Edit your profile',
+              onPressed: () => context.pushReplacement(Routes.editInfo),
+            )
+          else
+            PrimaryButton(
+              label: 'Try again',
+              onPressed: () => context.pushReplacement(Routes.digilocker),
+            ),
           const SizedBox(height: 8),
           SecondaryButton(
-            label: digi ? 'Use the selfie check' : 'Use DigiLocker',
-            onPressed: () => context.pushReplacement(
-              digi ? Routes.selfie : Routes.digilocker,
-            ),
-          ),
-          Center(
-            child: TextActionButton(label: 'Get help', onPressed: () {}),
+            label: 'Not now',
+            onPressed: () => context.go(Routes.home),
           ),
         ],
       ),
       child: ResultScaffoldBody(
         mark: const ResultMark(icon: Icons.warning_amber_rounded, size: 76),
-        title: digi ? "DigiLocker didn't respond." : "That didn't match.",
-        body: digi
-            ? 'The site was unreachable, or the sign-in was cancelled before it '
-                'finished. Nothing was shared, and nothing on your profile '
-                'changed.'
-            : 'Usually the light, or a hand not quite where the pose asked. '
-                'Nothing on your profile changed and nobody is told.',
-        note: NoteCard(
-          text: digi
-              ? 'If it keeps failing, DigiLocker may be down — it happens. The '
-                  'selfie check takes two minutes and works just as well.'
-              : 'Try somewhere brighter, facing a window. Or use DigiLocker '
-                  'instead, which takes about a minute.',
+        title: f.title,
+        body: f.body,
+        note: const NoteCard(
+          text: 'Nothing on your profile changed, nobody is told, and we kept '
+              'nothing DigiLocker sent.',
         ),
       ),
     );

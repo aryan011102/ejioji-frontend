@@ -3,6 +3,7 @@ import '../core/network/endpoints.dart';
 import '../core/network/json.dart';
 import '../shared/models/enums.dart';
 import '../shared/models/person.dart';
+import '../shared/models/tile.dart';
 
 /// The feed, and everything a person can do about someone in it.
 ///
@@ -60,8 +61,16 @@ class MatchingRepository {
   ///
   /// Capped per day. The server counts from the table rather than a cache, so
   /// the number is exact.
-  Future<RequestResult> sendRequest(String userId) async {
-    final body = await _api.post(Api.requests, body: {'user_id': userId});
+  ///
+  /// [tile] is "chat about this": one of their tiles, which goes with the
+  /// request and nothing else, since no words go before a match. Asking back
+  /// with one opens the conversation on it. The server refuses a tile that is
+  /// not on their profile now (409, tile_not_shown).
+  Future<RequestResult> sendRequest(String userId, {ProfileTile? tile}) async {
+    final body = await _api.post(
+      Api.requests,
+      body: {'user_id': userId, if (tile != null) 'tile': tile.toRef()},
+    );
     return RequestResult.fromJson(body);
   }
 

@@ -3,6 +3,7 @@ import '../core/network/endpoints.dart';
 import '../core/network/json.dart';
 import '../core/util/ids.dart';
 import '../shared/models/chat.dart';
+import '../shared/models/tile.dart';
 
 /// Conversations.
 ///
@@ -52,6 +53,7 @@ class ChatRepository {
     String? text,
     String? mediaId,
     String? clientId,
+    ProfileTile? tile,
   }) async {
     final body = await _api.post(
       Api.messages(matchId),
@@ -59,6 +61,8 @@ class ChatRepository {
         'client_id': clientId ?? Ids.uuid(),
         if (text != null) 'text': text,
         if (mediaId != null) 'media_id': mediaId,
+        // Their tile, quoted above the text. Only with text.
+        if (tile != null) 'tile': tile.toRef(),
       },
     );
     return Message.fromJson(body);

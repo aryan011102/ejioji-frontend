@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/network/api_exception.dart';
 import '../shared/models/person.dart';
+import '../shared/models/tile.dart';
 import 'providers.dart';
 
 /// The feed, as a deck rather than a list.
@@ -133,8 +134,10 @@ class FeedController extends Notifier<FeedState> {
   ///
   /// Returns the result when the request went through, and null when it did
   /// not; the caller shows the message.
-  Future<RequestResult?> request(String userId) async {
-    final result = await ref.read(matchingRepositoryProvider).sendRequest(userId);
+  Future<RequestResult?> request(String userId, {ProfileTile? tile}) async {
+    final result = await ref
+        .read(matchingRepositoryProvider)
+        .sendRequest(userId, tile: tile);
     _advance();
     ref
       ..invalidate(outgoingRequestsProvider)

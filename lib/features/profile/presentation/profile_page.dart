@@ -28,6 +28,7 @@ import '../../../shared/widgets/pressable.dart';
 import '../../../shared/widgets/sheets.dart';
 import '../../../shared/widgets/social_mark.dart';
 import '../../../shared/widgets/states.dart';
+import '../../../shared/widgets/swipe_to_chat.dart';
 import '../../../shared/widgets/tiles.dart';
 import 'arrange_wall.dart';
 
@@ -62,10 +63,16 @@ class ProfilePage extends ConsumerStatefulWidget {
     required this.mode,
     this.candidate,
     this.backLabel,
+    this.chatAbout = false,
     super.key,
   });
 
   final ProfileMode mode;
+
+  /// On a guest profile, its tiles slide to "Chat about this" and the one
+  /// chosen is popped back to the screen behind (PersonArgs.chatAbout). The
+  /// deck's own profile always slides, and asks there and then.
+  final bool chatAbout;
 
   /// Required in [ProfileMode.viewer] and [ProfileMode.guest]; ignored
   /// otherwise.
@@ -397,7 +404,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     for (final t in shown)
                       BentoItem(
                         size: t.tileSize,
-                        child: InsightTile(
+                        child: _chatAbout(
+                          t,
+                          person,
+                          InsightTile(
                           size: t.tileSize,
                           number: t.isAnswer ? null : t.headline,
                           caption: t.isAnswer ? null : t.body,
@@ -412,6 +422,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                           // own wall. A viewer is being introduced to a person
                           // and does not need a filing system on the photos.
                           categoryGlyph: _viewer ? null : t.glyph,
+                          ),
                         ),
                       ),
                   ],
@@ -757,6 +768,37 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
   /// Pass, or ask to chat.
   ///
+  /// Their tile, sliding to "Chat about this". Somebody else's wall only, and
+  /// on a guest profile only where the screen behind asked for it.
+  Widget _chatAbout(api.ProfileTile t, Candidate? person, Widget tile) {
+    if (person == null || !(_viewer || widget.chatAbout)) return tile;
+    return SwipeToChat(
+      onChat: () => _viewer ? _askAbout(person, t) : context.pop(t),
+      child: tile,
+    );
+  }
+
+  /// "Chat about this" from the deck: a request carrying the tile and nothing
+  /// else, since no words go before a match. If they had already asked, this
+  /// accepts theirs and the chat opens on the tile.
+  Future<void> _askAbout(Candidate person, api.ProfileTile tile) async {
+    try {
+      final result = await ref
+          .read(feedProvider.notifier)
+          .request(person.userId, tile: tile);
+      if (!mounted || result == null) return;
+      showAppToast(
+        context,
+        result.accepted
+            ? '${person.firstName} asked you too. The chat opens on this tile.'
+            : 'Asked about this. ${person.firstName} will see it with your '
+                'request.',
+      );
+    } on ApiException catch (e) {
+      if (mounted) showAppToast(context, e.message);
+    }
+  }
+
   /// There is no like and no gate: the ask goes straight out, and the other
   /// person answers it in their own time. Asking somebody who already asked
   /// you accepts theirs, which the server decides and says so in its answer.

@@ -171,6 +171,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             mode: ProfileMode.guest,
             candidate: args?.person,
             backLabel: args?.backLabel,
+            chatAbout: args?.chatAbout ?? false,
           );
         },
       ),

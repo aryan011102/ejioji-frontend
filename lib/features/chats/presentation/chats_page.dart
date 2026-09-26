@@ -11,11 +11,13 @@ import '../../../shared/format.dart';
 import '../../../shared/models/chat.dart';
 import '../../../shared/models/enums.dart';
 import '../../../shared/models/person.dart';
+import '../../../shared/models/tile.dart';
 import '../../../shared/widgets/buttons.dart';
 import '../../../shared/widgets/controls.dart';
 import '../../../shared/widgets/identity.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/pressable.dart';
+import '../../../shared/widgets/quoted_tile.dart';
 import '../../../shared/widgets/sheets.dart';
 import '../../../shared/widgets/states.dart';
 
@@ -56,6 +58,22 @@ class _ChatsPageState extends ConsumerState<ChatsPage> {
       if (!mounted) return;
       _refreshEverything();
       context.push(Routes.conversationWith(match.id));
+    } on ApiException catch (e) {
+      if (mounted) showAppToast(context, e.message);
+    }
+  }
+
+  /// "Chat about this" on the profile of someone who asked you: asking back
+  /// about one of their tiles, which accepts their request, and the chat opens
+  /// on both tiles.
+  Future<void> _askBack(PendingRequest request, ProfileTile tile) async {
+    try {
+      final result = await ref
+          .read(matchingRepositoryProvider)
+          .sendRequest(request.person.userId, tile: tile);
+      if (!mounted) return;
+      _refreshEverything();
+      if (result.accepted) context.push(Routes.conversationWith(result.id));
     } on ApiException catch (e) {
       if (mounted) showAppToast(context, e.message);
     }
@@ -114,6 +132,7 @@ class _ChatsPageState extends ConsumerState<ChatsPage> {
               _Tab.requests => _IncomingList(
                   onAccept: _accept,
                   onDecline: _decline,
+                  onAskBack: _askBack,
                 ),
               _Tab.sent => const _SentList(),
             },
@@ -182,10 +201,15 @@ class _ConversationList extends ConsumerWidget {
 }
 
 class _IncomingList extends ConsumerWidget {
-  const _IncomingList({required this.onAccept, required this.onDecline});
+  const _IncomingList({
+    required this.onAccept,
+    required this.onDecline,
+    required this.onAskBack,
+  });
 
   final Future<void> Function(PendingRequest) onAccept;
   final Future<void> Function(PendingRequest) onDecline;
+  final Future<void> Function(PendingRequest, ProfileTile) onAskBack;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -215,6 +239,7 @@ class _IncomingList extends ConsumerWidget {
                 request: r,
                 onAccept: () => onAccept(r),
                 onDecline: () => onDecline(r),
+                onAskBack: (tile) => onAskBack(r, tile),
               ),
             Padding(
               padding: const EdgeInsets.symmetric(
@@ -283,7 +308,10 @@ class _SentList extends ConsumerWidget {
                   for (final r in out.requests)
                     AppRow(
                       label: r.person.firstName,
-                      subtitle: 'Asked ${relativeTime(r.requestedAt)} ago',
+                      subtitle: r.tile == null
+                          ? 'Asked ${relativeTime(r.requestedAt)} ago'
+                          : 'Asked about a tile '
+                              '${relativeTime(r.requestedAt)} ago',
                       last: r.id == out.requests.last.id,
                       leading: Avatar(
                         seedColor: AppColors.fill,
@@ -293,6 +321,27 @@ class _SentList extends ConsumerWidget {
                     ),
                 ],
               ),
+              // What each request was about, under the list: the design's
+              // "you've sent a request along with the tile".
+              for (final r in out.requests)
+                if (r.tile != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      Insets.gutter,
+                      14,
+                      Insets.gutter,
+                      0,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        QuotedTileLabel(
+                          'You asked ${r.person.firstName} about this',
+                        ),
+                        QuotedTile(tile: r.tile!),
+                      ],
+                    ),
+                  ),
           ],
         );
       },
@@ -310,11 +359,27 @@ class _RequestCard extends StatelessWidget {
     required this.request,
     required this.onAccept,
     required this.onDecline,
+    required this.onAskBack,
   });
 
   final PendingRequest request;
   final VoidCallback onAccept;
   final VoidCallback onDecline;
+
+  /// A tile of theirs chosen on their profile: asking back about it.
+  final void Function(ProfileTile) onAskBack;
+
+  Future<void> _openProfile(BuildContext context) async {
+    final tile = await context.push<ProfileTile>(
+      Routes.person,
+      extra: PersonArgs(
+        person: request.person,
+        backLabel: 'Requests',
+        chatAbout: true,
+      ),
+    );
+    if (tile != null) onAskBack(tile);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -337,10 +402,7 @@ class _RequestCard extends StatelessWidget {
             // tile and one line of a city: nobody should have to answer on that,
             // and the buttons stay outside the tap so answering still takes aim.
             Pressable(
-              onTap: () => context.push(
-                Routes.person,
-                extra: PersonArgs(person: person, backLabel: 'Requests'),
-              ),
+              onTap: () => _openProfile(context),
               semanticLabel: "Open ${person.firstName}'s profile",
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -381,7 +443,13 @@ class _RequestCard extends StatelessWidget {
                           '${relativeTime(request.requestedAt)} ago',
                           style: AppText.footnote,
                         ),
-                        if (person.tiles.isNotEmpty) ...[
+                        if (request.tile != null) ...[
+                          const SizedBox(height: 12),
+                          QuotedTileLabel(
+                            '${person.firstName} wants to chat about this',
+                          ),
+                          QuotedTile(tile: request.tile!),
+                        ] else if (person.tiles.isNotEmpty) ...[
                           const SizedBox(height: 10),
                           Text(
                             person.tiles.first.isAnswer

@@ -118,8 +118,17 @@ abstract final class Routes {
 /// conversation, and "Back" in both places would be the lazy answer.
 @immutable
 class PersonArgs {
-  const PersonArgs({required this.person, required this.backLabel});
+  const PersonArgs({
+    required this.person,
+    required this.backLabel,
+    this.chatAbout = false,
+  });
 
   final Candidate person;
   final String backLabel;
+
+  /// Their tiles slide to "Chat about this", and the tile chosen comes back
+  /// as the pushed route's result: from a conversation it becomes the quote
+  /// above the keyboard, from a request it is asking back about it.
+  final bool chatAbout;
 }

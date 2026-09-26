@@ -311,12 +311,18 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
 
   // The menu.
 
-  Person? get _person => ref
+  Conversation? get _conversation => ref
       .read(conversationsProvider)
       .valueOrNull
       ?.where((c) => c.matchId == _matchId)
-      .firstOrNull
-      ?.person;
+      .firstOrNull;
+
+  Person? get _person => _conversation?.person;
+
+  /// A "Message the founder" conversation: no profile behind the name, and
+  /// nothing to share with family. The server refuses both anyway; this just
+  /// does not offer them.
+  bool get _founderLine => _conversation?.founderLine ?? false;
 
   /// The full profile behind the name at the top.
   ///
@@ -358,41 +364,51 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
   Future<void> _menu() async {
     final person = _person;
     final name = person?.firstName ?? 'them';
+    // Family sharing needs an ordinary match, which a founder conversation is
+    // not; report and block are always there.
+    final options = <(SheetAction, Future<void> Function())>[
+      if (!_founderLine)
+        (
+          const SheetAction(
+            'Ready for friends and family',
+            icon: Icons.people_alt_rounded,
+          ),
+          () async => unawaited(
+                context.push<void>(
+                  Routes.shareFor(_matchId, name: person?.firstName),
+                ),
+              ),
+        ),
+      (const SheetAction('Unmatch', destructive: true), () => _unmatch(name)),
+      (
+        const SheetAction('Report', destructive: true),
+        () async {
+          if (person == null) return;
+          unawaited(
+            context.push<void>(
+              Routes.reportFor(
+                person.userId,
+                name: person.firstName,
+                matchId: _matchId,
+              ),
+            ),
+          );
+        },
+      ),
+      (
+        SheetAction('Block $name', destructive: true),
+        () async {
+          if (person != null) await _block(person.userId, name);
+        },
+      ),
+    ];
     final choice = await showAppActionSheet(
       context,
       message: '$name is never told if you report them.',
-      actions: [
-        const SheetAction(
-          'Ready for friends and family',
-          icon: Icons.people_alt_rounded,
-        ),
-        const SheetAction('Unmatch', destructive: true),
-        const SheetAction('Report', destructive: true),
-        SheetAction('Block $name', destructive: true),
-      ],
+      actions: [for (final (action, _) in options) action],
     );
     if (!mounted || choice == null) return;
-    switch (choice) {
-      case 0:
-        unawaited(
-          context.push<void>(Routes.shareFor(_matchId, name: person?.firstName)),
-        );
-      case 1:
-        await _unmatch(name);
-      case 2:
-        if (person == null) return;
-        unawaited(
-          context.push<void>(
-            Routes.reportFor(
-              person.userId,
-              name: person.firstName,
-              matchId: _matchId,
-            ),
-          ),
-        );
-      case 3:
-        if (person != null) await _block(person.userId, name);
-    }
+    await options[choice].$2();
   }
 
   Future<void> _unmatch(String name) async {
@@ -453,7 +469,8 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
       navBar: AppNavBar(
         title: name,
         // No door once the match is over: there is nothing on the other side.
-        onTitle: _ended || _person == null ? null : _openProfile,
+        // None on a founder conversation either: it is text only.
+        onTitle: _ended || _person == null || _founderLine ? null : _openProfile,
         backLabel: 'Chats',
         onBack: () => context.pop(),
         trailingLabel: _ended ? null : '···',

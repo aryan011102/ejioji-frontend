@@ -91,6 +91,12 @@ class MatchingRepository {
   Future<void> decline(String requestId) =>
       _api.postEmpty(Api.declineRequest(requestId));
 
+  /// Opens (or reopens) the conversation with the founder and returns its id,
+  /// for `/chats/<id>`. Text only: it is in neither person's matches, so no
+  /// profile opens from it, until the two also match the ordinary way.
+  Future<String> messageFounder() async =>
+      (await _api.post(Api.founder)).str('id');
+
   Future<List<Match>> matches() async {
     final body = await _api.getJson(Api.matches);
     return Match.listFrom(body.objects('matches'));

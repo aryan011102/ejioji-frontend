@@ -81,6 +81,8 @@ abstract final class Api {
   static String endMatch(String matchId) => '$prefix/matching/matches/$matchId';
   static const passes = '$prefix/matching/passes';
   static const blocks = '$prefix/matching/blocks';
+  /// Settings' "Message the founder": opens that conversation, text only.
+  static const founder = '$prefix/matching/founder';
   static String unblock(String userId) => '$prefix/matching/blocks/$userId';
   // POST when a profile has been on screen for 3 seconds; GET for who has
   // looked at yours.

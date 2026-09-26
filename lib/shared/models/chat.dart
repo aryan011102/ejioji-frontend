@@ -147,6 +147,7 @@ class Conversation {
     required this.unread,
     required this.theirReadSeq,
     this.lastMessage,
+    this.founderLine = false,
   });
 
   final String matchId;
@@ -155,6 +156,10 @@ class Conversation {
   final LastMessage? lastMessage;
   final int unread;
   final int theirReadSeq;
+
+  /// Opened from "Message the founder" and not an ordinary match (yet): text
+  /// only. The name and photo are all there is; no profile opens from it.
+  final bool founderLine;
 
   /// Nobody has written yet. The list leads with this rather than an empty row.
   bool get isNew => lastMessage == null;
@@ -170,6 +175,7 @@ class Conversation {
       lastMessage: last == null ? null : LastMessage.fromJson(last),
       unread: j.intOr('unread', 0),
       theirReadSeq: j.intOr('their_read_seq', 0),
+      founderLine: j.flag('founder_line'),
     );
   }
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -14,6 +16,18 @@ import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/sheets.dart';
 import '../../../shared/widgets/social_mark.dart';
 import '../../profile/presentation/social_link_sheet.dart';
+
+/// A small spinner where a row's chevron goes, while it waits on the server.
+class _RowSpinner extends StatelessWidget {
+  const _RowSpinner();
+
+  @override
+  Widget build(BuildContext context) => const SizedBox(
+        width: 16,
+        height: 16,
+        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.label3),
+      );
+}
 
 /// Five groups: your account, your socials, appearance, help, and the one that
 /// ends things.
@@ -48,6 +62,30 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   /// Waiting on the server for the stealth switch.
   bool _stealthBusy = false;
+
+  /// Waiting on the server to open the founder's conversation.
+  bool _openingFounder = false;
+
+  /// A chat with the founder, in the app (Aryan's call, 2026-09-27): text only,
+  /// her profile does not open from it. The founder herself gets the server's
+  /// own line back (409 founder_is_you), shown as it is.
+  Future<void> _messageFounder() async {
+    if (_openingFounder) return;
+    setState(() => _openingFounder = true);
+    try {
+      final id = await ref.read(matchingRepositoryProvider).messageFounder();
+      ref.invalidate(conversationsProvider);
+      if (mounted) unawaited(context.push(Routes.conversationWith(id)));
+    } on NotFoundFailure {
+      if (mounted) {
+        showAppToast(context, "The founder isn't taking messages here right now.");
+      }
+    } on ApiException catch (e) {
+      if (mounted) showAppToast(context, e.message);
+    } finally {
+      if (mounted) setState(() => _openingFounder = false);
+    }
+  }
 
   /// Out of every feed while still browsing and asking, or back in. Free for
   /// now: there is no premium to check against yet.
@@ -246,21 +284,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             children: [
               AppRow(
                 label: 'Message the founder',
-                subtitle: 'Goes straight to my inbox',
+                subtitle: 'Straight to her chats. She reads every one.',
                 leading: const Icon(
-                  Icons.mail_outline,
+                  Icons.chat_bubble_outline,
                   size: 18,
                   color: AppColors.label2,
                 ),
-                onTap: () => showAppActionSheet(
-                  context,
-                  title: 'Message the founder',
-                  message: 'pritika@theonebytwo.com — I read these myself.',
-                  actions: const [
-                    SheetAction('Open Mail'),
-                    SheetAction('Copy address'),
-                  ],
-                ),
+                control: _openingFounder ? const _RowSpinner() : null,
+                onTap: _messageFounder,
               ),
               AppRow(
                 label: 'Support and privacy',

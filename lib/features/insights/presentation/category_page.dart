@@ -95,27 +95,41 @@ class CategoryPage extends ConsumerStatefulWidget {
 typedef _Choice = ({TileKind kind, String key});
 
 class _CategoryPageState extends ConsumerState<CategoryPage> {
-  /// The server's rule too: three to a category, so every category gets a
-  /// turn on the profile.
-  static const _cap = 3;
+  /// The server's rules too: two to a category, so every category gets a
+  /// turn, and ten on the profile in all. Photos are not tiles and do not
+  /// count.
+  static const _perCategory = 2;
+  static const _maxTiles = 10;
 
   Set<_Choice>? _picked;
-  bool _showCapNote = false;
+
+  /// Tiles on the profile from every other category, which count toward
+  /// [_maxTiles] alongside what is picked here. Set on each build.
+  int _elsewhere = 0;
+
+  /// Why the last tap added nothing, shown for a moment at the foot.
+  String? _capNote;
   bool _saving = false;
 
   void _toggle(_Choice choice) {
     final picked = _picked!;
+    String? note;
     setState(() {
       if (picked.remove(choice)) return;
-      if (picked.length >= _cap) {
-        _showCapNote = true;
-        return;
+      if (picked.length >= _perCategory) {
+        note = 'Two to a category, so every category gets a turn. Drop one '
+            'to swap it.';
+      } else if (_elsewhere + picked.length >= _maxTiles) {
+        note = 'Ten tiles is the most a profile shows. Drop one here or in '
+            'another category to add this.';
+      } else {
+        picked.add(choice);
       }
-      picked.add(choice);
+      _capNote = note;
     });
-    if (_showCapNote) {
+    if (note != null) {
       Future<void>.delayed(const Duration(milliseconds: 2200), () {
-        if (mounted) setState(() => _showCapNote = false);
+        if (mounted && _capNote == note) setState(() => _capNote = null);
       });
     }
   }
@@ -248,6 +262,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
         if (t.category == category) (kind: t.kind, key: t.key),
     };
     final picked = _picked!;
+    _elsewhere = current.where((t) => t.category != category).length;
     final inCategory = insights.where((i) => i.category == category).toList();
     final answered = answers.where((a) => a.category == category).toList();
     // Thin: their data could not fill this category, so we ask instead. The
@@ -347,7 +362,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                           : asking
                               ? 'Not enough here to say anything true. So we '
                                   'would rather ask.'
-                              : 'Pick up to three, and put a photo or video '
+                              : 'Pick up to two, and put a photo or video '
                                   'behind any of them.',
                       style: AppText.callout.copyWith(fontSize: 14),
                     ),
@@ -403,7 +418,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
               ),
             ],
           ),
-          if (_showCapNote)
+          if (_capNote case final note?)
             Positioned(
               left: 26,
               right: 26,
@@ -416,8 +431,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                   border: Border.all(color: AppColors.glassEdge),
                 ),
                 child: Text(
-                  'Three to a category, so every category gets a turn. Drop '
-                  'one to swap it.',
+                  note,
                   textAlign: TextAlign.center,
                   style: AppText.footnote.copyWith(color: AppColors.label),
                 ),

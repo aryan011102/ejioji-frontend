@@ -347,6 +347,21 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               else
                 BentoGrid(
                   children: [
+                    // First, so it is always in the top row: the grid packs
+                    // from the top, so the first item takes the top left.
+                    // Small or wide by what keeps the rows even, so the move
+                    // up does not leave a hole at the foot of the wall.
+                    if (photos.length > 1)
+                      BentoItem(
+                        size: columnsUsed.isOdd
+                            ? TileSize.small
+                            : TileSize.wide,
+                        child: PhotosTile(
+                          photoUrls: [
+                            for (final p in photos.skip(1)) p.stillUrl,
+                          ],
+                        ),
+                      ),
                     for (final t in shown)
                       BentoItem(
                         size: t.tileSize,
@@ -365,17 +380,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                           // own wall. A viewer is being introduced to a person
                           // and does not need a filing system on the photos.
                           categoryGlyph: _viewer ? null : t.glyph,
-                        ),
-                      ),
-                    if (photos.length > 1)
-                      BentoItem(
-                        size: columnsUsed.isOdd
-                            ? TileSize.small
-                            : TileSize.wide,
-                        child: PhotosTile(
-                          photoUrls: [
-                            for (final p in photos.skip(1)) p.stillUrl,
-                          ],
                         ),
                       ),
                   ],

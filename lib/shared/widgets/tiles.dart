@@ -9,8 +9,8 @@ import 'pressable.dart';
 enum TileSize { small, wide, tall, large }
 
 extension TileSizeX on TileSize {
-  /// Columns consumed, used to work out whether the last row has a hole for
-  /// the photos tile to fill.
+  /// Columns consumed, used to size the photos tile so the wall's rows come
+  /// out even.
   int get columns => switch (this) {
         TileSize.small || TileSize.tall => 1,
         TileSize.wide || TileSize.large => 2,
@@ -731,11 +731,10 @@ class StaggeredGrid extends StatelessWidget {
   }
 }
 
-/// The photos tile at the end of the wall.
+/// The photos tile, first on the wall so it is always in the top row.
 ///
 /// One photo with dots, not a collage: a collage says "here are four small
 /// things", and this is one thing you can swipe.
-/// The photos tile that fills the hole at the end of the wall.
 ///
 /// The URLs are signed and expire, so a failure here is ordinary rather than
 /// exceptional: it falls back to a plain fill instead of Flutter's grey box

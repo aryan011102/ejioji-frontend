@@ -9,11 +9,12 @@ import '../config/env.dart';
 /// Push notifications, and the only file in the app that knows Firebase
 /// exists.
 ///
-/// Three things are pushed, all of them from the backend's
-/// `notifications/push.py`: a chat message, a chat request, and a request
-/// accepted. A push carries the other person's first name, and ids. A chat
-/// message's push also carries the start of what was written (the backend's
-/// `chat/notify.py`, since 2026-09-23); the other two carry fixed copy.
+/// Four things are pushed, all of them from the backend's
+/// `notifications/push.py`: a chat message, a chat request, a request
+/// accepted, and the daily "3 people saw your profile today". The first three
+/// carry the other person's first name, and ids. A chat message's push also
+/// carries the start of what was written (the backend's `chat/notify.py`,
+/// since 2026-09-23). The daily one carries a count and nothing else.
 ///
 /// Every method here is a no-op unless this build was given a Firebase
 /// project ([Env.pushConfigured]) on a platform Firebase Messaging covers.
@@ -141,7 +142,7 @@ abstract final class Push {
 
 /// What a tapped notification was about. Ids only, which is all the server
 /// sends and all the app needs to open the right screen.
-enum PushKind { message, request, match }
+enum PushKind { message, request, match, profileViews }
 
 @immutable
 class PushOpen {
@@ -150,11 +151,12 @@ class PushOpen {
   final PushKind kind;
 
   /// The match for a message or an accepted request, the request itself for a
-  /// new one. Null when a push arrived without one, which is a server bug
-  /// rather than something to crash over.
+  /// new one. Null for profile views, which opens a list rather than a thing,
+  /// and when a push arrived without one, which is a server bug rather than
+  /// something to crash over.
   final String? id;
 
-  /// Reads one of the three `data` payloads. Anything else is ignored: a
+  /// Reads one of the four `data` payloads. Anything else is ignored: a
   /// newer server may push a kind this build has never heard of.
   static PushOpen? from(RemoteMessage? message) {
     if (message == null) return null;
@@ -168,6 +170,7 @@ class PushOpen {
           kind: PushKind.request,
           id: data['request_id'] as String?,
         ),
+      'profile_views' => const PushOpen(kind: PushKind.profileViews, id: null),
       _ => null,
     };
   }

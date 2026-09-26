@@ -109,6 +109,9 @@ abstract final class Api {
   // Safety. Reporting always blocks; blocking works on its own.
   static const reports = '$prefix/trust/reports';
 
+  // Support. "Report a problem" is about the app; a person is a report above.
+  static const feedback = '$prefix/support/feedback';
+
   // Account.
   static const deleteAccount = '$prefix/account/delete';
 }

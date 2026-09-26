@@ -303,7 +303,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
             ],
           ),
-          Center(child: Text('theonebytwo 1.0 (build 1)', style: AppText.micro)),
+          Center(
+            child: Text(
+              switch (ref.watch(appVersionProvider)) {
+                AsyncData(value: final v?) => 'theonebytwo $v',
+                _ => 'theonebytwo',
+              },
+              style: AppText.micro,
+            ),
+          ),
         ],
       ),
     );

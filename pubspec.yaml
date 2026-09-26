@@ -63,6 +63,11 @@ dependencies:
 
   equatable: ^2.0.5
 
+  # This build's version and build number (Codemagic stamps the TestFlight
+  # one), for the foot of Settings and for feedback, so a bug report can be
+  # matched to the build it came from.
+  package_info_plus: ^9.0.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

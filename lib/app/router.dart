@@ -7,8 +7,10 @@ import '../features/account/presentation/account_page.dart';
 import '../features/account/presentation/blocked_page.dart';
 import '../features/account/presentation/premium_page.dart';
 import '../features/account/presentation/profile_views_page.dart';
+import '../features/account/presentation/report_problem_page.dart';
 import '../features/account/presentation/settings_page.dart';
 import '../features/account/presentation/subscription_page.dart';
+import '../features/account/presentation/support_info_pages.dart';
 import '../features/account/presentation/support_page.dart';
 import '../features/account/presentation/take_break_page.dart';
 import '../features/auth/presentation/otp_page.dart';
@@ -288,6 +290,26 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const SubscriptionPage(),
       ),
       GoRoute(path: Routes.support, builder: (_, __) => const SupportPage()),
+      GoRoute(
+        path: Routes.supportRead,
+        builder: (_, __) => const WhatWeReadPage(),
+      ),
+      GoRoute(
+        path: Routes.supportSeen,
+        builder: (_, __) => const WhatOthersSeePage(),
+      ),
+      GoRoute(
+        path: Routes.supportNever,
+        builder: (_, __) => const NeverShownPage(),
+      ),
+      GoRoute(
+        path: Routes.safetyTips,
+        builder: (_, __) => const SafetyTipsPage(),
+      ),
+      GoRoute(
+        path: Routes.reportProblem,
+        builder: (_, __) => const ReportProblemPage(),
+      ),
       GoRoute(
         path: Routes.takeBreak,
         builder: (_, __) => const TakeBreakPage(),

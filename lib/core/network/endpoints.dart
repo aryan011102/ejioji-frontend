@@ -82,6 +82,9 @@ abstract final class Api {
   static const passes = '$prefix/matching/passes';
   static const blocks = '$prefix/matching/blocks';
   static String unblock(String userId) => '$prefix/matching/blocks/$userId';
+  // POST when a profile has been on screen for 3 seconds; GET for who has
+  // looked at yours.
+  static const views = '$prefix/matching/views';
 
   // Chat. The conversation id is the match id; chat holds no id of its own.
   static const conversations = '$prefix/chat/conversations';

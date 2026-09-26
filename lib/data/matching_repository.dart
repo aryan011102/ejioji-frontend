@@ -111,4 +111,13 @@ class MatchingRepository {
   /// Lifting a block only lets the two back into each other's feeds. What the
   /// block ended stays ended.
   Future<void> unblock(String userId) => _api.deleteEmpty(Api.unblock(userId));
+
+  /// Says someone's profile has been on screen long enough to count as a look.
+  /// The server decides whether it does (never while you are in stealth or not
+  /// showing) and answers the same either way.
+  Future<void> recordView(String userId) =>
+      _api.postEmpty(Api.views, body: {'user_id': userId});
+
+  Future<ProfileViews> views() async =>
+      ProfileViews.fromJson(await _api.getJson(Api.views));
 }

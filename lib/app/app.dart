@@ -58,6 +58,8 @@ class _EjiojiAppState extends ConsumerState<EjiojiApp> {
         if (id != null) router.push(Routes.conversationWith(id));
       case PushKind.request:
         router.go(Routes.chats);
+      case PushKind.profileViews:
+        router.push(Routes.profileViews);
     }
   }
 
@@ -70,7 +72,7 @@ class _EjiojiAppState extends ConsumerState<EjiojiApp> {
     return switch (open.kind) {
       PushKind.message || PushKind.match =>
         open.id == null || open.id != OpenConversations.top,
-      PushKind.request => true,
+      PushKind.request || PushKind.profileViews => true,
     };
   }
 

@@ -173,7 +173,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             children: [
               AppRow(
                 label: 'Profile views',
-                subtitle: 'Not counted yet',
+                subtitle: switch (ref.watch(profileViewsProvider)) {
+                  AsyncData(:final value) => switch (value.total) {
+                      0 => 'Nobody yet',
+                      1 => '1 person has looked',
+                      final n => '$n people have looked',
+                    },
+                  _ => 'Who has looked at your profile',
+                },
                 leading: const Icon(
                   Icons.visibility_outlined,
                   size: 18,

@@ -174,6 +174,10 @@ final blockedProvider = FutureProvider.autoDispose<List<BlockedPerson>>(
   (ref) => ref.watch(matchingRepositoryProvider).blocks(),
 );
 
+final profileViewsProvider = FutureProvider.autoDispose<ProfileViews>(
+  (ref) => ref.watch(matchingRepositoryProvider).views(),
+);
+
 final conversationsProvider = FutureProvider.autoDispose<List<Conversation>>(
   (ref) => ref.watch(chatRepositoryProvider).conversations(),
 );

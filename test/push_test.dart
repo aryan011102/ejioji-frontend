@@ -31,12 +31,20 @@ void main() {
       expect(open?.id, 'r-1');
     });
 
+    test('the daily profile views push opens the list, with no id', () {
+      final open = PushOpen.from(
+        const RemoteMessage(data: {'type': 'profile_views'}),
+      );
+      expect(open?.kind, PushKind.profileViews);
+      expect(open?.id, isNull);
+    });
+
     test('a kind this build has never heard of is ignored', () {
       // The server can start pushing something new before this app ships.
       // Ignoring it leaves the notification itself readable and opens the app
       // where it was, which is better than guessing a screen.
       expect(
-        PushOpen.from(const RemoteMessage(data: {'type': 'profile_view'})),
+        PushOpen.from(const RemoteMessage(data: {'type': 'something_new'})),
         isNull,
       );
       expect(PushOpen.from(const RemoteMessage()), isNull);

@@ -82,6 +82,38 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   bool _arranging = false;
   bool _saving = false;
 
+  /// How long somebody else's profile must be on screen to count as a look
+  /// (Aryan's call, 2026-09-26): a swipe past is not one.
+  static const _lookAfter = Duration(seconds: 3);
+  Timer? _look;
+
+  @override
+  void initState() {
+    super.initState();
+    final person = widget.candidate;
+    if (_theirs && person != null) {
+      _look = Timer(_lookAfter, () => _recordLook(person.userId));
+    }
+  }
+
+  @override
+  void dispose() {
+    // Moving on to the next card, or leaving, before the time is up.
+    _look?.cancel();
+    super.dispose();
+  }
+
+  /// Fire and forget. Whether it counted is the server's business, and a
+  /// failure here is nothing the person looking needs to hear about.
+  void _recordLook(String userId) {
+    unawaited(
+      ref
+          .read(matchingRepositoryProvider)
+          .recordView(userId)
+          .catchError((Object _) {}),
+    );
+  }
+
   /// The order being edited, by tile key. Null until arranging starts, so the
   /// server's order is what shows until somebody changes it.
   List<String>? _draftOrder;

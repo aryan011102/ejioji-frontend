@@ -149,6 +149,48 @@ class PendingRequest {
       items.map(PendingRequest.fromJson).toList(growable: false);
 }
 
+/// Someone who has looked at your profile.
+@immutable
+class ProfileVisitor {
+  const ProfileVisitor({
+    required this.lastViewedAt,
+    required this.visits,
+    required this.person,
+  });
+
+  final DateTime lastViewedAt;
+
+  /// Separate visits. Coming back within the hour is the same one.
+  final int visits;
+
+  final Candidate person;
+
+  static ProfileVisitor fromJson(Json j) => ProfileVisitor(
+        lastViewedAt: j.time('last_viewed_at'),
+        visits: j.integer('visits'),
+        person: Candidate.fromJson(j.object('person')),
+      );
+}
+
+/// Who has looked at your profile, most recently first.
+@immutable
+class ProfileViews {
+  const ProfileViews({required this.total, required this.visitors});
+
+  /// Everyone who has looked and can still be shown to you. [visitors] is the
+  /// most recent hundred of them.
+  final int total;
+  final List<ProfileVisitor> visitors;
+
+  static ProfileViews fromJson(Json j) => ProfileViews(
+        total: j.integer('total'),
+        visitors: j
+            .objects('visitors')
+            .map(ProfileVisitor.fromJson)
+            .toList(growable: false),
+      );
+}
+
 /// What is left of today's allowance, and when it comes back.
 @immutable
 class OutgoingRequests {

@@ -23,6 +23,7 @@ import 'profile_repository.dart';
 import 'push_controller.dart';
 import 'sharing_repository.dart';
 import 'sources_repository.dart';
+import 'support_repository.dart';
 import 'trust_repository.dart';
 import 'verification_repository.dart';
 
@@ -85,6 +86,13 @@ final chatRepositoryProvider = Provider<ChatRepository>(
 
 final trustRepositoryProvider = Provider<TrustRepository>(
   (ref) => TrustRepository(ref.watch(apiClientProvider)),
+);
+
+/// This build's version, read once. Null where the platform cannot say.
+final appVersionProvider = FutureProvider<String?>((ref) => readAppVersion());
+
+final supportRepositoryProvider = Provider<SupportRepository>(
+  (ref) => SupportRepository(ref.watch(apiClientProvider)),
 );
 
 final sharingRepositoryProvider = Provider<SharingRepository>(

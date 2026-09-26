@@ -106,6 +106,11 @@ abstract final class Routes {
   static const blocked = '/you/settings/blocked';
   static const subscription = '/you/settings/subscription';
   static const support = '/you/settings/support';
+  static const supportRead = '/you/settings/support/read';
+  static const supportSeen = '/you/settings/support/seen';
+  static const supportNever = '/you/settings/support/never';
+  static const safetyTips = '/you/settings/support/safety';
+  static const reportProblem = '/you/settings/support/problem';
   static const takeBreak = '/you/settings/break';
   static const accountDeleted = '/you/settings/deleted';
   static const premium = '/premium';

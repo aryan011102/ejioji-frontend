@@ -242,6 +242,91 @@ class ProfileTile {
   Json toRef() => {'kind': kind.wire, 'key': key};
 }
 
+/// One of somebody's tiles as it read when it was sent with a chat request
+/// or a message: "chat about this".
+///
+/// A copy, so it does not change when the tile does. [removed] means what it
+/// rested on is gone (a source withdrawn, the answer deleted): say it was about
+/// a tile that is no longer there, and show nothing of it.
+@immutable
+class TileQuote {
+  const TileQuote({
+    required this.id,
+    required this.ownerId,
+    required this.kind,
+    required this.category,
+    required this.quotedAt,
+    required this.removed,
+    this.valueKind,
+    this.displayValue,
+    this.caption,
+    this.question,
+    this.answer,
+  });
+
+  final String id;
+
+  /// Whose tile it is. Always the other person in a request or a chat.
+  final String ownerId;
+
+  final TileKind kind;
+  final TileCategory category;
+  final DateTime quotedAt;
+  final bool removed;
+
+  /// Set on an insight that is still there.
+  final ValueKind? valueKind;
+  final String? displayValue;
+  final String? caption;
+
+  /// Set on an answer that is still there.
+  final String? question;
+  final String? answer;
+
+  bool get isAnswer => kind == TileKind.prompt;
+
+  static TileQuote fromJson(Json j) {
+    final insight = j.objectOrNull('insight');
+    final prompt = j.objectOrNull('prompt');
+    return TileQuote(
+      id: j.str('id'),
+      ownerId: j.str('owner_id'),
+      kind: TileKind.parse(j.strOrNull('kind')),
+      category: TileCategory.parse(j.strOrNull('category')),
+      quotedAt: j.time('quoted_at'),
+      removed: j.flag('removed'),
+      valueKind: insight == null
+          ? null
+          : ValueKind.parse(insight.strOrNull('value_kind')),
+      displayValue: insight?.strOrNull('display_value'),
+      caption: insight?.strOrNull('caption'),
+      question: prompt?.strOrNull('question'),
+      answer: prompt?.strOrNull('answer'),
+    );
+  }
+
+  /// How a tile will look once quoted, for the chip above the keyboard and
+  /// the bubble still sending, before the server has made the copy.
+  static TileQuote preview(ProfileTile t) => TileQuote(
+        id: '',
+        ownerId: '',
+        kind: t.kind,
+        category: t.category,
+        quotedAt: DateTime.now(),
+        removed: false,
+        valueKind: t.insight?.value.kind,
+        displayValue: t.insight?.displayValue,
+        caption: t.insight?.caption,
+        question: t.prompt?.question,
+        answer: t.prompt?.answer,
+      );
+
+  static TileQuote? maybe(Json j, String key) {
+    final found = j.objectOrNull(key);
+    return found == null ? null : TileQuote.fromJson(found);
+  }
+}
+
 MediaAsset? _media(Json j) {
   final m = j.objectOrNull('media');
   return m == null ? null : MediaAsset.fromJson(m);

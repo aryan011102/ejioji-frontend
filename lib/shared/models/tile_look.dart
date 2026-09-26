@@ -19,22 +19,7 @@ import 'tile.dart';
 ///    boxes, and the number is the whole point of the tile: it must not be
 ///    shrunk to fit a square that was chosen before anyone looked at it.
 extension TileLook on ProfileTile {
-  /// The colour family. One per category, so a wall reads as a set rather
-  /// than a paint chart.
-  String get tone => switch (category) {
-        TileCategory.foodDelivery => 'saffron',
-        TileCategory.goingOut => 'indigo',
-        TileCategory.shopping => 'rose',
-        TileCategory.travel => 'cobalt',
-        TileCategory.music => 'berry',
-        TileCategory.social => 'teal',
-        TileCategory.fitness => 'moss',
-        TileCategory.watching => 'chilli',
-        TileCategory.netflix => 'night',
-        TileCategory.chatgpt => 'olive',
-        TileCategory.home => 'cocoa',
-        TileCategory.unknown => 'slate',
-      };
+  String get tone => category.tone;
 
   String get glyph => category.glyph;
 
@@ -64,13 +49,11 @@ extension TileLook on ProfileTile {
       isEntity && category == TileCategory.music;
 }
 
-/// The same, for a tile that has not been picked onto a profile yet.
-///
-/// The picker shows candidates, which are bare insights rather than profile
-/// tiles, and they have to look identical to what they will become or the
-/// preview is a lie.
-extension CandidateLook on Insight {
-  String get tone => switch (category) {
+/// The colour family of a category. One per category, so a wall reads as a
+/// set rather than a paint chart, and a tile quoted in a request or a chat
+/// wears the same colour as the tile it came from.
+extension CategoryTone on TileCategory {
+  String get tone => switch (this) {
         TileCategory.foodDelivery => 'saffron',
         TileCategory.goingOut => 'indigo',
         TileCategory.shopping => 'rose',
@@ -84,6 +67,15 @@ extension CandidateLook on Insight {
         TileCategory.home => 'cocoa',
         TileCategory.unknown => 'slate',
       };
+}
+
+/// The same, for a tile that has not been picked onto a profile yet.
+///
+/// The picker shows candidates, which are bare insights rather than profile
+/// tiles, and they have to look identical to what they will become or the
+/// preview is a lie.
+extension CandidateLook on Insight {
+  String get tone => category.tone;
 
   String get glyph => category.glyph;
 

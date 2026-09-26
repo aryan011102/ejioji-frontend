@@ -19,8 +19,10 @@ import '../../../shared/format.dart';
 import '../../../shared/models/chat.dart';
 import '../../../shared/models/enums.dart';
 import '../../../shared/models/person.dart';
+import '../../../shared/models/tile.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/pressable.dart';
+import '../../../shared/widgets/quoted_tile.dart';
 import '../../../shared/widgets/sheets.dart';
 import '../../../shared/widgets/states.dart';
 
@@ -44,11 +46,14 @@ class ConversationPage extends ConsumerStatefulWidget {
 
 /// A message this phone has sent and the server has not answered yet.
 class _Pending {
-  _Pending({required this.clientId, this.text, this.photo = false});
+  _Pending({required this.clientId, this.text, this.photo = false, this.tile});
 
   final String clientId;
   final String? text;
   final bool photo;
+
+  /// Their tile, quoted above the text.
+  final ProfileTile? tile;
   String? mediaId;
   bool failed = false;
 }
@@ -59,6 +64,13 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
 
   final _messages = <Message>[];
   final _pending = <_Pending>[];
+
+  /// The tiles the conversation opens on, before any message.
+  List<Opener> _openers = const [];
+
+  /// Their tile, chosen on their profile with "Chat about this", waiting above
+  /// the keyboard to go with the next message.
+  ProfileTile? _quote;
   StreamSubscription<LiveEvent>? _events;
 
   Object? _loadError;
@@ -104,6 +116,7 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
         _messages
           ..clear()
           ..addAll(page.messages);
+        _openers = page.openers;
         _hasMore = page.hasMore;
         _myRead = page.myReadSeq;
         _theirRead = page.theirReadSeq;
@@ -234,8 +247,11 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
     final text = _composer.text.trim();
     if (text.isEmpty || _ended) return;
     _composer.clear();
-    final pending = _Pending(clientId: Ids.uuid(), text: text);
-    setState(() => _pending.add(pending));
+    final pending = _Pending(clientId: Ids.uuid(), text: text, tile: _quote);
+    setState(() {
+      _pending.add(pending);
+      _quote = null;
+    });
     await _deliver(pending);
   }
 
@@ -275,6 +291,7 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
             text: pending.text,
             mediaId: pending.mediaId,
             clientId: pending.clientId,
+            tile: pending.tile,
           );
       if (!mounted) return;
       _merge([message]);
@@ -320,10 +337,17 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
         showAppToast(context, 'That profile is no longer available.');
         return;
       }
-      await context.push(
+      // Their tiles slide to "Chat about this" here, and the one chosen comes
+      // back to wait above the keyboard.
+      final tile = await context.push<ProfileTile>(
         Routes.person,
-        extra: PersonArgs(person: match.person, backLabel: 'Chat'),
+        extra: PersonArgs(
+          person: match.person,
+          backLabel: 'Chat',
+          chatAbout: true,
+        ),
       );
+      if (tile != null && mounted) setState(() => _quote = tile);
     } on ApiException catch (e) {
       if (mounted) showAppToast(context, e.message);
     } finally {
@@ -491,6 +515,22 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
         );
       }
     }
+    // At the very start of the conversation, before any message: what each
+    // of them swiped to ask. Reversed, like everything else in this list.
+    if (!_hasMore) {
+      for (final o in _openers.reversed) {
+        final mine = me != null && o.senderId == me;
+        rows.add(
+          _OpenerRow(
+            opener: o,
+            mine: mine,
+            label: mine
+                ? 'You asked about this'
+                : '${_person?.firstName ?? 'They'} wanted to chat about this',
+          ),
+        );
+      }
+    }
     if (_hasMore) {
       rows.add(
         Center(
@@ -533,7 +573,8 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
       borderRadius: BorderRadius.circular(20),
       borderSide: const BorderSide(color: AppColors.hairline),
     );
-    return Row(
+    final quote = _quote;
+    final bar = Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Pressable(
@@ -593,6 +634,60 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
         ),
       ],
     );
+    if (quote == null) return bar;
+    // The quote goes with words, so it waits here until something is typed.
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: QuotedTile(
+            tile: TileQuote.preview(quote),
+            compact: true,
+            onRemove: () => setState(() => _quote = null),
+          ),
+        ),
+        bar,
+      ],
+    );
+  }
+}
+
+/// One of the tiles the conversation opens on, on the side of whoever swiped
+/// it.
+class _OpenerRow extends StatelessWidget {
+  const _OpenerRow({
+    required this.opener,
+    required this.mine,
+    required this.label,
+  });
+
+  final Opener opener;
+  final bool mine;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Align(
+        alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.sizeOf(context).width * 0.72,
+          ),
+          child: Column(
+            crossAxisAlignment:
+                mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            children: [
+              QuotedTileLabel(label),
+              QuotedTile(tile: opener.tile),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -645,6 +740,11 @@ class _Bubble extends StatelessWidget {
                         ),
                       ),
                     ),
+                  ),
+                if (message.tile != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: QuotedTile(tile: message.tile!),
                   ),
                 if (message.text != null && message.text!.isNotEmpty) ...[
                   if (media != null) const SizedBox(height: 4),
@@ -701,6 +801,16 @@ class _PendingBubble extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
+                  if (pending.tile != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Opacity(
+                        opacity: 0.6,
+                        child: QuotedTile(
+                          tile: TileQuote.preview(pending.tile!),
+                        ),
+                      ),
+                    ),
                   Opacity(
                     opacity: 0.6,
                     child: Container(

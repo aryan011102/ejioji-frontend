@@ -4,6 +4,7 @@ import '../../core/network/json.dart';
 import 'enums.dart';
 import 'media.dart';
 import 'person.dart';
+import 'tile.dart';
 
 /// One message.
 ///
@@ -22,6 +23,7 @@ class Message {
     required this.sentAt,
     this.text,
     this.media,
+    this.tile,
   });
 
   final String id;
@@ -36,6 +38,10 @@ class Message {
   final MessageKind kind;
   final String? text;
   final MediaAsset? media;
+
+  /// The other person's tile this message is about, as it read when sent.
+  final TileQuote? tile;
+
   final DateTime sentAt;
 
   bool mine(String myUserId) => senderId == myUserId;
@@ -51,12 +57,29 @@ class Message {
       kind: MessageKind.parse(j.strOrNull('kind')),
       text: j.strOrNull('text'),
       media: media == null ? null : MediaAsset.fromJson(media),
+      tile: TileQuote.maybe(j, 'tile'),
       sentAt: j.time('sent_at'),
     );
   }
 
   static List<Message> listFrom(List<Json> items) =>
       items.map(Message.fromJson).toList(growable: false);
+}
+
+/// A tile the conversation opens on, before any message: the one the
+/// request was about, then the one asking back was about.
+@immutable
+class Opener {
+  const Opener({required this.senderId, required this.tile});
+
+  /// Who swiped it. The tile is the other person's.
+  final String senderId;
+  final TileQuote tile;
+
+  static Opener fromJson(Json j) => Opener(
+        senderId: j.str('sender_id'),
+        tile: TileQuote.fromJson(j.object('tile')),
+      );
 }
 
 /// A page of a conversation, oldest-first, with both read marks.
@@ -67,9 +90,13 @@ class MessagePage {
     required this.hasMore,
     required this.myReadSeq,
     required this.theirReadSeq,
+    this.openers = const [],
   });
 
   final List<Message> messages;
+
+  /// On every page, at most two.
+  final List<Opener> openers;
   final bool hasMore;
   final int myReadSeq;
   final int theirReadSeq;
@@ -79,6 +106,7 @@ class MessagePage {
         hasMore: j.flag('has_more'),
         myReadSeq: j.intOr('my_read_seq', 0),
         theirReadSeq: j.intOr('their_read_seq', 0),
+        openers: j.objects('openers').map(Opener.fromJson).toList(growable: false),
       );
 }
 

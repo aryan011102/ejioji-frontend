@@ -373,13 +373,19 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     // up does not leave a hole at the foot of the wall.
                     // Every photo on the profile, the main one included, so
                     // the tile is the one place to page through all of them.
+                    // The main one goes last rather than first: it is already
+                    // the round picture beside the name, and the tile opening
+                    // on it again reads as the same photo twice.
                     if (photos.isNotEmpty)
                       BentoItem(
                         size: columnsUsed.isOdd
                             ? TileSize.small
                             : TileSize.wide,
                         child: PhotosTile(
-                          photoUrls: [for (final p in photos) p.stillUrl],
+                          photoUrls: [
+                            for (final p in [...photos.skip(1), photos.first])
+                              p.stillUrl,
+                          ],
                         ),
                       ),
                     for (final t in shown)

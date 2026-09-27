@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../core/theme/tokens.dart';
 import '../../core/theme/typography.dart';
+import '../models/tile.dart' show SongMusic;
 import 'pressable.dart';
 
 /// How much of the bento grid a tile takes.
@@ -54,6 +56,8 @@ class InsightTile extends StatelessWidget {
     this.isLivePhoto = false,
     this.mediaBusy = false,
     this.isTrack = false,
+    this.music,
+    this.playMusic = true,
     this.categoryGlyph,
     this.selectable = false,
     this.selected = false,
@@ -91,6 +95,15 @@ class InsightTile extends StatelessWidget {
 
   final bool isTrack;
 
+  /// The song a track tile is about, from Apple Music's catalog: its cover
+  /// goes behind the tile when nothing of the person's own is there, and its
+  /// preview plays from the button top right.
+  final SongMusic? music;
+
+  /// False where a preview would be in the way (the wobbling arrange wall):
+  /// the cover still shows.
+  final bool playMusic;
+
   /// Shown on your own wall only. A viewer is being introduced to a person and
   /// does not need a filing system on top of the photos.
   final String? categoryGlyph;
@@ -123,6 +136,10 @@ class InsightTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final withMedia = hasMedia || mediaUrl != null;
     final overMedia = withMedia || isTrack;
+    // The person's own photo or video wins over the song's cover.
+    final cover = mediaUrl == null && !hasMedia ? music?.artworkUrl : null;
+    final preview = isTrack && playMusic ? music?.previewUrl : null;
+    final trackWidth = preview != null ? 118.0 : (isTrack ? 84.0 : 0.0);
 
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 160),
@@ -165,12 +182,12 @@ class InsightTile extends StatelessWidget {
                     // Where a tap picks the tile, it cannot also pause.
                     tapToPause: onTap == null,
                     // Clear of whatever already sits top right.
-                    controlsRight: 10 +
-                        (selectable ? 36.0 : 0) +
-                        (isTrack ? 84.0 : 0),
+                    controlsRight: 10 + (selectable ? 36.0 : 0) + trackWidth,
                   )
                 else if (mediaUrl != null)
                   _MediaImage(url: mediaUrl!)
+                else if (cover != null)
+                  _MediaImage(url: cover, fill: music?.artworkBackground)
                 else if (hasMedia)
                   const ColoredBox(color: Color(0xFF1A1114)),
                 // Paint only: the scrim covers the whole tile and must not take
@@ -234,7 +251,19 @@ class InsightTile extends StatelessWidget {
                     left: 10,
                     child: _Badge(child: Text(categoryGlyph!)),
                   ),
-                if (isTrack)
+                if (preview != null)
+                  Positioned(
+                    top: 10,
+                    right: selectable ? 46 : 10,
+                    child: SongPreview(
+                      // A new song is a new player, not a reused one.
+                      key: ValueKey(preview),
+                      url: preview,
+                      title: music!.title,
+                      appleMusicUrl: music!.appleMusicUrl,
+                    ),
+                  )
+                else if (isTrack)
                   Positioned(
                     top: 12,
                     right: selectable ? 46 : 12,
@@ -536,9 +565,13 @@ class _RoundControl extends StatelessWidget {
 /// connection is ordinary, so both have an answer that is not Flutter's grey
 /// box: a spinner while it loads, and the plain dark fill if it never does.
 class _MediaImage extends StatelessWidget {
-  const _MediaImage({required this.url});
+  const _MediaImage({required this.url, this.fill});
 
   final String url;
+
+  /// Painted while it loads and if it never does. A song's cover brings its
+  /// own colour, so the tile is the right colour before the image arrives.
+  final Color? fill;
 
   @override
   Widget build(BuildContext context) {
@@ -548,7 +581,7 @@ class _MediaImage extends StatelessWidget {
       loadingBuilder: (context, child, progress) => progress == null
           ? child
           : ColoredBox(
-              color: const Color(0xFF1A1114),
+              color: fill ?? const Color(0xFF1A1114),
               child: Center(
                 child: SizedBox(
                   width: 22,
@@ -564,7 +597,177 @@ class _MediaImage extends StatelessWidget {
                 ),
               ),
             ),
-      errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFF1A1114)),
+      errorBuilder: (_, __, ___) =>
+          ColoredBox(color: fill ?? const Color(0xFF1A1114)),
+    );
+  }
+}
+
+/// A song's thirty-second preview: play and pause, and the Apple Music badge
+/// beside it, which is Apple's condition for using its previews.
+///
+/// Nothing loads until the first tap, so a wall of songs costs nothing until
+/// someone wants to hear one. One song plays at a time: starting one stops
+/// whichever was playing. Leaving the screen stops it too, since the player
+/// goes with the tile.
+class SongPreview extends StatefulWidget {
+  const SongPreview({
+    required this.url,
+    required this.title,
+    this.appleMusicUrl,
+    super.key,
+  });
+
+  final String url;
+  final String title;
+  final String? appleMusicUrl;
+
+  /// The preview playing now, anywhere in the app.
+  static final ValueNotifier<Object?> _playing = ValueNotifier(null);
+
+  @override
+  State<SongPreview> createState() => _SongPreviewState();
+}
+
+class _SongPreviewState extends State<SongPreview> {
+  VideoPlayerController? _audio;
+  bool _loading = false;
+  bool _playing = false;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    SongPreview._playing.addListener(_onOtherStarted);
+  }
+
+  void _onOtherStarted() {
+    if (SongPreview._playing.value != this && _playing) _audio?.pause();
+  }
+
+  Future<void> _toggle() async {
+    final audio = _audio;
+    if (audio != null) {
+      if (_playing) {
+        await audio.pause();
+      } else {
+        SongPreview._playing.value = this;
+        await audio.play();
+      }
+      return;
+    }
+    setState(() => _loading = true);
+    final created = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+    try {
+      await created.initialize();
+    } catch (_) {
+      // A moved link or no connection: the button goes, the cover stays.
+      await created.dispose();
+      if (mounted) setState(() => _failed = true);
+      return;
+    }
+    if (!mounted) {
+      await created.dispose();
+      return;
+    }
+    created.addListener(_onTick);
+    _audio = created;
+    SongPreview._playing.value = this;
+    await created.play();
+    if (mounted) setState(() => _loading = false);
+  }
+
+  void _onTick() {
+    final v = _audio!.value;
+    // At the end it settles back to the start, ready to play again.
+    if (v.isPlaying && v.duration > Duration.zero && v.position >= v.duration) {
+      _audio!
+        ..pause()
+        ..seekTo(Duration.zero);
+    }
+    if (v.isPlaying != _playing && mounted) setState(() => _playing = v.isPlaying);
+  }
+
+  Future<void> _openAppleMusic() async {
+    final url = widget.appleMusicUrl;
+    if (url == null) return;
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  }
+
+  @override
+  void dispose() {
+    SongPreview._playing.removeListener(_onOtherStarted);
+    if (SongPreview._playing.value == this) SongPreview._playing.value = null;
+    _audio
+      ?..removeListener(_onTick)
+      ..dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (!_failed)
+          Pressable(
+            onTap: _loading ? null : _toggle,
+            semanticLabel: _playing
+                ? 'Pause ${widget.title}'
+                : 'Play a preview of ${widget.title}',
+            child: Container(
+              width: 30,
+              height: 30,
+              decoration: const BoxDecoration(
+                color: Color(0x6B000000),
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: _loading
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.8,
+                        color: AppColors.label,
+                      ),
+                    )
+                  : Icon(
+                      _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                      size: 19,
+                      color: AppColors.label,
+                    ),
+            ),
+          ),
+        const SizedBox(width: 8),
+        Pressable(
+          onTap: widget.appleMusicUrl == null ? null : _openAppleMusic,
+          semanticLabel: 'Open in Apple Music',
+          child: Container(
+            height: 24,
+            padding: const EdgeInsets.fromLTRB(6, 0, 8, 0),
+            decoration: BoxDecoration(
+              color: const Color(0xEBFFFFFF),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.apple, size: 14, color: Color(0xFF1A1116)),
+                const SizedBox(width: 2),
+                Text(
+                  'Music',
+                  style: AppText.micro.copyWith(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF1A1116),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -587,8 +790,8 @@ class _Badge extends StatelessWidget {
       );
 }
 
-/// The scannable code on a track tile. It keeps the album art and the code and
-/// loses the player, because a page cannot borrow the listener's account.
+/// The scannable code on a track tile whose song Apple's catalog does not
+/// have, so there is no preview to play in its place.
 class _ScanCode extends StatelessWidget {
   const _ScanCode();
 

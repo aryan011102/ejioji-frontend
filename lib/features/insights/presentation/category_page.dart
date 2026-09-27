@@ -382,6 +382,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                       caption: ins.caption,
                       tone: ins.tone,
                       isTrack: ins.looksLikeTrack,
+                      music: ins.music,
                     ),
                   if (!asking)
                     for (final a in answered)
@@ -453,6 +454,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
     String? prompt,
     String? answer,
     bool isTrack = false,
+    SongMusic? music,
   }) {
     final picked = _picked!;
     final behind = media.resolve(choice.kind, choice.key, serverMedia);
@@ -466,6 +468,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
         answer: answer,
         tone: tone,
         isTrack: isTrack,
+        music: music,
         mediaUrl: behind?.stillUrl,
         videoUrl: behind?.videoUrl,
         isLivePhoto: behind?.kind == MediaKind.livePhoto,

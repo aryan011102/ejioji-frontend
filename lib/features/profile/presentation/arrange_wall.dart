@@ -123,8 +123,11 @@ class _ArrangeableTile extends StatelessWidget {
           answer: tile.isAnswer ? tile.headline : null,
           tone: tile.tone,
           isTrack: tile.looksLikeTrack,
-          // The still only: a wall of wobbling tiles is no place to play clips.
+          // The still only: a wall of wobbling tiles is no place to play clips,
+          // or songs.
           mediaUrl: media?.stillUrl,
+          music: tile.music,
+          playMusic: false,
         ),
       );
 

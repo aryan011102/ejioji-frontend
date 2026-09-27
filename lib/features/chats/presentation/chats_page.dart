@@ -12,6 +12,7 @@ import '../../../shared/models/chat.dart';
 import '../../../shared/models/enums.dart';
 import '../../../shared/models/person.dart';
 import '../../../shared/models/tile.dart';
+import '../../../shared/widgets/ask_about_sheet.dart';
 import '../../../shared/widgets/buttons.dart';
 import '../../../shared/widgets/controls.dart';
 import '../../../shared/widgets/identity.dart';
@@ -64,19 +65,31 @@ class _ChatsPageState extends ConsumerState<ChatsPage> {
   }
 
   /// "Chat about this" on the profile of someone who asked you: asking back
-  /// about one of their tiles, which accepts their request, and the chat opens
-  /// on both tiles.
+  /// about one of their tiles, with a line if wanted, which accepts their
+  /// request, and the chat opens on both tiles.
   Future<void> _askBack(PendingRequest request, ProfileTile tile) async {
-    try {
-      final result = await ref
-          .read(matchingRepositoryProvider)
-          .sendRequest(request.person.userId, tile: tile);
-      if (!mounted) return;
-      _refreshEverything();
-      if (result.accepted) context.push(Routes.conversationWith(result.id));
-    } on ApiException catch (e) {
-      if (mounted) showAppToast(context, e.message);
-    }
+    final repo = ref.read(matchingRepositoryProvider);
+    String? opened;
+    final sent = await showAskAboutSheet(
+      context,
+      name: request.person.firstName,
+      tile: tile,
+      send: (note) async {
+        final result = await repo.sendRequest(
+          request.person.userId,
+          tile: tile,
+          note: note,
+        );
+        if (result.accepted) opened = result.id;
+        return result.accepted
+            ? 'You matched. The chat opens on both tiles.'
+            : 'Asked about this.';
+      },
+    );
+    if (!mounted || sent != true) return;
+    _refreshEverything();
+    final id = opened;
+    if (id != null) context.push(Routes.conversationWith(id));
   }
 
   Future<void> _decline(PendingRequest request) async {
@@ -339,6 +352,7 @@ class _SentList extends ConsumerWidget {
                           'You asked ${r.person.firstName} about this',
                         ),
                         QuotedTile(tile: r.tile!),
+                        if (r.note != null) RequestNoteLine(r.note!),
                       ],
                     ),
                   ),
@@ -449,6 +463,8 @@ class _RequestCard extends StatelessWidget {
                             '${person.firstName} wants to chat about this',
                           ),
                           QuotedTile(tile: request.tile!),
+                          if (request.note != null)
+                            RequestNoteLine(request.note!),
                         ] else if (person.tiles.isNotEmpty) ...[
                           const SizedBox(height: 10),
                           Text(

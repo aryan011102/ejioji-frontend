@@ -66,10 +66,22 @@ class MatchingRepository {
   /// request and nothing else, since no words go before a match. Asking back
   /// with one opens the conversation on it. The server refuses a tile that is
   /// not on their profile now (409, tile_not_shown).
-  Future<RequestResult> sendRequest(String userId, {ProfileTile? tile}) async {
+  ///
+  /// [note] is a line written with the tile, only ever with one: at most 150
+  /// characters, one line, and no contact details, which the server refuses
+  /// (422 text_rejected, with a message to show).
+  Future<RequestResult> sendRequest(
+    String userId, {
+    ProfileTile? tile,
+    String? note,
+  }) async {
     final body = await _api.post(
       Api.requests,
-      body: {'user_id': userId, if (tile != null) 'tile': tile.toRef()},
+      body: {
+        'user_id': userId,
+        if (tile != null) 'tile': tile.toRef(),
+        if (tile != null && note != null) 'note': note,
+      },
     );
     return RequestResult.fromJson(body);
   }

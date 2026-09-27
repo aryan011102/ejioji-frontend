@@ -20,6 +20,7 @@ import '../../../shared/models/profile.dart';
 import '../../../shared/models/social.dart';
 import '../../../shared/models/tile.dart' as api;
 import '../../../shared/models/tile_look.dart';
+import '../../../shared/widgets/ask_about_sheet.dart';
 import '../../../shared/widgets/buttons.dart';
 import '../../../shared/widgets/identity.dart';
 import '../../../shared/widgets/layout.dart';
@@ -812,34 +813,47 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       return tile;
     }
     return SwipeToChat(
-      onChat: () => _viewer
+      onChat: () => _viewer || _askable
           ? _askAbout(person, t)
-          : _askable
-              ? _askFromHere(person, tile: t)
-              : context.pop(t),
+          : context.pop(t),
       child: tile,
     );
   }
 
-  /// "Chat about this" from the deck: a request carrying the tile and nothing
-  /// else, since no words go before a match. If they had already asked, this
-  /// accepts theirs and the chat opens on the tile.
+  /// "Chat about this": the tile, and a line if they want one, in a sheet. From
+  /// the deck the request moves it on, as the button does; from a saved
+  /// profile it leaves Home alone, since this person is not the card there. If
+  /// they had already asked, this accepts theirs and the chat opens on the tile.
   Future<void> _askAbout(Candidate person, api.ProfileTile tile) async {
-    try {
-      final result = await ref
-          .read(feedProvider.notifier)
-          .request(person.userId, tile: tile);
-      if (!mounted || result == null) return;
-      showAppToast(
-        context,
-        result.accepted
+    final deck = _viewer;
+    final feed = ref.read(feedProvider.notifier);
+    final repo = ref.read(matchingRepositoryProvider);
+    await showAskAboutSheet(
+      context,
+      name: person.firstName,
+      tile: tile,
+      send: (note) async {
+        final bool accepted;
+        if (deck) {
+          accepted =
+              (await feed.request(person.userId, tile: tile, note: note))
+                      ?.accepted ??
+                  false;
+        } else {
+          accepted =
+              (await repo.sendRequest(person.userId, tile: tile, note: note))
+                  .accepted;
+          ref
+            ..invalidate(outgoingRequestsProvider)
+            ..invalidate(incomingRequestsProvider)
+            ..invalidate(conversationsProvider);
+        }
+        return accepted
             ? '${person.firstName} asked you too. The chat opens on this tile.'
             : 'Asked about this. ${person.firstName} will see it with your '
-                'request.',
-      );
-    } on ApiException catch (e) {
-      if (mounted) showAppToast(context, e.message);
-    }
+                'request.';
+      },
+    );
   }
 
   /// There is no like and no gate: the ask goes straight out, and the other
@@ -907,11 +921,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
   /// The same request the deck sends, without moving the deck: this person is
   /// not the card on Home.
-  Future<void> _askFromHere(Candidate person, {api.ProfileTile? tile}) async {
+  Future<void> _askFromHere(Candidate person) async {
     try {
       final result = await ref
           .read(matchingRepositoryProvider)
-          .sendRequest(person.userId, tile: tile);
+          .sendRequest(person.userId);
       ref
         ..invalidate(outgoingRequestsProvider)
         ..invalidate(incomingRequestsProvider)
@@ -919,15 +933,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       if (!mounted) return;
       showAppToast(
         context,
-        switch ((result.accepted, tile != null)) {
-          (true, true) =>
-            '${person.firstName} asked you too. The chat opens on this tile.',
-          (true, false) => '${person.firstName} asked you too. The chat is open.',
-          (false, true) => 'Asked about this. ${person.firstName} will see it '
-              'with your request.',
-          (false, false) =>
-            'Asked. ${person.firstName} will see it in their requests.',
-        },
+        result.accepted
+            ? '${person.firstName} asked you too. The chat is open.'
+            : 'Asked. ${person.firstName} will see it in their requests.',
       );
     } on ApiException catch (e) {
       if (mounted) showAppToast(context, e.message);

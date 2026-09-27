@@ -700,6 +700,33 @@ class _OpenerRow extends StatelessWidget {
             children: [
               QuotedTileLabel(label),
               QuotedTile(tile: opener.tile),
+              // What they wrote with it: their first line, drawn as a bubble on
+              // their side, since that is what it was.
+              if (opener.note != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: mine ? AppColors.fill : AppColors.bubbleThem,
+                      borderRadius: BorderRadius.circular(20),
+                      border: mine
+                          ? null
+                          : Border.all(color: AppColors.bubbleThemEdge),
+                    ),
+                    child: Text(
+                      opener.note!,
+                      style: AppText.body.copyWith(
+                        fontSize: 15.5,
+                        height: 21 / 15.5,
+                        color: mine ? AppColors.onAccent : AppColors.label,
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),

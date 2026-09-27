@@ -134,10 +134,14 @@ class FeedController extends Notifier<FeedState> {
   ///
   /// Returns the result when the request went through, and null when it did
   /// not; the caller shows the message.
-  Future<RequestResult?> request(String userId, {ProfileTile? tile}) async {
+  Future<RequestResult?> request(
+    String userId, {
+    ProfileTile? tile,
+    String? note,
+  }) async {
     final result = await ref
         .read(matchingRepositoryProvider)
-        .sendRequest(userId, tile: tile);
+        .sendRequest(userId, tile: tile, note: note);
     _advance();
     ref
       ..invalidate(outgoingRequestsProvider)

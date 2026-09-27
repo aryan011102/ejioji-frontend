@@ -70,15 +70,19 @@ class Message {
 /// request was about, then the one asking back was about.
 @immutable
 class Opener {
-  const Opener({required this.senderId, required this.tile});
+  const Opener({required this.senderId, required this.tile, this.note});
 
   /// Who swiped it. The tile is the other person's.
   final String senderId;
   final TileQuote tile;
 
+  /// What they wrote with the tile, shown as their first line under it.
+  final String? note;
+
   static Opener fromJson(Json j) => Opener(
         senderId: j.str('sender_id'),
         tile: TileQuote.fromJson(j.object('tile')),
+        note: j.strOrNull('note'),
       );
 }
 

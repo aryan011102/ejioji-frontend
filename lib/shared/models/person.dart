@@ -135,6 +135,7 @@ class PendingRequest {
     required this.requestedAt,
     required this.person,
     this.tile,
+    this.note,
   });
 
   final String id;
@@ -148,11 +149,15 @@ class PendingRequest {
   /// "chat with" request.
   final TileQuote? tile;
 
+  /// What the requester wrote with the tile. Only ever with one.
+  final String? note;
+
   static PendingRequest fromJson(Json j) => PendingRequest(
         id: j.str('id'),
         requestedAt: j.time('requested_at'),
         person: Candidate.fromJson(j.object('person')),
         tile: TileQuote.maybe(j, 'tile'),
+        note: j.strOrNull('note'),
       );
 
   static List<PendingRequest> listFrom(List<Json> items) =>

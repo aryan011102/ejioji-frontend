@@ -153,3 +153,23 @@ class QuotedTileLabel extends StatelessWidget {
         ),
       );
 }
+
+
+/// What someone wrote with a tile on a request, under the tile. In quotes,
+/// because it is their words and nobody has replied yet.
+class RequestNoteLine extends StatelessWidget {
+  const RequestNoteLine(this.note, {super.key});
+
+  final String note;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Text(
+        '“$note”',
+        style: AppText.callout.copyWith(color: AppColors.label),
+      ),
+    );
+  }
+}

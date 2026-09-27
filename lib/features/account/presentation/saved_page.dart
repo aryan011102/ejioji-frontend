@@ -21,7 +21,10 @@ import '../../../shared/widgets/states.dart';
 /// who has since blocked you, stopped showing or left your filters is not here.
 /// Nobody is ever told they were saved.
 class SavedPage extends ConsumerWidget {
-  const SavedPage({super.key});
+  const SavedPage({this.backLabel = 'Profile', super.key});
+
+  /// The screen behind: your profile's bookmark or the You tab.
+  final String backLabel;
 
   static String _when(DateTime at) => switch (dayLabel(at)) {
         'Today' || 'Yesterday' => 'Saved ${dayLabel(at).toLowerCase()}',
@@ -35,7 +38,7 @@ class SavedPage extends ConsumerWidget {
     return AppScaffold(
       navBar: AppNavBar(
         title: 'Saved',
-        backLabel: 'Profile',
+        backLabel: backLabel,
         onBack: () => context.pop(),
       ),
       child: saved.when(

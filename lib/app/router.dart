@@ -286,7 +286,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.profileViews,
         builder: (_, __) => const ProfileViewsPage(),
       ),
-      GoRoute(path: Routes.saved, builder: (_, __) => const SavedPage()),
+      GoRoute(
+        path: Routes.saved,
+        builder: (_, state) =>
+            SavedPage(backLabel: state.extra as String? ?? 'Profile'),
+      ),
       GoRoute(path: Routes.blocked, builder: (_, __) => const BlockedPage()),
       GoRoute(
         path: Routes.subscription,

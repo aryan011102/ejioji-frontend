@@ -79,6 +79,17 @@ class AccountPage extends ConsumerWidget {
             _PremiumPromo(onTap: () => context.push(Routes.premium)),
             SectionGroup(
               children: [
+                // Also the bookmark on your own profile; here too because the
+                // You tab is where people look for their own lists.
+                AppRow(
+                  label: 'Saved profiles',
+                  leading: const Icon(
+                    Icons.bookmark,
+                    size: 18,
+                    color: AppColors.label2,
+                  ),
+                  onTap: () => context.push(Routes.saved, extra: 'You'),
+                ),
                 AppRow(
                   label: 'Settings',
                   last: true,

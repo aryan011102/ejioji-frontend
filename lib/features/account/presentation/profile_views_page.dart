@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/routes.dart';
+import '../../../core/theme/tokens.dart';
 import '../../../data/providers.dart';
 import '../../../shared/format.dart';
 import '../../../shared/models/person.dart';
+import '../../../shared/widgets/buttons.dart';
 import '../../../shared/widgets/identity.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/states.dart';
@@ -20,9 +22,9 @@ import '../../../shared/widgets/states.dart';
 /// Nothing here is invented. The earlier version of this screen listed four
 /// made-up people, and a fake viewer is indistinguishable from a real one.
 ///
-/// This will be Premium, with the faces behind a blur for everyone else
-/// ([Avatar.blurred]). There is no billing yet, so everyone sees everything;
-/// the gate belongs on the server, not in this screen.
+/// Who looked is Premium; how many is free. The gate is on the server, which
+/// sends no visitors without Premium, so the locked reading below has nothing
+/// to hide rather than a list it is hiding.
 class ProfileViewsPage extends ConsumerWidget {
   const ProfileViewsPage({super.key});
 
@@ -53,7 +55,41 @@ class ProfileViewsPage extends ConsumerWidget {
           error: e,
           onRetry: () => ref.invalidate(profileViewsProvider),
         ),
-        data: (seen) => seen.visitors.isEmpty
+        data: (seen) => seen.locked && seen.total > 0
+            ? ListView(
+                padding: const EdgeInsets.only(top: 18, bottom: 40),
+                children: [
+                  SectionGroup(
+                    header: seen.total == 1
+                        ? '1 person has looked'
+                        : '${seen.total} people have looked',
+                    footer: 'Names and faces are part of Premium. The count '
+                        'is always free.',
+                    children: [
+                      for (var i = 0; i < seen.total.clamp(1, 3); i++)
+                        AppRow(
+                          label: 'Someone',
+                          subtitle: 'Looked at your profile',
+                          last: i == seen.total.clamp(1, 3) - 1,
+                          leading: const Avatar(
+                            seedColor: Color(0xFF8E7B93),
+                            size: 29,
+                            blurred: true,
+                          ),
+                        ),
+                    ],
+                  ),
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: Insets.gutter),
+                    child: PrimaryButton(
+                      label: 'See who with Premium',
+                      onPressed: () => context.push(Routes.premium),
+                    ),
+                  ),
+                ],
+              )
+            : seen.visitors.isEmpty
             ? const EmptyState(
                 icon: Icons.visibility_outlined,
                 title: 'Nobody has looked yet',

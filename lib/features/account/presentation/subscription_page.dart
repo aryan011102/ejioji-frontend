@@ -4,16 +4,19 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/routes.dart';
 import '../../../core/theme/tokens.dart';
+import '../../../data/providers.dart';
+import '../../../shared/format.dart';
+import '../../../shared/models/premium.dart';
 import '../../../shared/widgets/buttons.dart';
 import '../../../shared/widgets/layout.dart';
+import '../../../shared/widgets/states.dart';
 
 class SubscriptionPage extends ConsumerWidget {
   const SubscriptionPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Nothing can be subscribed to yet, so only the free reading is rendered.
-    // `_active` is kept for when billing exists.
+    final premium = ref.watch(premiumProvider);
 
     return AppScaffold(
       navBar: AppNavBar(
@@ -21,16 +24,44 @@ class SubscriptionPage extends ConsumerWidget {
         backLabel: 'Settings',
         onBack: () => context.pop(),
       ),
-      child: ListView(
-        padding: const EdgeInsets.only(top: 18, bottom: 40),
-        children: _free(context),
+      child: premium.when(
+        loading: () => const LoadingView(),
+        error: (e, _) => ErrorView(
+          error: e,
+          onRetry: () => ref.invalidate(premiumProvider),
+        ),
+        data: (status) => ListView(
+          padding: const EdgeInsets.only(top: 18, bottom: 40),
+          children: status.active ? _active(status) : _free(context),
+        ),
       ),
     );
   }
 
-  // The paid reading of this screen was written before there was any billing
-  // to drive it, and nothing could reach it. It is in the first commit of this
-  // repository if it is wanted back when Premium exists.
+  List<Widget> _active(PremiumStatus status) {
+    final plan = status.plans
+        .where((p) => p.key == status.plan)
+        .map((p) => p.title)
+        .firstOrNull;
+    final ends = status.endsAt;
+    return [
+      SectionGroup(
+        header: 'Current plan',
+        footer: 'Premium is free for now. Nothing renews and nothing is '
+            'charged: when it ends you are back on free, and anything '
+            'Premium turned on, like stealth, turns off with it.',
+        children: [
+          const AppRow(label: 'Plan', value: 'Premium'),
+          if (plan != null) AppRow(label: 'Length', value: plan),
+          AppRow(
+            label: 'Ends',
+            value: ends == null ? '' : dayLabel(ends.toLocal()),
+            last: true,
+          ),
+        ],
+      ),
+    ];
+  }
 
   List<Widget> _free(BuildContext context) => [
         const SectionGroup(

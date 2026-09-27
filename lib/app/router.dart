@@ -8,6 +8,7 @@ import '../features/account/presentation/blocked_page.dart';
 import '../features/account/presentation/premium_page.dart';
 import '../features/account/presentation/profile_views_page.dart';
 import '../features/account/presentation/report_problem_page.dart';
+import '../features/account/presentation/saved_page.dart';
 import '../features/account/presentation/settings_page.dart';
 import '../features/account/presentation/subscription_page.dart';
 import '../features/account/presentation/support_info_pages.dart';
@@ -284,6 +285,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.profileViews,
         builder: (_, __) => const ProfileViewsPage(),
       ),
+      GoRoute(path: Routes.saved, builder: (_, __) => const SavedPage()),
       GoRoute(path: Routes.blocked, builder: (_, __) => const BlockedPage()),
       GoRoute(
         path: Routes.subscription,

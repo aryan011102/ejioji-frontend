@@ -2,13 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/network/api_exception.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
+import '../../../data/providers.dart';
+import '../../../shared/format.dart';
+import '../../../shared/models/premium.dart';
 import '../../../shared/widgets/buttons.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/pressable.dart';
+import '../../../shared/widgets/sheets.dart';
+import '../../../shared/widgets/states.dart';
 
 /// Four things, and none of them unlock something we took away.
+///
+/// The plans and their prices come from the server. Until there is a payment
+/// provider the prices are shown and nothing is charged: starting a plan
+/// grants it for that long, and the server records it as a free purchase. The app never sets Premium in
+/// its own state; it asks, and reads the answer back.
 ///
 /// Nothing is capped on free — anyone can write to anyone, and replying stays
 /// optional whether or not somebody pays. A paywall that removes an artificial
@@ -22,6 +33,7 @@ class PremiumPage extends ConsumerStatefulWidget {
 
 class _PremiumPageState extends ConsumerState<PremiumPage> {
   String _plan = 'm3';
+  bool _starting = false;
 
   static const _features = <(IconData, String, String)>[
     (
@@ -41,20 +53,44 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
       'Your profile is shown to more people, sooner.',
     ),
     (
-      Icons.star_outline,
-      'More insights',
-      'Put more of what you picked on the wall.',
+      Icons.bookmark_border,
+      'Saved profiles',
+      'Keep someone to come back to. They are never told.',
     ),
   ];
 
-  static const _plans = <(String, String, String, String, String?)>[
-    ('m1', '1 month', '₹799', '₹799 a month', null),
-    ('m3', '3 months', '₹1,799', '₹600 a month', 'Most chosen'),
-    ('m12', '12 months', '₹4,999', '₹417 a month', null),
-  ];
+  static String _subtitle(PremiumPlan plan, {required bool freeForNow}) {
+    if (freeForNow) return 'Free for now';
+    if (plan.unit == 'month' && plan.count > 1) {
+      return '₹${plan.pricePaise ~/ 100 ~/ plan.count} a month';
+    }
+    return 'For ${plan.title}';
+  }
+
+  Future<void> _start() async {
+    setState(() => _starting = true);
+    try {
+      await ref.read(premiumRepositoryProvider).start(_plan);
+      ref
+        ..invalidate(premiumProvider)
+        ..invalidate(profileViewsProvider);
+      if (!mounted) return;
+      showAppToast(context, 'Premium is on.');
+      context.pop();
+    } on ApiException catch (e) {
+      if (mounted) showAppToast(context, e.message);
+    } finally {
+      if (mounted) setState(() => _starting = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final premium = ref.watch(premiumProvider);
+    final status = premium.valueOrNull;
+    final active = status?.active ?? false;
+    final ends = status?.endsAt;
+
     return AppScaffold(
       navBar: AppNavBar(
         trailingLabel: 'Close',
@@ -62,20 +98,30 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
       ),
       footer: Column(
         children: [
-          // There is no billing behind this: no plans endpoint, no store
-          // handoff, no receipt validation and no entitlement. The button used
-          // to set Premium in local state, which is exactly the thing a client
-          // must never do, so it is disabled until a server can decide it.
-          const PrimaryButton(label: 'Start Premium', onPressed: null),
+          PrimaryButton(
+            label: active ? 'You have Premium' : 'Start Premium',
+            busy: _starting,
+            onPressed: status == null || active || _starting ? null : _start,
+          ),
           const SizedBox(height: 9),
           Text(
-            'Premium is not available yet. Nothing here can be bought.',
+            active && ends != null
+                ? 'Until ${dayLabel(ends.toLocal())}. Nothing renews and '
+                    'nothing is charged.'
+                : status?.freeForNow ?? true
+                ? 'Free for now. Nothing renews and nothing is charged.'
+                : 'Nothing renews.',
             textAlign: TextAlign.center,
             style: AppText.micro,
           ),
         ],
       ),
-      child: ListView(
+      child: premium.hasError
+          ? ErrorView(
+              error: premium.error!,
+              onRetry: () => ref.invalidate(premiumProvider),
+            )
+          : ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
           Padding(
@@ -131,16 +177,21 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
             padding: const EdgeInsets.symmetric(horizontal: Insets.gutter),
             child: Column(
               children: [
-                for (final (id, title, price, sub, badge) in _plans)
+                for (final plan in status?.plans ?? const <PremiumPlan>[])
                   Padding(
                     padding: const EdgeInsets.only(bottom: 9),
                     child: _PlanRow(
-                      title: title,
-                      price: price,
-                      subtitle: sub,
-                      badge: badge,
-                      selected: _plan == id,
-                      onTap: () => setState(() => _plan = id),
+                      title: plan.title,
+                      price: plan.price,
+                      subtitle: _subtitle(
+                        plan,
+                        freeForNow: status?.freeForNow ?? true,
+                      ),
+                      badge: plan.key == 'm3' ? 'Most chosen' : null,
+                      selected: _plan == plan.key,
+                      onTap: active
+                          ? () {}
+                          : () => setState(() => _plan = plan.key),
                     ),
                   ),
               ],

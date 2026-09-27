@@ -103,6 +103,7 @@ abstract final class Routes {
 
   static const settings = '/you/settings';
   static const profileViews = '/you/settings/views';
+  static const saved = '/you/settings/saved';
   static const blocked = '/you/settings/blocked';
   static const subscription = '/you/settings/subscription';
   static const support = '/you/settings/support';

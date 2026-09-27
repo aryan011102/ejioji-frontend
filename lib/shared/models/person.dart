@@ -159,6 +159,40 @@ class PendingRequest {
       items.map(PendingRequest.fromJson).toList(growable: false);
 }
 
+/// Someone you saved to come back to.
+@immutable
+class SavedPerson {
+  const SavedPerson({required this.savedAt, required this.person});
+
+  final DateTime savedAt;
+  final Candidate person;
+
+  static SavedPerson fromJson(Json j) => SavedPerson(
+        savedAt: j.time('saved_at'),
+        person: Candidate.fromJson(j.object('person')),
+      );
+}
+
+/// Your saved profiles, newest first. Premium: without it [locked] is true and
+/// the list is empty, though what you saved is kept for when you come back.
+@immutable
+class SavedProfiles {
+  const SavedProfiles({required this.saved, this.locked = false});
+
+  final List<SavedPerson> saved;
+  final bool locked;
+
+  bool has(String userId) => saved.any((s) => s.person.userId == userId);
+
+  static SavedProfiles fromJson(Json j) => SavedProfiles(
+        locked: j.flag('locked'),
+        saved: j
+            .objects('saved')
+            .map(SavedPerson.fromJson)
+            .toList(growable: false),
+      );
+}
+
 /// Someone who has looked at your profile.
 @immutable
 class ProfileVisitor {
@@ -185,15 +219,24 @@ class ProfileVisitor {
 /// Who has looked at your profile, most recently first.
 @immutable
 class ProfileViews {
-  const ProfileViews({required this.total, required this.visitors});
+  const ProfileViews({
+    required this.total,
+    required this.visitors,
+    this.locked = false,
+  });
 
   /// Everyone who has looked and can still be shown to you. [visitors] is the
   /// most recent hundred of them.
   final int total;
   final List<ProfileVisitor> visitors;
 
+  /// Who they are is Premium. The count is free; without Premium the server
+  /// sends no visitors at all, so no face reaches this phone to be blurred.
+  final bool locked;
+
   static ProfileViews fromJson(Json j) => ProfileViews(
         total: j.integer('total'),
+        locked: j.flag('locked'),
         visitors: j
             .objects('visitors')
             .map(ProfileVisitor.fromJson)

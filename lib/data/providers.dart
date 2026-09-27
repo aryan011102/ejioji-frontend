@@ -10,6 +10,7 @@ import '../shared/models/connection.dart';
 import '../shared/models/consent.dart';
 import '../shared/models/media.dart';
 import '../shared/models/person.dart';
+import '../shared/models/premium.dart';
 import '../shared/models/profile.dart';
 import '../shared/models/social.dart';
 import '../shared/models/tile.dart';
@@ -19,6 +20,7 @@ import 'chat_repository.dart';
 import 'consent_repository.dart';
 import 'matching_repository.dart';
 import 'media_repository.dart';
+import 'premium_repository.dart';
 import 'profile_repository.dart';
 import 'push_controller.dart';
 import 'sharing_repository.dart';
@@ -93,6 +95,10 @@ final appVersionProvider = FutureProvider<String?>((ref) => readAppVersion());
 
 final supportRepositoryProvider = Provider<SupportRepository>(
   (ref) => SupportRepository(ref.watch(apiClientProvider)),
+);
+
+final premiumRepositoryProvider = Provider<PremiumRepository>(
+  (ref) => PremiumRepository(ref.watch(apiClientProvider)),
 );
 
 final sharingRepositoryProvider = Provider<SharingRepository>(
@@ -184,6 +190,16 @@ final blockedProvider = FutureProvider.autoDispose<List<BlockedPerson>>(
 
 final profileViewsProvider = FutureProvider.autoDispose<ProfileViews>(
   (ref) => ref.watch(matchingRepositoryProvider).views(),
+);
+
+final savedProvider = FutureProvider.autoDispose<SavedProfiles>(
+  (ref) => ref.watch(matchingRepositoryProvider).saved(),
+);
+
+/// Whether you have Premium, from the server. Invalidated after starting a
+/// plan, together with the views list, which it unlocks.
+final premiumProvider = FutureProvider.autoDispose<PremiumStatus>(
+  (ref) => ref.watch(premiumRepositoryProvider).status(),
 );
 
 final conversationsProvider = FutureProvider.autoDispose<List<Conversation>>(

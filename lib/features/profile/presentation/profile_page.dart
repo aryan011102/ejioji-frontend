@@ -198,10 +198,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 
   Future<void> _moreSheet(Candidate person) async {
+    final saved =
+        ref.read(savedProvider).valueOrNull?.has(person.userId) ?? false;
     final choice = await showAppActionSheet(
       context,
       message: '${person.firstName} is never told either way.',
       actions: [
+        SheetAction(saved ? 'Remove from saved' : 'Save profile'),
         const SheetAction('Report profile', destructive: true),
         SheetAction('Block ${person.firstName}', destructive: true),
       ],
@@ -209,12 +212,14 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     if (!mounted) return;
 
     if (choice == 0) {
+      await _toggleSaved(person, saved: saved);
+    } else if (choice == 1) {
       unawaited(
         context.push<void>(
           Routes.reportFor(person.userId, name: person.firstName),
         ),
       );
-    } else if (choice == 1) {
+    } else if (choice == 2) {
       try {
         // Blocking is two-way and immediate: it ends any match, declines a
         // pending request in either direction, and takes them out of both
@@ -225,6 +230,34 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         showAppToast(context, '${person.firstName} is blocked.');
       } on ApiException catch (e) {
         if (mounted) showAppToast(context, e.message);
+      }
+    }
+  }
+
+  /// Saving is Premium; the server says so with `premium_required`, and then
+  /// the Premium page opens instead of a toast. Removing is always allowed.
+  Future<void> _toggleSaved(Candidate person, {required bool saved}) async {
+    final repo = ref.read(matchingRepositoryProvider);
+    try {
+      if (saved) {
+        await repo.unsave(person.userId);
+      } else {
+        await repo.save(person.userId);
+      }
+      ref.invalidate(savedProvider);
+      if (!mounted) return;
+      showAppToast(
+        context,
+        saved
+            ? '${person.firstName} is no longer saved.'
+            : '${person.firstName} is saved.',
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      if (e.code == 'premium_required') {
+        unawaited(context.push<void>(Routes.premium));
+      } else {
+        showAppToast(context, e.message);
       }
     }
   }

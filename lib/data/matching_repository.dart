@@ -135,4 +135,14 @@ class MatchingRepository {
 
   Future<ProfileViews> views() async =>
       ProfileViews.fromJson(await _api.getJson(Api.views));
+
+  Future<SavedProfiles> saved() async =>
+      SavedProfiles.fromJson(await _api.getJson(Api.saved));
+
+  /// 403 `premium_required` without Premium. Saving twice is one save, and the
+  /// person saved is never told.
+  Future<void> save(String userId) => _api.putEmpty(Api.savedOne(userId));
+
+  /// Always allowed, Premium or not.
+  Future<void> unsave(String userId) => _api.deleteEmpty(Api.savedOne(userId));
 }

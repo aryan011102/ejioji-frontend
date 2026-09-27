@@ -103,7 +103,7 @@ abstract final class Routes {
 
   static const settings = '/you/settings';
   static const profileViews = '/you/settings/views';
-  static const saved = '/you/settings/saved';
+  static const saved = '/you/profile/saved';
   static const blocked = '/you/settings/blocked';
   static const subscription = '/you/settings/subscription';
   static const support = '/you/settings/support';
@@ -128,10 +128,15 @@ class PersonArgs {
     required this.person,
     required this.backLabel,
     this.chatAbout = false,
+    this.canAsk = false,
   });
 
   final Candidate person;
   final String backLabel;
+
+  /// A "Chat with" button at the foot, and tiles that slide to ask about
+  /// them. For the saved list, which has no answer of its own to give.
+  final bool canAsk;
 
   /// Their tiles slide to "Chat about this", and the tile chosen comes back
   /// as the pushed route's result: from a conversation it becomes the quote

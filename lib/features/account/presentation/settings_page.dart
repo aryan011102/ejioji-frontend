@@ -231,16 +231,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 onTap: () => context.push(Routes.profileViews),
               ),
               AppRow(
-                label: 'Saved profiles',
-                subtitle: 'People you want to come back to',
-                leading: const Icon(
-                  Icons.bookmark_border,
-                  size: 18,
-                  color: AppColors.label2,
-                ),
-                onTap: () => context.push(Routes.saved),
-              ),
-              AppRow(
                 label: 'Stealth mode',
                 subtitle: premium?.active ?? false
                     ? 'Only people you ask can see you'

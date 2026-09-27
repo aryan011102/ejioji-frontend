@@ -13,6 +13,7 @@ import '../../../shared/models/enums.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/pressable.dart';
 import '../../../shared/widgets/states.dart';
+import '../../profile/presentation/person_actions.dart';
 import '../../profile/presentation/profile_page.dart';
 import 'empty_feed_page.dart';
 
@@ -166,6 +167,9 @@ class _HomeBar extends ConsumerWidget {
     // page is for catching up, and a number on a bell reads like a debt.
     final fresh =
         (ref.watch(activityProvider).valueOrNull?.newCount ?? 0) > 0;
+    // Only while a card is up: on an empty or loading feed there is nobody to
+    // save or report.
+    final person = ref.watch(feedProvider.select((f) => f.current));
     return SizedBox(
       height: 44,
       child: Row(
@@ -192,38 +196,55 @@ class _HomeBar extends ConsumerWidget {
             ),
           ),
           const Spacer(),
-          Pressable(
+          // Notifications, then the bookmark and the "···" for the card on
+          // screen. The profile underneath draws none of these itself: this
+          // bar floats over its bar, and anything there would sit under here
+          // where no tap can reach it.
+          NavIconButton(
+            icon: Icons.notifications_none,
+            semanticLabel:
+                fresh ? 'Notifications, something new' : 'Notifications',
             onTap: () => context.push(Routes.notifications),
-            semanticLabel: fresh ? 'Notifications, something new' : 'Notifications',
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(6, 6, 14, 2),
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  const Icon(
-                    Icons.notifications_none,
-                    size: 22,
-                    color: AppColors.accent,
-                  ),
-                  if (fresh)
-                    Positioned(
-                      key: const ValueKey('bell-dot'),
-                      top: 0,
-                      right: 0,
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: AppColors.pink,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.group, width: 1.5),
-                        ),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(
+                  Icons.notifications_none,
+                  size: 22,
+                  color: AppColors.accent,
+                ),
+                if (fresh)
+                  Positioned(
+                    key: const ValueKey('bell-dot'),
+                    top: 0,
+                    right: 0,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: AppColors.pink,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.group, width: 1.5),
                       ),
                     ),
-                ],
-              ),
+                  ),
+              ],
             ),
           ),
+          if (person != null) ...[
+            SaveProfileButton(person: person),
+            NavIconButton(
+              icon: Icons.more_horiz,
+              semanticLabel: 'More about ${person.firstName}',
+              onTap: () => showPersonMenu(
+                context,
+                ref,
+                person,
+                onBlocked: () => ref.read(feedProvider.notifier).dropCurrent(),
+              ),
+            ),
+          ],
+          const SizedBox(width: 7),
         ],
       ),
     );

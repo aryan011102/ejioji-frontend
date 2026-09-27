@@ -175,6 +175,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             candidate: args?.person,
             backLabel: args?.backLabel,
             chatAbout: args?.chatAbout ?? false,
+            canAsk: args?.canAsk ?? false,
           );
         },
       ),

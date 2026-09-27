@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart' show Color;
 
 import '../../core/network/json.dart';
 import 'enums.dart';
@@ -34,6 +35,54 @@ class TileValue {
       );
 }
 
+/// The song a tile is about, as Apple Music's catalog has it.
+///
+/// Set only on a tile about one song. The cover goes behind the tile unless
+/// the person put their own photo or video there, and the preview plays on a
+/// tap, never on its own. The preview is an ordinary audio file Apple serves,
+/// so whoever is looking needs no Apple Music of their own.
+@immutable
+class SongMusic {
+  const SongMusic({
+    required this.title,
+    required this.artist,
+    this.artworkUrl,
+    this.artworkBackground,
+    this.previewUrl,
+    this.appleMusicUrl,
+    this.spotifyUrl,
+  });
+
+  final String title;
+  final String artist;
+  final String? artworkUrl;
+
+  /// The cover's main colour, to paint while the image loads.
+  final Color? artworkBackground;
+
+  /// Thirty seconds, streamed from Apple.
+  final String? previewUrl;
+
+  /// Where the Apple Music badge goes.
+  final String? appleMusicUrl;
+  final String? spotifyUrl;
+
+  static SongMusic fromJson(Json j) => SongMusic(
+        title: j.str('title'),
+        artist: j.str('artist'),
+        artworkUrl: j.strOrNull('artwork_url'),
+        artworkBackground: _hex(j.strOrNull('artwork_background')),
+        previewUrl: j.strOrNull('preview_url'),
+        appleMusicUrl: j.strOrNull('apple_music_url'),
+        spotifyUrl: j.strOrNull('spotify_url'),
+      );
+
+  static Color? _hex(String? six) {
+    final v = six == null || six.length != 6 ? null : int.tryParse(six, radix: 16);
+    return v == null ? null : Color(0xFF000000 | v);
+  }
+}
+
 /// A derived tile: a fact the server computed, with a caption around it.
 ///
 /// The value is never written by a model. A model may propose what to count
@@ -51,6 +100,7 @@ class Insight {
     required this.support,
     required this.providers,
     required this.computedAt,
+    this.music,
   });
 
   /// Stable across refreshes, so a picked tile keeps its place when the data
@@ -76,6 +126,9 @@ class Insight {
   /// taste, so the age is shown rather than hidden.
   final DateTime computedAt;
 
+  /// The song this tile is about, when it is about one Apple's catalog has.
+  final SongMusic? music;
+
   static Insight fromJson(Json j) => Insight(
         key: j.str('key'),
         origin: TileOrigin.parse(j.strOrNull('origin')),
@@ -89,7 +142,13 @@ class Insight {
             .map(SourceProvider.parse)
             .toList(growable: false),
         computedAt: j.time('computed_at'),
+        music: _music(j),
       );
+
+  static SongMusic? _music(Json j) {
+    final m = j.objectOrNull('music');
+    return m == null ? null : SongMusic.fromJson(m);
+  }
 
   static List<Insight> listFrom(List<Json> items) =>
       items.map(Insight.fromJson).toList(growable: false);
@@ -216,6 +275,9 @@ class ProfileTile {
   String? get question => prompt?.question;
 
   bool get isAnswer => kind == TileKind.prompt;
+
+  /// The song, on a tile about one.
+  SongMusic? get music => insight?.music;
 
   /// The photo or video the person put behind it, if any. It belongs to the
   /// tile rather than the profile, so it survives the tile being dropped and

@@ -403,6 +403,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                           answer: t.isAnswer ? t.headline : null,
                           tone: t.tone,
                           isTrack: t.looksLikeTrack,
+                          music: t.music,
                           mediaUrl: _media(t)?.stillUrl,
                           videoUrl: _media(t)?.videoUrl,
                           isLivePhoto: _media(t)?.kind == MediaKind.livePhoto,

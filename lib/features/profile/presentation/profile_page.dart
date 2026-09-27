@@ -20,7 +20,6 @@ import '../../../shared/models/profile.dart';
 import '../../../shared/models/social.dart';
 import '../../../shared/models/tile.dart' as api;
 import '../../../shared/models/tile_look.dart';
-import '../../../shared/widgets/app_tab_bar.dart';
 import '../../../shared/widgets/buttons.dart';
 import '../../../shared/widgets/identity.dart';
 import '../../../shared/widgets/layout.dart';
@@ -31,6 +30,7 @@ import '../../../shared/widgets/states.dart';
 import '../../../shared/widgets/swipe_to_chat.dart';
 import '../../../shared/widgets/tiles.dart';
 import 'arrange_wall.dart';
+import 'person_actions.dart';
 
 /// Where this screen was reached from. It changes the foot and nothing else.
 enum ProfileMode {
@@ -64,10 +64,16 @@ class ProfilePage extends ConsumerStatefulWidget {
     this.candidate,
     this.backLabel,
     this.chatAbout = false,
+    this.canAsk = false,
     super.key,
   });
 
   final ProfileMode mode;
+
+  /// On a guest profile, a "Chat with" button at the foot. Set where the
+  /// screen behind has no answer of its own to give, which is the saved list:
+  /// a request or a conversation already is one.
+  final bool canAsk;
 
   /// On a guest profile, its tiles slide to "Chat about this" and the one
   /// chosen is popped back to the screen behind (PersonArgs.chatAbout). The
@@ -134,6 +140,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
   bool get _dirty => _draftOrder != null;
 
+  /// A guest profile with its own way to ask, from the saved list.
+  bool get _askable => widget.mode == ProfileMode.guest && widget.canAsk;
+
   /// The order to render, which is the draft while arranging and the server's
   /// otherwise.
   List<api.ProfileTile> _ordered(List<api.ProfileTile> tiles) {
@@ -194,71 +203,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       context.go(Routes.home);
     } on ApiException catch (e) {
       if (mounted) showAppToast(context, e.message);
-    }
-  }
-
-  Future<void> _moreSheet(Candidate person) async {
-    final saved =
-        ref.read(savedProvider).valueOrNull?.has(person.userId) ?? false;
-    final choice = await showAppActionSheet(
-      context,
-      message: '${person.firstName} is never told either way.',
-      actions: [
-        SheetAction(saved ? 'Remove from saved' : 'Save profile'),
-        const SheetAction('Report profile', destructive: true),
-        SheetAction('Block ${person.firstName}', destructive: true),
-      ],
-    );
-    if (!mounted) return;
-
-    if (choice == 0) {
-      await _toggleSaved(person, saved: saved);
-    } else if (choice == 1) {
-      unawaited(
-        context.push<void>(
-          Routes.reportFor(person.userId, name: person.firstName),
-        ),
-      );
-    } else if (choice == 2) {
-      try {
-        // Blocking is two-way and immediate: it ends any match, declines a
-        // pending request in either direction, and takes them out of both
-        // feeds.
-        await ref.read(matchingRepositoryProvider).block(person.userId);
-        if (!mounted) return;
-        ref.read(feedProvider.notifier).dropCurrent();
-        showAppToast(context, '${person.firstName} is blocked.');
-      } on ApiException catch (e) {
-        if (mounted) showAppToast(context, e.message);
-      }
-    }
-  }
-
-  /// Saving is Premium; the server says so with `premium_required`, and then
-  /// the Premium page opens instead of a toast. Removing is always allowed.
-  Future<void> _toggleSaved(Candidate person, {required bool saved}) async {
-    final repo = ref.read(matchingRepositoryProvider);
-    try {
-      if (saved) {
-        await repo.unsave(person.userId);
-      } else {
-        await repo.save(person.userId);
-      }
-      ref.invalidate(savedProvider);
-      if (!mounted) return;
-      showAppToast(
-        context,
-        saved
-            ? '${person.firstName} is no longer saved.'
-            : '${person.firstName} is saved.',
-      );
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      if (e.code == 'premium_required') {
-        unawaited(context.push<void>(Routes.premium));
-      } else {
-        showAppToast(context, e.message);
-      }
     }
   }
 
@@ -356,7 +300,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
     return AppScaffold(
       navBar: _topBar(context, person),
-      footer: _theirs ? null : _foot(context, tiles, publish),
+      footer: _theirs
+          ? (_askable && person != null ? _askFoot(person) : null)
+          : _foot(context, tiles, publish),
       child: Stack(
         children: [
           ListView(
@@ -507,20 +453,64 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       : ref.watch(tileMediaProvider).resolve(t.kind, t.key, t.media);
 
   PreferredSizeWidget _topBar(BuildContext context, Candidate? person) {
+    // The deck's bar is Home's: it floats over this one and carries the
+    // bookmark and the "···" for the card on screen, so drawing them here too
+    // would put a second set underneath, where nothing can reach them.
+    if (_viewer) return const AppNavBar();
     if (_theirs) {
       return AppNavBar(
-        // The deck has nowhere to go back to; a pushed profile always does.
-        backLabel: _viewer ? null : (widget.backLabel ?? 'Back'),
-        onBack: _viewer ? null : () => context.pop(),
-        trailingLabel: '···',
-        onTrailing: person == null ? null : () => _moreSheet(person),
+        backLabel: widget.backLabel ?? 'Back',
+        onBack: () => context.pop(),
+        trailing: person == null
+            ? null
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SaveProfileButton(person: person),
+                  NavIconButton(
+                    icon: Icons.more_horiz,
+                    semanticLabel: 'More about ${person.firstName}',
+                    onTap: () => showPersonMenu(
+                      context,
+                      ref,
+                      person,
+                      onBlocked: () => context.pop(),
+                    ),
+                  ),
+                ],
+              ),
       );
     }
     return AppNavBar(
       backLabel: widget.mode == ProfileMode.owner ? 'You' : 'Back',
       onBack: () => context.pop(),
-      trailingLabel: _arranging ? 'Done' : 'Arrange',
-      onTrailing: () => setState(() => _arranging = !_arranging),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Pressable(
+            onTap: () => setState(() => _arranging = !_arranging),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+              child: Text(
+                _arranging ? 'Done' : 'Arrange',
+                style: AppText.navAction.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.accent,
+                ),
+              ),
+            ),
+          ),
+          // Your saved list, which lives on your own profile rather than in
+          // Settings. Hidden while arranging, where leaving would drop the
+          // order being worked on.
+          if (widget.mode == ProfileMode.owner && !_arranging)
+            NavIconButton(
+              icon: Icons.bookmark,
+              semanticLabel: 'Saved profiles',
+              onTap: () => context.push(Routes.saved),
+            ),
+        ],
+      ),
     );
   }
 
@@ -796,21 +786,31 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   static const _actionsFade = 60.0;
 
   /// The gap between the buttons and the top of the tab bar.
-  static const _aboveTabBar = 16.0;
+  static const _aboveTabBar = 12.0;
 
   /// What the actions cover, which is what the wall scrolls clear of, so the
   /// last tile can be read rather than sitting under the scrim for good.
-  static double get _actionsHeight =>
-      _actionsFade + _actionsControl + _aboveTabBar + AppTabBar.clearance;
+  ///
+  /// The tab bar is not in this sum. The shell's scaffold extends its body
+  /// under the bar and adds the bar's height to the bottom padding it hands
+  /// down, so this page's safe area already ends at the top of the bar. Adding
+  /// the bar again floated the buttons a whole bar's height above it.
+  static const _actionsHeight = _actionsFade + _actionsControl + _aboveTabBar;
 
   /// Pass, or ask to chat.
   ///
   /// Their tile, sliding to "Chat about this". Somebody else's wall only, and
   /// on a guest profile only where the screen behind asked for it.
   Widget _chatAbout(api.ProfileTile t, Candidate? person, Widget tile) {
-    if (person == null || !(_viewer || widget.chatAbout)) return tile;
+    if (person == null || !(_viewer || _askable || widget.chatAbout)) {
+      return tile;
+    }
     return SwipeToChat(
-      onChat: () => _viewer ? _askAbout(person, t) : context.pop(t),
+      onChat: () => _viewer
+          ? _askAbout(person, t)
+          : _askable
+              ? _askFromHere(person, tile: t)
+              : context.pop(t),
       child: tile,
     );
   }
@@ -845,11 +845,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       right: 0,
       bottom: 0,
       child: Container(
-        padding: EdgeInsets.fromLTRB(
+        padding: const EdgeInsets.fromLTRB(
           Insets.gutter,
           _actionsFade,
           Insets.gutter,
-          AppTabBar.clearance + _aboveTabBar,
+          _aboveTabBar,
         ),
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -890,6 +890,42 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         ),
       ),
     );
+  }
+
+  /// "Chat with" on a saved profile. No pass: passing is how the deck moves
+  /// on, and there is no deck here.
+  Widget _askFoot(Candidate person) => PrimaryButton(
+        label: 'Chat with ${person.firstName}',
+        onPressed: () => _askFromHere(person),
+      );
+
+  /// The same request the deck sends, without moving the deck: this person is
+  /// not the card on Home.
+  Future<void> _askFromHere(Candidate person, {api.ProfileTile? tile}) async {
+    try {
+      final result = await ref
+          .read(matchingRepositoryProvider)
+          .sendRequest(person.userId, tile: tile);
+      ref
+        ..invalidate(outgoingRequestsProvider)
+        ..invalidate(incomingRequestsProvider)
+        ..invalidate(conversationsProvider);
+      if (!mounted) return;
+      showAppToast(
+        context,
+        switch ((result.accepted, tile != null)) {
+          (true, true) =>
+            '${person.firstName} asked you too. The chat opens on this tile.',
+          (true, false) => '${person.firstName} asked you too. The chat is open.',
+          (false, true) => 'Asked about this. ${person.firstName} will see it '
+              'with your request.',
+          (false, false) =>
+            'Asked. ${person.firstName} will see it in their requests.',
+        },
+      );
+    } on ApiException catch (e) {
+      if (mounted) showAppToast(context, e.message);
+    }
   }
 
   Future<void> _ask(Candidate person) async {

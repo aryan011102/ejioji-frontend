@@ -83,6 +83,7 @@ class AppNavBar extends StatelessWidget implements PreferredSizeWidget {
     this.trailingLabel,
     this.onTrailing,
     this.trailingEnabled = true,
+    this.trailing,
     super.key,
   });
 
@@ -102,6 +103,11 @@ class AppNavBar extends StatelessWidget implements PreferredSizeWidget {
   final String? trailingLabel;
   final VoidCallback? onTrailing;
   final bool trailingEnabled;
+
+  /// Icons on the right instead of [trailingLabel], or beside it when the
+  /// label is part of this widget. Allowed to be wider than the left side, so
+  /// use it on a bar with no title, where there is nothing to pull off centre.
+  final Widget? trailing;
 
   @override
   Size get preferredSize => const Size.fromHeight(48);
@@ -194,29 +200,41 @@ class AppNavBar extends StatelessWidget implements PreferredSizeWidget {
                     ),
                   ),
           ),
-          SizedBox(
-            width: 112,
-            child: trailingLabel == null
-                ? null
-                : Align(
-                    alignment: Alignment.centerRight,
-                    child: Pressable(
-                      onTap: trailingEnabled ? onTrailing : null,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(8, 4, 14, 4),
-                        child: Text(
-                          trailingLabel!,
-                          style: AppText.navAction.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: trailingEnabled
-                                ? AppColors.accent
-                                : AppColors.label4,
+          if (trailing != null)
+            ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 112),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 7),
+                  child: trailing,
+                ),
+              ),
+            )
+          else
+            SizedBox(
+              width: 112,
+              child: trailingLabel == null
+                  ? null
+                  : Align(
+                      alignment: Alignment.centerRight,
+                      child: Pressable(
+                        onTap: trailingEnabled ? onTrailing : null,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 4, 14, 4),
+                          child: Text(
+                            trailingLabel!,
+                            style: AppText.navAction.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: trailingEnabled
+                                  ? AppColors.accent
+                                  : AppColors.label4,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-          ),
+            ),
         ],
       ),
     );

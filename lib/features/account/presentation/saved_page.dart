@@ -11,7 +11,11 @@ import '../../../shared/widgets/identity.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/states.dart';
 
-/// People you saved from their profile's "···" sheet, newest first. Premium.
+/// People you saved with the bookmark on their profile, newest first. Premium.
+///
+/// Reached from the bookmark on your own profile. Opening someone here gives
+/// their profile a "Chat with" button, since this list is where you come back
+/// to ask.
 ///
 /// The list is checked on the server every time, as the views list is: someone
 /// who has since blocked you, stopped showing or left your filters is not here.
@@ -31,7 +35,7 @@ class SavedPage extends ConsumerWidget {
     return AppScaffold(
       navBar: AppNavBar(
         title: 'Saved',
-        backLabel: 'Settings',
+        backLabel: 'Profile',
         onBack: () => context.pop(),
       ),
       child: saved.when(
@@ -69,7 +73,7 @@ class SavedPage extends ConsumerWidget {
             ? const EmptyState(
                 icon: Icons.bookmark_border,
                 title: 'Nobody saved yet',
-                body: 'Open "···" on a profile and tap Save profile to keep '
+                body: 'Tap the bookmark at the top of a profile to keep '
                     'them here. They are never told.',
               )
             : RefreshIndicator(
@@ -95,6 +99,7 @@ class SavedPage extends ConsumerWidget {
                               extra: PersonArgs(
                                 person: s.person,
                                 backLabel: 'Saved',
+                                canAsk: true,
                               ),
                             ),
                           ),

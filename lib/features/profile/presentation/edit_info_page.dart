@@ -32,7 +32,7 @@ class EditInfoPage extends ConsumerStatefulWidget {
 }
 
 class _EditInfoPageState extends ConsumerState<EditInfoPage> {
-  static const _slots = 3;
+  static const _slots = PhotoController.maxOnProfile;
 
   String? _name;
   String? _lastName;
@@ -42,6 +42,7 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
   final _languages = <Language>{};
   Education? _education;
   Pronouns? _pronouns;
+  String? _company;
 
   bool _dirty = false;
   bool _saving = false;
@@ -91,6 +92,7 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
             ],
             education: _education,
             pronouns: _pronouns,
+            company: (_company ?? '').trim().isEmpty ? null : _company!.trim(),
           );
       final profile = await ref.read(profileRepositoryProvider).load();
       if (!mounted) return;
@@ -116,6 +118,22 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
     if (typed != null) {
       setState(() {
         _name = typed;
+        _dirty = true;
+      });
+    }
+  }
+
+  Future<void> _editCompany() async {
+    final typed = await showTextEntrySheet(
+      context,
+      title: 'Company',
+      hint: 'Where you work',
+      initial: _company ?? '',
+      maxLength: 60,
+    );
+    if (typed != null) {
+      setState(() {
+        _company = typed;
         _dirty = true;
       });
     }
@@ -278,6 +296,7 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
       _languages.addAll(details.languages);
       _education = details.education;
       _pronouns = details.pronouns;
+      _company = details.company;
     }
 
     return AppScaffold(
@@ -315,41 +334,34 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
                       style: AppText.groupHeader,
                     ),
                   ),
-                  Row(
-                    children: [
-                      for (var i = 0; i < _slots; i++) ...[
-                        if (i > 0) const SizedBox(width: 10),
-                        Expanded(
-                          child: DraggablePhotoSlot(
-                            index: i,
-                            filled: i < photos.assets.length,
-                            onMove: (from, to) => ref
+                  PhotoSlotGrid(
+                    count: _slots,
+                    slotBuilder: (i) => DraggablePhotoSlot(
+                      index: i,
+                      filled: i < photos.assets.length,
+                      onMove: (from, to) => ref
+                          .read(photoPoolProvider.notifier)
+                          .movePhoto(from, to, onError: _toast),
+                      child: PhotoSlot(
+                        imageUrl: i < photos.assets.length
+                            ? photos.assets[i].stillUrl
+                            : null,
+                        busy: photos.uploading && i == photos.assets.length,
+                        main: i == 0,
+                        onTap: () => i < photos.assets.length
+                            ? _photoSheet(photos.assets[i].id)
+                            : ref
                                 .read(photoPoolProvider.notifier)
-                                .movePhoto(from, to, onError: _toast),
-                            child: PhotoSlot(
-                              imageUrl: i < photos.assets.length
-                                  ? photos.assets[i].stillUrl
-                                  : null,
-                              busy: photos.uploading &&
-                                  i == photos.assets.length,
-                              main: i == 0,
-                              onTap: () => i < photos.assets.length
-                                  ? _photoSheet(photos.assets[i].id)
-                                  : ref
-                                      .read(photoPoolProvider.notifier)
-                                      .add(onError: _toast),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
+                                .add(onError: _toast),
+                      ),
+                    ),
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
                     child: Text(
                       'Your first photo is the one people see first. Hold '
                       'one and drag it to change the order. Photos save as '
-                      'soon as you add them.',
+                      'soon as you add them. Three are needed to be shown.',
                       style: AppText.caption,
                     ),
                   ),
@@ -405,8 +417,14 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
                   label: 'Pronouns',
                   value: _pronouns?.label,
                   placeholder: 'Optional',
-                  last: true,
                   onTap: _pickPronouns,
+                ),
+                FieldRow(
+                  label: 'Company',
+                  value: (_company ?? '').isEmpty ? null : _company,
+                  placeholder: 'Optional',
+                  last: true,
+                  onTap: _editCompany,
                 ),
               ],
             ),

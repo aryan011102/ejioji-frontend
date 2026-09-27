@@ -114,6 +114,7 @@ void main() {
       expect(profile.displayName, 'Priya');
       expect(profile.languages, isEmpty);
       expect(profile.education, isNull);
+      expect(profile.company, isNull);
     });
 
     test('a last name joins the first with one space', () {
@@ -356,8 +357,10 @@ void main() {
         'languages': ['hindi', 'english'],
         'education': 'bachelors',
         'pronouns': 'she_her',
+        'company': 'Zomato',
       });
       expect(card.pronouns, Pronouns.sheHer);
+      expect(card.company, 'Zomato');
       expect(card.languages, [Language.hindi, Language.english]);
       expect(card.education, Education.bachelors);
       // A surname beside purchase history is the caste inference, so a card has

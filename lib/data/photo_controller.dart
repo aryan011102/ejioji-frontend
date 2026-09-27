@@ -42,9 +42,11 @@ class PhotoPool {
 }
 
 class PhotoController extends Notifier<PhotoPool> {
-  /// The pool holds twelve, pending uploads included; a profile shows six.
+  /// The pool holds twelve, pending uploads included; a profile shows ten and
+  /// needs three to be shown to anyone (the server's gate says the same).
   static const maxPhotos = 12;
-  static const maxOnProfile = 6;
+  static const maxOnProfile = 10;
+  static const minOnProfile = 3;
 
   final _picker = ImagePicker();
 
@@ -160,7 +162,7 @@ class PhotoController extends Notifier<PhotoPool> {
         ],
       );
       ref.invalidate(mediaPoolProvider);
-      // The server took it off the profile already; this moves a seventh
+      // The server took it off the profile already; this moves an eleventh
       // photo up into the space it left.
       await _putOnProfile(onError);
     } on ApiException catch (e) {
@@ -168,7 +170,7 @@ class PhotoController extends Notifier<PhotoPool> {
     }
   }
 
-  /// The profile shows the pool's first six, in the pool's order. No screen
+  /// The profile shows the pool's first ten, in the pool's order. No screen
   /// lets anyone choose otherwise, so an upload that stopped at the pool
   /// would never reach the profile and publishing would say too few photos.
   Future<void> _putOnProfile(void Function(String) onError) => setOnProfile(

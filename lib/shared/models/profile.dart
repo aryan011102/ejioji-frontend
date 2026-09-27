@@ -24,6 +24,7 @@ class Profile {
     this.languages = const [],
     this.education,
     this.pronouns,
+    this.company,
   });
 
   final String firstName;
@@ -44,6 +45,10 @@ class Profile {
   /// Null means not stated. Shown as nothing, never guessed from gender.
   final Pronouns? pronouns;
 
+  /// Where they work, as they typed it. Null means not stated, and then no
+  /// chip is shown.
+  final String? company;
+
   /// The name as it is shown. A person with no last name is just their first.
   String get displayName =>
       lastName == null || lastName!.isEmpty ? firstName : '$firstName $lastName';
@@ -61,6 +66,7 @@ class Profile {
         ],
         education: Education.parse(j.strOrNull('education')),
         pronouns: Pronouns.parse(j.strOrNull('pronouns')),
+        company: j.strOrNull('company'),
       );
 }
 

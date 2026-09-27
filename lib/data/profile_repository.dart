@@ -27,11 +27,10 @@ class ProfileRepository {
   /// A field left out of this call is a field erased, so every optional one is
   /// sent explicitly, even when it is null or empty.
   ///
-  /// There is still no bio, no occupation and no employer: asking people to
-  /// describe themselves first is what produces a conventional profile, and
-  /// the derived tiles then have to argue with it. A last name is the one
-  /// exception, added 2026-09-20 on Aryan's call; see the model for what that
-  /// reversed.
+  /// There is still no bio and no occupation: asking people to describe
+  /// themselves first is what produces a conventional profile, and the derived
+  /// tiles then have to argue with it. A last name (2026-09-20) and a company
+  /// (2026-09-27) are the exceptions, both Aryan's calls and both optional.
   Future<Profile> save({
     required String firstName,
     required DateTime birthDate,
@@ -41,6 +40,7 @@ class ProfileRepository {
     List<Language> languages = const [],
     Education? education,
     Pronouns? pronouns,
+    String? company,
   }) async {
     final body = await _api.put(
       Api.profile,
@@ -53,6 +53,7 @@ class ProfileRepository {
         'languages': [for (final l in languages) l.wire],
         'education': education?.wire,
         'pronouns': pronouns?.wire,
+        'company': company,
       },
     );
     return Profile.fromJson(body);

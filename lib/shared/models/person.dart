@@ -22,6 +22,7 @@ class Candidate {
     this.languages = const [],
     this.education,
     this.pronouns,
+    this.company,
     required this.photos,
     required this.tiles,
     this.socials = const [],
@@ -39,6 +40,7 @@ class Candidate {
   final List<Language> languages;
   final Education? education;
   final Pronouns? pronouns;
+  final String? company;
   final List<MediaAsset> photos;
   final List<ProfileTile> tiles;
 
@@ -58,6 +60,7 @@ class Candidate {
         languages: languages,
         education: education,
         pronouns: pronouns,
+        company: company,
         photos: photos,
         tiles: tiles,
         socials: socials,
@@ -77,6 +80,7 @@ class Candidate {
         ],
         education: Education.parse(j.strOrNull('education')),
         pronouns: Pronouns.parse(j.strOrNull('pronouns')),
+        company: j.strOrNull('company'),
         photos: MediaAsset.listFrom(j.objects('photos')),
         tiles: ProfileTile.listFrom(j.objects('tiles')),
         verified: j.flag('verified'),

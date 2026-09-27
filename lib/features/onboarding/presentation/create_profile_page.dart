@@ -42,6 +42,7 @@ class CreateProfilePage extends ConsumerStatefulWidget {
 class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
   final _name = TextEditingController();
   final _lastName = TextEditingController();
+  final _company = TextEditingController();
   DateTime? _birthDate;
   Gender? _gender;
   City? _city;
@@ -50,14 +51,15 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
   bool _saving = false;
   bool _seeded = false;
 
-  /// Two photos to publish; the form asks for three so nobody arrives at the
-  /// gate one short.
-  static const _slots = 3;
+  /// Ten slots; three photos before Continue, the same three the server needs
+  /// before anyone is shown the profile.
+  static const _slots = PhotoController.maxOnProfile;
 
   @override
   void dispose() {
     _name.dispose();
     _lastName.dispose();
+    _company.dispose();
     super.dispose();
   }
 
@@ -65,7 +67,8 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
       _name.text.trim().isNotEmpty &&
       _birthDate != null &&
       _gender != null &&
-      _city != null;
+      _city != null &&
+      ref.read(photoPoolProvider).assets.length >= PhotoController.minOnProfile;
 
   Future<void> _pickDate() async {
     final now = DateTime.now();
@@ -165,6 +168,8 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
                 if (_languages.contains(l)) l,
             ],
             education: _education,
+            company:
+                _company.text.trim().isEmpty ? null : _company.text.trim(),
           );
       final profile = await ref.read(profileRepositoryProvider).load();
       if (!mounted) return;
@@ -195,6 +200,7 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
       _city = existing.city;
       _languages.addAll(existing.languages);
       _education = existing.education;
+      _company.text = existing.company ?? '';
     }
 
     return AppScaffold(
@@ -224,42 +230,35 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
                     style: AppText.footnote,
                   ),
                 ),
-                Row(
-                  children: [
-                    for (var i = 0; i < _slots; i++) ...[
-                      if (i > 0) const SizedBox(width: 10),
-                      Expanded(
-                        child: DraggablePhotoSlot(
-                          index: i,
-                          filled: i < photos.assets.length,
-                          onMove: (from, to) => ref
+                PhotoSlotGrid(
+                  count: _slots,
+                  slotBuilder: (i) => DraggablePhotoSlot(
+                    index: i,
+                    filled: i < photos.assets.length,
+                    onMove: (from, to) => ref
+                        .read(photoPoolProvider.notifier)
+                        .movePhoto(from, to, onError: _toast),
+                    child: PhotoSlot(
+                      imageUrl: i < photos.assets.length
+                          ? photos.assets[i].stillUrl
+                          : null,
+                      busy: photos.uploading && i == photos.assets.length,
+                      main: i == 0,
+                      label: i == 0 ? 'Main' : 'Add',
+                      onTap: () => i < photos.assets.length
+                          ? _photoSheet(photos.assets[i].id)
+                          : ref
                               .read(photoPoolProvider.notifier)
-                              .movePhoto(from, to, onError: _toast),
-                          child: PhotoSlot(
-                            imageUrl: i < photos.assets.length
-                                ? photos.assets[i].stillUrl
-                                : null,
-                            busy: photos.uploading &&
-                                i == photos.assets.length,
-                            main: i == 0,
-                            label: i == 0 ? 'Main' : 'Add',
-                            onTap: () => i < photos.assets.length
-                                ? _photoSheet(photos.assets[i].id)
-                                : ref
-                                    .read(photoPoolProvider.notifier)
-                                    .add(onError: _toast),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+                              .add(onError: _toast),
+                    ),
+                  ),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
                   child: Text(
                     'Your first photo is the one people see first. Hold one '
                     'and drag it to change the order. Clear face, no group '
-                    'shots. Two are needed to publish.',
+                    'shots. Add at least three to continue.',
                     style: AppText.caption,
                   ),
                 ),
@@ -298,8 +297,9 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
           ),
           SectionGroup(
             header: 'Background',
-            footer: 'Both are optional. Left blank, neither is used to narrow '
-                'who you see or who sees you.',
+            footer: 'All optional. Left blank, languages and education are '
+                'not used to narrow who you see or who sees you. Your company '
+                'is shown on your profile and never used to match you.',
             children: [
               FieldRow(
                 label: 'Languages',
@@ -311,8 +311,14 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
                 label: 'Education',
                 value: _education?.label,
                 placeholder: 'Optional',
-                last: true,
                 onTap: _pickEducation,
+              ),
+              FieldRow(
+                label: 'Company',
+                value: _company.text.isEmpty ? null : _company.text,
+                placeholder: 'Optional',
+                last: true,
+                onTap: _editCompany,
               ),
             ],
           ),
@@ -358,6 +364,17 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
     ];
     if (chosen.length <= 2) return chosen.join(', ');
     return '${chosen.take(2).join(', ')} +${chosen.length - 2}';
+  }
+
+  Future<void> _editCompany() async {
+    final typed = await showTextEntrySheet(
+      context,
+      title: 'Company',
+      hint: 'Where you work',
+      initial: _company.text,
+      maxLength: 60,
+    );
+    if (typed != null) setState(() => _company.text = typed);
   }
 
   Future<void> _editLastName() async {

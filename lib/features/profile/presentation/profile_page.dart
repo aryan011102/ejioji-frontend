@@ -252,6 +252,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             city: person.city,
             languages: person.languages,
             education: person.education,
+            company: person.company,
           ),
           // Only a match's card carries any: the server hands socials over with
           // a match and never with a feed card or a request.
@@ -294,6 +295,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     city: details.city,
                     languages: details.languages,
                     education: details.education,
+                    company: details.company,
                   ),
                   ..._socialChips(mySocials),
                 ],
@@ -390,15 +392,15 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     // from the top, so the first item takes the top left.
                     // Small or wide by what keeps the rows even, so the move
                     // up does not leave a hole at the foot of the wall.
-                    if (photos.length > 1)
+                    // Every photo on the profile, the main one included, so
+                    // the tile is the one place to page through all of them.
+                    if (photos.isNotEmpty)
                       BentoItem(
                         size: columnsUsed.isOdd
                             ? TileSize.small
                             : TileSize.wide,
                         child: PhotosTile(
-                          photoUrls: [
-                            for (final p in photos.skip(1)) p.stillUrl,
-                          ],
+                          photoUrls: [for (final p in photos) p.stillUrl],
                         ),
                       ),
                     for (final t in shown)
@@ -500,10 +502,12 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     required City city,
     required List<Language> languages,
     required Education? education,
+    required String? company,
   }) {
     return [
       _Fact('📍', city.label),
       _Fact('🎂', '$age'),
+      if (company != null && company.isNotEmpty) _Fact('💼', company),
       if (languages.isNotEmpty)
         _Fact(
           '🗣',

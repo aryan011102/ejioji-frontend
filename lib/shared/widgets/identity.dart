@@ -233,6 +233,48 @@ class DraggablePhotoSlot extends StatelessWidget {
   }
 }
 
+/// Photo slots in rows of five, the way the onboarding and edit screens lay
+/// out their ten. Every row has five places, so a short last row keeps the
+/// same slot size rather than stretching.
+class PhotoSlotGrid extends StatelessWidget {
+  const PhotoSlotGrid({
+    required this.count,
+    required this.slotBuilder,
+    super.key,
+  });
+
+  final int count;
+  final Widget Function(int index) slotBuilder;
+
+  static const _perRow = 5;
+  static const _gap = 8.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = (count + _perRow - 1) ~/ _perRow;
+    return Column(
+      children: [
+        for (var r = 0; r < rows; r++) ...[
+          if (r > 0) const SizedBox(height: _gap),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var c = 0; c < _perRow; c++) ...[
+                if (c > 0) const SizedBox(width: _gap),
+                Expanded(
+                  child: r * _perRow + c < count
+                      ? slotBuilder(r * _perRow + c)
+                      : const SizedBox.shrink(),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 class PhotoSlot extends StatelessWidget {
   const PhotoSlot({
     this.imageUrl,

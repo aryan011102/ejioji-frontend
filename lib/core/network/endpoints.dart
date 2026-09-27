@@ -87,6 +87,9 @@ abstract final class Api {
   // POST when a profile has been on screen for 3 seconds; GET for who has
   // looked at yours.
   static const views = '$prefix/matching/views';
+  // Saved profiles (Premium): the list, and PUT or DELETE one person.
+  static const saved = '$prefix/matching/saved';
+  static String savedOne(String userId) => '$prefix/matching/saved/$userId';
 
   // Chat. The conversation id is the match id; chat holds no id of its own.
   static const conversations = '$prefix/chat/conversations';
@@ -113,6 +116,10 @@ abstract final class Api {
 
   // Support. "Report a problem" is about the app; a person is a report above.
   static const feedback = '$prefix/support/feedback';
+
+  // Premium. Free until there are prices; the server records a ₹0 purchase.
+  static const premium = '$prefix/premium';
+  static const premiumPurchases = '$prefix/premium/purchases';
 
   // Account.
   static const deleteAccount = '$prefix/account/delete';

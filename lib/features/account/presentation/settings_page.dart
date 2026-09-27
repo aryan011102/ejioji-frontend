@@ -87,8 +87,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
   }
 
-  /// Out of every feed while still browsing and asking, or back in. Free for
-  /// now: there is no premium to check against yet.
+  /// Out of every feed while still browsing and asking, or back in. Turning
+  /// it on is Premium: the server answers 403 `premium_required` without it,
+  /// and then this opens the Premium page instead of a toast.
   Future<void> _setStealth(bool on) async {
     setState(() => _stealthBusy = true);
     final repo = ref.read(profileRepositoryProvider);
@@ -101,7 +102,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         session.onProfileChanged(await repo.load());
       }
     } on ApiException catch (e) {
-      if (mounted) showAppToast(context, e.message);
+      if (!mounted) return;
+      if (e.code == 'premium_required') {
+        context.push(Routes.premium);
+      } else {
+        showAppToast(context, e.message);
+      }
     } finally {
       if (mounted) setState(() => _stealthBusy = false);
     }
@@ -193,9 +199,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Premium does not exist yet: no plans, no purchase, no entitlement. The
-    // rows that depended on it are shown in their free reading and say so,
-    // rather than offering a switch that cannot be honoured.
+    final premium = ref.watch(premiumProvider).valueOrNull;
 
     return AppScaffold(
       navBar: AppNavBar(
@@ -227,8 +231,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 onTap: () => context.push(Routes.profileViews),
               ),
               AppRow(
+                label: 'Saved profiles',
+                subtitle: 'People you want to come back to',
+                leading: const Icon(
+                  Icons.bookmark_border,
+                  size: 18,
+                  color: AppColors.label2,
+                ),
+                onTap: () => context.push(Routes.saved),
+              ),
+              AppRow(
                 label: 'Stealth mode',
-                subtitle: 'Only people you ask can see you',
+                subtitle: premium?.active ?? false
+                    ? 'Only people you ask can see you'
+                    : 'Premium. Only people you ask can see you',
                 leading: const Icon(
                   Icons.visibility_off_outlined,
                   size: 18,
@@ -250,7 +266,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
               AppRow(
                 label: 'Subscription details',
-                value: 'Free',
+                value: premium?.active ?? false ? 'Premium' : 'Free',
                 last: true,
                 leading: const Icon(
                   Icons.credit_card,

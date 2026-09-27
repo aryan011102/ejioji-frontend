@@ -1,0 +1,99 @@
+import 'package:ejioji/shared/models/person.dart';
+import 'package:ejioji/shared/models/premium.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  group('premium', () {
+    test('plans come from the server with their length and price', () {
+      final status = PremiumStatus.fromJson({
+        'active': false,
+        'plan': null,
+        'ends_at': null,
+        'free_for_now': true,
+        'plans': [
+          {'key': 'd3', 'unit': 'day', 'count': 3, 'price_paise': 19900},
+          {'key': 'm1', 'unit': 'month', 'count': 1, 'price_paise': 79900},
+          {'key': 'm3', 'unit': 'month', 'count': 3, 'price_paise': 179900},
+          {'key': 'm12', 'unit': 'month', 'count': 12, 'price_paise': 499900},
+        ],
+      });
+      expect(status.active, isFalse);
+      expect(status.freeForNow, isTrue);
+      expect(status.endsAt, isNull);
+      expect(
+        [for (final p in status.plans) p.title],
+        ['3 days', '1 month', '3 months', '12 months'],
+      );
+      expect(
+        [for (final p in status.plans) p.price],
+        ['₹199', '₹799', '₹1,799', '₹4,999'],
+      );
+    });
+
+    test('a running plan says which and until when', () {
+      final status = PremiumStatus.fromJson({
+        'active': true,
+        'plan': 'm3',
+        'ends_at': '2026-12-27T08:00:00Z',
+        'plans': const [],
+      });
+      expect(status.active, isTrue);
+      expect(status.plan, 'm3');
+      expect(status.endsAt!.toUtc(), DateTime.utc(2026, 12, 27, 8));
+    });
+
+    test('a price past a lakh groups the Indian way', () {
+      const plan = PremiumPlan(
+        key: 'x',
+        unit: 'month',
+        count: 12,
+        pricePaise: 12345600,
+      );
+      expect(plan.price, '₹1,23,456');
+    });
+
+    test('a locked views list keeps its count and has nobody in it', () {
+      final views = ProfileViews.fromJson({
+        'total': 4,
+        'visitors': const [],
+        'locked': true,
+      });
+      expect(views.locked, isTrue);
+      expect(views.total, 4);
+      expect(views.visitors, isEmpty);
+    });
+
+    test('an older server that sends no lock reads as unlocked', () {
+      final views = ProfileViews.fromJson({'total': 0, 'visitors': const []});
+      expect(views.locked, isFalse);
+    });
+  });
+
+  group('saved profiles', () {
+    test('a saved list knows who is on it', () {
+      final saved = SavedProfiles.fromJson({
+        'locked': false,
+        'saved': [
+          {
+            'saved_at': '2026-09-27T08:00:00Z',
+            'person': {
+              'user_id': '11111111-1111-1111-1111-111111111111',
+              'first_name': 'Ananya',
+              'age': 28,
+              'city': 'bengaluru',
+            },
+          },
+        ],
+      });
+      expect(saved.locked, isFalse);
+      expect(saved.has('11111111-1111-1111-1111-111111111111'), isTrue);
+      expect(saved.has('22222222-2222-2222-2222-222222222222'), isFalse);
+    });
+
+    test('without Premium the list is locked and empty', () {
+      final saved = SavedProfiles.fromJson({'locked': true, 'saved': const []});
+      expect(saved.locked, isTrue);
+      expect(saved.saved, isEmpty);
+    });
+  });
+}

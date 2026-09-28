@@ -11,13 +11,6 @@ import 'pressable.dart';
 enum TileSize { small, wide, tall, large }
 
 extension TileSizeX on TileSize {
-  /// Columns consumed, used to size the photos tile so the wall's rows come
-  /// out even.
-  int get columns => switch (this) {
-        TileSize.small || TileSize.tall => 1,
-        TileSize.wide || TileSize.large => 2,
-      };
-
   int get crossAxisCells => switch (this) {
         TileSize.small || TileSize.tall => 1,
         TileSize.wide || TileSize.large => 2,

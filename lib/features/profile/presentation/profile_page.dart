@@ -22,6 +22,7 @@ import '../../../shared/models/tile.dart' as api;
 import '../../../shared/models/tile_look.dart';
 import '../../../shared/widgets/ask_about_sheet.dart';
 import '../../../shared/widgets/buttons.dart';
+import '../../../shared/widgets/capture_shield.dart';
 import '../../../shared/widgets/identity.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/pressable.dart';
@@ -220,27 +221,31 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           ),
         );
       }
-      return _wall(
-        name: person.displayName,
-        pronouns: person.pronouns,
-        verified: person.verified,
-        chips: [
-          ..._chips(
-            age: person.age,
-            city: person.city,
-            languages: person.languages,
-            education: person.education,
-            company: person.company,
-            smoking: person.smoking,
-            drinking: person.drinking,
-          ),
-          // Only a match's card carries any: the server hands socials over with
-          // a match and never with a feed card or a request.
-          ..._socialChips(person.socials),
-        ],
-        photos: person.photos,
-        tiles: person.tiles,
-        person: person,
+      // Somebody else's photos: kept out of screenshots. Your own wall is
+      // yours to screenshot.
+      return CaptureShield(
+        child: _wall(
+          name: person.displayName,
+          pronouns: person.pronouns,
+          verified: person.verified,
+          chips: [
+            ..._chips(
+              age: person.age,
+              city: person.city,
+              languages: person.languages,
+              education: person.education,
+              company: person.company,
+              smoking: person.smoking,
+              drinking: person.drinking,
+            ),
+            // Only a match's card carries any: the server hands socials over with
+            // a match and never with a feed card or a request.
+            ..._socialChips(person.socials),
+          ],
+          photos: person.photos,
+          tiles: person.tiles,
+          person: person,
+        ),
       );
     }
 

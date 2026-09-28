@@ -21,6 +21,7 @@ import '../../../shared/widgets/pressable.dart';
 import '../../../shared/widgets/sheets.dart';
 import '../../../shared/widgets/social_mark.dart';
 import '../../../shared/widgets/states.dart';
+import '../../insights/presentation/category_page.dart';
 import '../../profile/presentation/social_link_sheet.dart';
 
 /// What the profile is actually made of, and the one screen that deals with it.
@@ -159,10 +160,14 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
   Future<void> _read(SourceProvider provider, {String? declined}) async {
     switch (provider) {
       case SourceProvider.netflix:
-        await context.push(Routes.netflixUpload);
+        await context.push(
+          Routes.upload(Routes.netflixUpload, editing: widget.editing),
+        );
         return;
       case SourceProvider.spotify:
-        await context.push(Routes.spotifyUpload);
+        await context.push(
+          Routes.upload(Routes.spotifyUpload, editing: widget.editing),
+        );
         return;
       default:
         break;
@@ -176,7 +181,7 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
         if (declined != null) showAppToast(context, declined);
         return;
       }
-      await context.push(Routes.readingRun(run.id));
+      await context.push(Routes.readingRun(run.id, editing: widget.editing));
     } on ApiException catch (e) {
       if (mounted) showAppToast(context, e.message);
     }
@@ -343,6 +348,33 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
     ];
   }
 
+  /// Edit tiles: every category, with how many of its tiles are on the
+  /// profile, each opening on its own. Null until the three reads land.
+  Widget? _tilesGroup() {
+    final candidates = ref.watch(candidatesProvider).valueOrNull;
+    final profile = ref.watch(myProfileProvider).valueOrNull;
+    final bank = ref.watch(promptBankProvider).valueOrNull;
+    if (candidates == null || profile == null || bank == null) return null;
+    final categories = pickableCategories(candidates, bank.answers, bank);
+    if (categories.isEmpty) return null;
+    return _Group(
+      header: 'Your tiles · ${profile.tiles.length} of 10 on your profile',
+      children: [
+        for (final (i, c) in categories.indexed)
+          AppRow(
+            leading: Text(c.glyph, style: const TextStyle(fontSize: 17)),
+            label: c.label,
+            value: switch (profile.tiles.where((t) => t.category == c).length) {
+              0 => null,
+              final n => '$n on profile',
+            },
+            last: i == categories.length - 1,
+            onTap: () => context.push(Routes.editCategoryOnly(i)),
+          ),
+      ],
+    );
+  }
+
   void _next() => context.push(
         widget.editing ? Routes.editCategoryAt(0) : Routes.pickCategoryAt(0),
       );
@@ -380,25 +412,27 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
       navBar: widget.editing
           ? AppNavBar(backLabel: 'Profile', onBack: () => context.pop())
           : null,
-      footer: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          PrimaryButton(
-            label: 'Next',
-            // In edit mode there is always something to walk: answers stand
-            // in for a category nothing filled.
-            onPressed: widget.editing || linked.isNotEmpty ? _next : null,
-          ),
-          // Nothing connected still has a way on: every category comes back
-          // thin, so the walk is all questions.
-          if (!widget.editing && linked.isEmpty)
-            TextActionButton(
-              label: "I'll do this later",
-              dim: true,
-              onPressed: _next,
+      // Setup walks every category once. Editing is usually one thing, so it
+      // is the list of categories at the top instead of a walk.
+      footer: widget.editing
+          ? null
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                PrimaryButton(
+                  label: 'Next',
+                  onPressed: linked.isNotEmpty ? _next : null,
+                ),
+                // Nothing connected still has a way on: every category comes
+                // back thin, so the walk is all questions.
+                if (linked.isEmpty)
+                  TextActionButton(
+                    label: "I'll do this later",
+                    dim: true,
+                    onPressed: _next,
+                  ),
+              ],
             ),
-        ],
-      ),
       child: connections.when(
         loading: () => const LoadingView(),
         error: (e, _) => ErrorView(error: e, onRetry: _refetch),
@@ -406,6 +440,8 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
           padding: EdgeInsets.only(top: widget.editing ? 0 : 12, bottom: 22),
           children: [
             const _Heading(),
+            if (widget.editing)
+              if (_tilesGroup() case final group?) group,
             _ReadOnceCard(onTap: () => context.push(Routes.consent)),
             _StrengthCard(linked: linked, of: _sourceCount),
             for (final (header, sources) in _groups)

@@ -23,9 +23,14 @@ import '../../../shared/widgets/states.dart';
 /// ring in three seconds regardless of what was happening, which is the kind
 /// of thing that looks fine until a read fails and the app says it worked.
 class ReadingPage extends ConsumerStatefulWidget {
-  const ReadingPage({required this.runId, super.key});
+  const ReadingPage({required this.runId, this.editing = false, super.key});
 
   final String runId;
+
+  /// Started from Edit tiles. When the read lands with something in it, the
+  /// way on is that app's tiles, not the whole walk: somebody who refreshed
+  /// YouTube should not page through food and travel to reach it.
+  final bool editing;
 
   @override
   ConsumerState<ReadingPage> createState() => _ReadingPageState();
@@ -109,8 +114,30 @@ class _ReadingPageState extends ConsumerState<ReadingPage> {
       navBar: _watching
           ? AppNavBar(trailingLabel: 'Later', onTrailing: _back)
           : const AppNavBar(),
-      footer: finished ? PrimaryButton(label: 'Done', onPressed: _back) : null,
+      footer: finished ? _foot(run) : null,
       child: finished ? _result(run) : _reading(run),
+    );
+  }
+
+  Widget _foot(IngestionRun run) {
+    final pick = widget.editing &&
+        run.problem == null &&
+        run.status != RunStatus.empty &&
+        run.itemsFound > 0;
+    if (!pick) return PrimaryButton(label: 'Done', onPressed: _back);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        PrimaryButton(
+          label: 'Pick ${run.provider.label} tiles',
+          // In place of this screen, so the walk's last Save lands back on
+          // Edit tiles, where the refresh started.
+          onPressed: () => context.pushReplacement(
+            Routes.editCategoryAt(0, source: run.provider),
+          ),
+        ),
+        TextActionButton(label: 'Later', dim: true, onPressed: _back),
+      ],
     );
   }
 

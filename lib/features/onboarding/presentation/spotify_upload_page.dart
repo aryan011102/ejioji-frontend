@@ -26,7 +26,10 @@ import '../../../shared/widgets/states.dart';
 /// holds an address and an email) is left behind here, and the server refuses
 /// any element that is not a play in case something slips through.
 class SpotifyUploadPage extends ConsumerStatefulWidget {
-  const SpotifyUploadPage({super.key});
+  const SpotifyUploadPage({this.editing = false, super.key});
+
+  /// Opened from Edit tiles rather than setup; passed on to the reading screen.
+  final bool editing;
 
   @override
   ConsumerState<SpotifyUploadPage> createState() => _SpotifyUploadPageState();
@@ -147,7 +150,9 @@ class _SpotifyUploadPageState extends ConsumerState<SpotifyUploadPage> {
       }
 
       // Like Netflix, the run finishes inside the request.
-      context.pushReplacement('${Routes.reading}?run=${run.id}');
+      context.pushReplacement(
+        Routes.readingRun(run.id, editing: widget.editing),
+      );
     } on FormatException {
       if (mounted) {
         showAppToast(context, 'One of those files could not be read.');

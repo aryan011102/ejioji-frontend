@@ -25,7 +25,10 @@ import '../../../shared/widgets/states.dart';
 /// people's viewing, and the server refuses it by looking at the column names
 /// before it reads a single row.
 class NetflixUploadPage extends ConsumerStatefulWidget {
-  const NetflixUploadPage({super.key});
+  const NetflixUploadPage({this.editing = false, super.key});
+
+  /// Opened from Edit tiles rather than setup; passed on to the reading screen.
+  final bool editing;
 
   @override
   ConsumerState<NetflixUploadPage> createState() => _NetflixUploadPageState();
@@ -89,7 +92,9 @@ class _NetflixUploadPageState extends ConsumerState<NetflixUploadPage> {
 
       // The upload opens and finishes its run inside the request, so there is
       // nothing to poll: this goes straight to the result.
-      context.pushReplacement('${Routes.reading}?run=${run.id}');
+      context.pushReplacement(
+        Routes.readingRun(run.id, editing: widget.editing),
+      );
     } on ApiException catch (e) {
       if (mounted) showAppToast(context, e.message);
     } finally {

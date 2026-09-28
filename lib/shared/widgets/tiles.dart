@@ -128,10 +128,14 @@ class InsightTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final withMedia = hasMedia || mediaUrl != null;
-    final overMedia = withMedia || isTrack;
     // The person's own photo or video wins over the song's cover.
     final cover = mediaUrl == null && !hasMedia ? music?.artworkUrl : null;
-    final preview = isTrack && playMusic ? music?.previewUrl : null;
+    // Over a cover too, so a count about one artist stays readable on it.
+    final overMedia = withMedia || isTrack || cover != null;
+    // Any tile the server gave a song to: a song, or an artist, whose most
+    // played song it is. A count about one artist is not a name tile, and plays
+    // it all the same.
+    final preview = playMusic ? music?.previewUrl : null;
     final trackWidth = preview != null ? 118.0 : (isTrack ? 84.0 : 0.0);
 
     return AnimatedOpacity(

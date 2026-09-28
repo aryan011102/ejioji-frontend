@@ -79,6 +79,10 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
   bool _hasMore = false;
   bool _loadingOlder = false;
   bool _ended = false;
+
+  /// A photo sent here was refused as sexual, and a moderator has not looked
+  /// yet. Both people can read; neither can write.
+  bool _paused = false;
   bool _openingProfile = false;
   int _myRead = 0;
   int _theirRead = 0;
@@ -121,6 +125,7 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
         _hasMore = page.hasMore;
         _myRead = page.myReadSeq;
         _theirRead = page.theirReadSeq;
+        _paused = page.paused;
         _loading = false;
         _loadError = null;
       });
@@ -151,7 +156,10 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
           .messages(_matchId, after: _messages.last.seq);
       if (!mounted) return;
       _merge(page.messages);
-      setState(() => _theirRead = page.theirReadSeq);
+      setState(() {
+        _theirRead = page.theirReadSeq;
+        _paused = page.paused;
+      });
       unawaited(_markRead());
     } on NotFoundFailure {
       if (mounted) setState(() => _ended = true);
@@ -275,7 +283,13 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
       pending.mediaId = asset.id;
     } on ApiException catch (e) {
       if (!mounted) return;
-      setState(() => _pending.remove(pending));
+      setState(() {
+        _pending.remove(pending);
+        // Refused as sexual: the server has paused this chat too.
+        if (e.code == 'media_explicit' || e.code == 'conversation_paused') {
+          _paused = true;
+        }
+      });
       showAppToast(context, e.message);
       return;
     }
@@ -305,7 +319,10 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
       });
     } on ApiException catch (e) {
       if (!mounted) return;
-      setState(() => pending.failed = true);
+      setState(() {
+        pending.failed = true;
+        if (e.code == 'conversation_paused') _paused = true;
+      });
       showAppToast(context, e.message);
     }
   }
@@ -479,7 +496,11 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
           trailingLabel: _ended ? null : '···',
           onTrailing: _ended ? null : _menu,
         ),
-        footer: _ended ? _endedNote() : _composerBar(),
+        footer: _ended
+            ? _endedNote()
+            : _paused
+                ? _pausedNote()
+                : _composerBar(),
         child: _body(),
       ),
     );
@@ -584,6 +605,16 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
         padding: const EdgeInsets.only(bottom: 8),
         child: Text(
           'This conversation has ended.',
+          textAlign: TextAlign.center,
+          style: AppText.caption,
+        ),
+      );
+
+  Widget _pausedNote() => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+        child: Text(
+          'This chat is paused while we check a photo that was sent in it. '
+          'You can still read it.',
           textAlign: TextAlign.center,
           style: AppText.caption,
         ),

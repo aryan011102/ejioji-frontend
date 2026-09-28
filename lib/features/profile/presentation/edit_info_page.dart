@@ -43,6 +43,8 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
   Education? _education;
   Pronouns? _pronouns;
   String? _company;
+  Habit? _smoking;
+  Habit? _drinking;
 
   bool _dirty = false;
   bool _saving = false;
@@ -93,6 +95,8 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
             education: _education,
             pronouns: _pronouns,
             company: (_company ?? '').trim().isEmpty ? null : _company!.trim(),
+            smoking: _smoking,
+            drinking: _drinking,
           );
       final profile = await ref.read(profileRepositoryProvider).load();
       if (!mounted) return;
@@ -219,6 +223,57 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
     }
   }
 
+  /// One sheet for either habit: the server's options, labelled the way the
+  /// chip will read, and a way back to not stated once one is chosen.
+  Future<Habit?> _pickHabit(
+    String title,
+    List<({String key, String label})> offered,
+    Habit? current,
+  ) async {
+    final choice = await showAppActionSheet(
+      context,
+      title: title,
+      actions: [
+        for (final o in offered) SheetAction(o.label),
+        if (current != null) const SheetAction('Not stated', destructive: true),
+      ],
+    );
+    if (choice == null) return current;
+    return choice < offered.length ? Habit.parse(offered[choice].key) : null;
+  }
+
+  Future<void> _pickSmoking() async {
+    final offered = ref.read(profileOptionsProvider).valueOrNull?.smoking ?? [];
+    if (offered.isEmpty) return;
+    final picked = await _pickHabit(
+      'Smoking',
+      [for (final o in offered) (key: o.key, label: o.label)],
+      _smoking,
+    );
+    if (picked != _smoking) {
+      setState(() {
+        _smoking = picked;
+        _dirty = true;
+      });
+    }
+  }
+
+  Future<void> _pickDrinking() async {
+    final offered = ref.read(profileOptionsProvider).valueOrNull?.drinking ?? [];
+    if (offered.isEmpty) return;
+    final picked = await _pickHabit(
+      'Drinking',
+      [for (final o in offered) (key: o.key, label: o.label)],
+      _drinking,
+    );
+    if (picked != _drinking) {
+      setState(() {
+        _drinking = picked;
+        _dirty = true;
+      });
+    }
+  }
+
   Future<void> _pickDate() async {
     final now = DateTime.now();
     final picked = await showDatePicker(
@@ -297,6 +352,8 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
       _education = details.education;
       _pronouns = details.pronouns;
       _company = details.company;
+      _smoking = details.smoking;
+      _drinking = details.drinking;
     }
 
     return AppScaffold(
@@ -425,6 +482,25 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
                   placeholder: 'Optional',
                   last: true,
                   onTap: _editCompany,
+                ),
+              ],
+            ),
+            SectionGroup(
+              header: 'Habits',
+              footer: 'Both optional. Shown on your profile as you put them.',
+              children: [
+                FieldRow(
+                  label: 'Smoking',
+                  value: _smoking?.smokingLabel,
+                  placeholder: 'Optional',
+                  onTap: _pickSmoking,
+                ),
+                FieldRow(
+                  label: 'Drinking',
+                  value: _drinking?.drinkingLabel,
+                  placeholder: 'Optional',
+                  last: true,
+                  onTap: _pickDrinking,
                 ),
               ],
             ),

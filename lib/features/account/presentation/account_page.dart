@@ -121,7 +121,7 @@ class _ProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = profile?.profile?.firstName ?? '';
+    final name = profile?.profile?.displayName ?? '';
     final photos = profile?.photos.length ?? 0;
     final tiles = profile?.tiles.length ?? 0;
 

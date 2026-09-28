@@ -221,7 +221,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         );
       }
       return _wall(
-        name: person.firstName,
+        name: person.displayName,
         pronouns: person.pronouns,
         verified: person.verified,
         chips: [
@@ -231,6 +231,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             languages: person.languages,
             education: person.education,
             company: person.company,
+            smoking: person.smoking,
+            drinking: person.drinking,
           ),
           // Only a match's card carries any: the server hands socials over with
           // a match and never with a feed card or a request.
@@ -262,7 +264,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       data: (profile) {
         final details = profile.profile;
         return _wall(
-          name: details?.firstName ?? '',
+          name: details?.displayName ?? '',
           pronouns: details?.pronouns,
           verified: profile.verified,
           chips: details == null
@@ -274,6 +276,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     languages: details.languages,
                     education: details.education,
                     company: details.company,
+                    smoking: details.smoking,
+                    drinking: details.drinking,
                   ),
                   ..._socialChips(mySocials),
                 ],
@@ -531,6 +535,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     required List<Language> languages,
     required Education? education,
     required String? company,
+    required Habit? smoking,
+    required Habit? drinking,
   }) {
     return [
       _Fact('📍', city.label),
@@ -545,6 +551,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   '+${languages.length - 2}',
         ),
       if (education != null) _Fact('💻', education.label),
+      if (smoking != null) _Fact('🚬', smoking.smokingLabel),
+      if (drinking != null) _Fact('🍷', drinking.drinkingLabel),
     ];
   }
 
@@ -603,6 +611,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                           Flexible(
                             child: Text(
                               name,
+                              maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: AppText.title1.copyWith(
                                 fontSize: 29,

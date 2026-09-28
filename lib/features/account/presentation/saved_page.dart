@@ -89,7 +89,7 @@ class SavedPage extends ConsumerWidget {
                       children: [
                         for (final s in list.saved)
                           AppRow(
-                            label: '${s.person.firstName}, ${s.person.age}',
+                            label: '${s.person.displayName}, ${s.person.age}',
                             subtitle: _when(s.savedAt),
                             last: s == list.saved.last,
                             leading: Avatar(

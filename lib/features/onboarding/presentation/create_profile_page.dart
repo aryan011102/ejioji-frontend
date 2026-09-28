@@ -48,6 +48,13 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
   City? _city;
   final _languages = <Language>{};
   Education? _education;
+
+  // Not asked on this screen, only carried: saving leaves out nothing it was
+  // not given, so somebody who comes back here keeps what they set in Edit
+  // info.
+  Pronouns? _pronouns;
+  Habit? _smoking;
+  Habit? _drinking;
   bool _saving = false;
   bool _seeded = false;
 
@@ -168,8 +175,11 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
                 if (_languages.contains(l)) l,
             ],
             education: _education,
+            pronouns: _pronouns,
             company:
                 _company.text.trim().isEmpty ? null : _company.text.trim(),
+            smoking: _smoking,
+            drinking: _drinking,
           );
       final profile = await ref.read(profileRepositoryProvider).load();
       if (!mounted) return;
@@ -201,6 +211,9 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
       _languages.addAll(existing.languages);
       _education = existing.education;
       _company.text = existing.company ?? '';
+      _pronouns = existing.pronouns;
+      _smoking = existing.smoking;
+      _drinking = existing.drinking;
     }
 
     return AppScaffold(

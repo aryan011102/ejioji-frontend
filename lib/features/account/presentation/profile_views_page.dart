@@ -112,7 +112,7 @@ class ProfileViewsPage extends ConsumerWidget {
                       children: [
                         for (final v in seen.visitors)
                           AppRow(
-                            label: '${v.person.firstName}, ${v.person.age}',
+                            label: '${v.person.displayName}, ${v.person.age}',
                             subtitle: _when(v),
                             last: v == seen.visitors.last,
                             leading: Avatar(

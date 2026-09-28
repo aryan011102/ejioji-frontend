@@ -77,6 +77,7 @@ class CategoryPage extends ConsumerStatefulWidget {
     required this.index,
     required this.editing,
     this.source,
+    this.single = false,
     super.key,
   });
 
@@ -86,6 +87,10 @@ class CategoryPage extends ConsumerStatefulWidget {
   /// Set when this was opened from one app's card, which makes the walk that
   /// app's categories instead of all of them. [index] counts within the walk.
   final SourceProvider? source;
+
+  /// Opened from the list on Edit tiles: one category, and Save goes back to
+  /// the list. Editing is usually one thing, so it is not a walk.
+  final bool single;
 
   @override
   ConsumerState<CategoryPage> createState() => _CategoryPageState();
@@ -100,6 +105,19 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
   /// count.
   static const _perCategory = 2;
   static const _maxTiles = 10;
+
+  /// And what it takes to be shown at all (`PUBLISH_MIN_TILES` and
+  /// `PUBLISH_MIN_CATEGORIES`). Said up front on every category, because a
+  /// rule you only meet as a refusal reads as the app being difficult.
+  static const _minTiles = 6;
+  static const _minCategories = 3;
+
+  /// The running count under the heading: everything on the profile, this
+  /// category's picks included, against the rules.
+  String _tally(int total) => total < _minTiles
+      ? '$total of $_minTiles needed to be shown, from at least '
+          '$_minCategories categories. Up to $_maxTiles in all.'
+      : '$total on your profile, up to $_maxTiles. Enough to be shown.';
 
   Set<_Choice>? _picked;
 
@@ -162,6 +180,10 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
     try {
       await _save(category, current);
       if (!mounted) return;
+      if (widget.single) {
+        context.pop();
+        return;
+      }
       if (widget.editing) {
         _leave(count);
         return;
@@ -276,22 +298,28 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
       navBar: AppNavBar(
         backLabel: 'Back',
         onBack: () => context.pop(),
-        trailingLabel: !widget.editing
-            ? 'Skip'
-            : widget.index < categories.length - 1
-                ? 'Next'
-                : null,
-        onTrailing: !widget.editing
-            ? () => _advance(categories.length)
-            : widget.index < categories.length - 1
-                ? () => _leave(categories.length)
-                : null,
+        trailingLabel: widget.single
+            ? null
+            : !widget.editing
+                ? 'Skip'
+                : widget.index < categories.length - 1
+                    ? 'Next'
+                    : null,
+        onTrailing: widget.single
+            ? null
+            : !widget.editing
+                ? () => _advance(categories.length)
+                : widget.index < categories.length - 1
+                    ? () => _leave(categories.length)
+                    : null,
       ),
       footer: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           PrimaryButton(
-            label: widget.editing
+            label: widget.single
+                ? 'Save ${picked.length} on your profile'
+                : widget.editing
                 ? widget.index < categories.length - 1
                     ? 'Save ${picked.length} and next'
                     : 'Save ${picked.length} on your profile'
@@ -365,6 +393,11 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                               : 'Pick up to two, and put a photo or video '
                                   'behind any of them.',
                       style: AppText.callout.copyWith(fontSize: 14),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _tally(_elsewhere + picked.length),
+                      style: AppText.caption,
                     ),
                   ],
                 ),

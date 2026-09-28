@@ -21,10 +21,18 @@ abstract final class Routes {
   static const netflixUpload = '/onboarding/connect/netflix';
   static const spotifyUpload = '/onboarding/connect/spotify';
 
+  /// An upload page, carrying `?edit=1` from Edit tiles so the reading screen
+  /// after it knows it is not in setup.
+  static String upload(String page, {required bool editing}) =>
+      editing ? '$page?edit=1' : page;
+
   /// Carries `?run=<id>`: the run it is watching. There is no such thing as
   /// this screen without one.
   static const reading = '/onboarding/reading';
-  static String readingRun(String runId) => '/onboarding/reading?run=$runId';
+  /// [editing] is a read started from Edit tiles: when it lands, the screen
+  /// offers that app's tiles straight away instead of the whole walk.
+  static String readingRun(String runId, {bool editing = false}) =>
+      '/onboarding/reading?run=$runId${editing ? '&edit=1' : ''}';
   static const ready = '/onboarding/ready';
   static const pickCategory = '/onboarding/insights/:index';
   static String pickCategoryAt(int i) => '/onboarding/insights/$i';
@@ -100,6 +108,10 @@ abstract final class Routes {
   /// and moving.
   static String editCategoryAt(int i, {SourceProvider? source}) =>
       '/you/profile/insights/$i${source == null ? '' : '?source=${source.wire}'}';
+
+  /// One category on its own, from the list on Edit tiles: saving goes back
+  /// to the list rather than on to the next.
+  static String editCategoryOnly(int i) => '/you/profile/insights/$i?one=1';
 
   static const settings = '/you/settings';
   static const profileViews = '/you/settings/views';

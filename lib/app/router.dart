@@ -119,16 +119,22 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.netflixUpload,
-        builder: (_, __) => const NetflixUploadPage(),
+        builder: (_, state) => NetflixUploadPage(
+          editing: state.uri.queryParameters['edit'] == '1',
+        ),
       ),
       GoRoute(
         path: Routes.spotifyUpload,
-        builder: (_, __) => const SpotifyUploadPage(),
+        builder: (_, state) => SpotifyUploadPage(
+          editing: state.uri.queryParameters['edit'] == '1',
+        ),
       ),
       GoRoute(
         path: Routes.reading,
-        builder: (_, state) =>
-            ReadingPage(runId: state.uri.queryParameters['run'] ?? ''),
+        builder: (_, state) => ReadingPage(
+          runId: state.uri.queryParameters['run'] ?? '',
+          editing: state.uri.queryParameters['edit'] == '1',
+        ),
       ),
       GoRoute(
         path: Routes.pickCategory,
@@ -277,6 +283,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             index: int.tryParse(state.pathParameters['index'] ?? '0') ?? 0,
             editing: true,
             source: source == SourceProvider.unknown ? null : source,
+            single: state.uri.queryParameters['one'] == '1',
           );
         },
       ),

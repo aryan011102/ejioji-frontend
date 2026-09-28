@@ -20,6 +20,7 @@ import '../../../shared/models/chat.dart';
 import '../../../shared/models/enums.dart';
 import '../../../shared/models/person.dart';
 import '../../../shared/models/tile.dart';
+import '../../../shared/widgets/capture_shield.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/pressable.dart';
 import '../../../shared/widgets/quoted_tile.dart';
@@ -465,19 +466,22 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
       ..watch(conversationsProvider);
     final name = _person?.displayName ?? 'Chat';
 
-    return AppScaffold(
-      navBar: AppNavBar(
-        title: name,
-        // No door once the match is over: there is nothing on the other side.
-        // None on a founder conversation either: it is text only.
-        onTitle: _ended || _person == null || _founderLine ? null : _openProfile,
-        backLabel: 'Chats',
-        onBack: () => context.pop(),
-        trailingLabel: _ended ? null : '···',
-        onTrailing: _ended ? null : _menu,
+    // Their words and the photos they send stay out of screenshots.
+    return CaptureShield(
+      child: AppScaffold(
+        navBar: AppNavBar(
+          title: name,
+          // No door once the match is over: there is nothing on the other side.
+          // None on a founder conversation either: it is text only.
+          onTitle: _ended || _person == null || _founderLine ? null : _openProfile,
+          backLabel: 'Chats',
+          onBack: () => context.pop(),
+          trailingLabel: _ended ? null : '···',
+          onTrailing: _ended ? null : _menu,
+        ),
+        footer: _ended ? _endedNote() : _composerBar(),
+        child: _body(),
       ),
-      footer: _ended ? _endedNote() : _composerBar(),
-      child: _body(),
     );
   }
 

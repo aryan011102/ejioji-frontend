@@ -95,6 +95,7 @@ class MessagePage {
     required this.myReadSeq,
     required this.theirReadSeq,
     this.openers = const [],
+    this.paused = false,
   });
 
   final List<Message> messages;
@@ -105,12 +106,17 @@ class MessagePage {
   final int myReadSeq;
   final int theirReadSeq;
 
+  /// Readable, but nobody can write until a moderator has looked at a photo
+  /// the server refused in it.
+  final bool paused;
+
   static MessagePage fromJson(Json j) => MessagePage(
         messages: Message.listFrom(j.objects('messages')),
         hasMore: j.flag('has_more'),
         myReadSeq: j.intOr('my_read_seq', 0),
         theirReadSeq: j.intOr('their_read_seq', 0),
         openers: j.objects('openers').map(Opener.fromJson).toList(growable: false),
+        paused: j.flag('paused'),
       );
 }
 

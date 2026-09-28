@@ -296,8 +296,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     PublishState? publish,
   }) {
     final shown = _ordered(tiles);
-    final columnsUsed =
-        shown.fold<int>(0, (sum, t) => sum + t.tileSize.columns);
 
     return AppScaffold(
       navBar: _topBar(context, person),
@@ -370,8 +368,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   children: [
                     // First, so it is always in the top row: the grid packs
                     // from the top, so the first item takes the top left.
-                    // Small or wide by what keeps the rows even, so the move
-                    // up does not leave a hole at the foot of the wall.
+                    // Always square, whatever else is on the wall, so a photo
+                    // is never cropped wide. The rows may then come out one
+                    // square short at the foot of the wall.
                     // Every photo on the profile, the main one included, so
                     // the tile is the one place to page through all of them.
                     // The main one goes last rather than first: it is already
@@ -379,9 +378,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     // on it again reads as the same photo twice.
                     if (photos.isNotEmpty)
                       BentoItem(
-                        size: columnsUsed.isOdd
-                            ? TileSize.small
-                            : TileSize.wide,
+                        size: TileSize.small,
                         child: PhotosTile(
                           photoUrls: [
                             for (final p in [...photos.skip(1), photos.first])

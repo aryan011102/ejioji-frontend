@@ -347,7 +347,7 @@ void main() {
       expect(Pronouns.parse(null), isNull);
     });
 
-    test('a card carries what the header shows, and never a surname', () {
+    test('a card carries what the header shows, full name included', () {
       final card = Candidate.fromJson({
         'user_id': '11111111-1111-1111-1111-111111111111',
         'first_name': 'Ananya',
@@ -363,9 +363,59 @@ void main() {
       expect(card.company, 'Zomato');
       expect(card.languages, [Language.hindi, Language.english]);
       expect(card.education, Education.bachelors);
-      // A surname beside purchase history is the caste inference, so a card has
-      // no field for one however much the server sends.
+      // Shown to everyone since 2026-09-28: labels use the full name, sentences
+      // the first.
       expect(card.firstName, 'Ananya');
+      expect(card.displayName, 'Ananya Garg');
+    });
+  });
+
+  group('full names', () {
+    test('are the first name alone without a last one', () {
+      expect(fullName('Ananya', null), 'Ananya');
+      expect(fullName('Ananya', ''), 'Ananya');
+      expect(fullName(null, 'Garg'), isNull);
+      expect(
+        Person.fromJson({'user_id': 'x', 'first_name': 'Ananya'}).displayName,
+        'Ananya',
+      );
+      expect(
+        BlockedPerson.fromJson({
+          'user_id': 'x',
+          'blocked_at': '2026-09-28T10:00:00Z',
+          'first_name': 'Ananya',
+          'last_name': 'Garg',
+        }).displayName,
+        'Ananya Garg',
+      );
+    });
+  });
+
+  group('habits', () {
+    test('are not stated unless the server says so', () {
+      final card = Candidate.fromJson({
+        'user_id': '11111111-1111-1111-1111-111111111111',
+        'first_name': 'Ananya',
+        'age': 28,
+        'city': 'bengaluru',
+      });
+      expect(card.smoking, isNull);
+      expect(card.drinking, isNull);
+    });
+
+    test('read the closed scale, and label each the way its chip reads', () {
+      final card = Candidate.fromJson({
+        'user_id': '11111111-1111-1111-1111-111111111111',
+        'first_name': 'Ananya',
+        'age': 28,
+        'city': 'bengaluru',
+        'smoking': 'never',
+        'drinking': 'socially',
+      });
+      expect(card.smoking!.smokingLabel, "Doesn't smoke");
+      expect(card.drinking!.drinkingLabel, 'Drinks socially');
+      expect(Habit.parse('daily'), isNull);
+      expect(Habit.parse(null), isNull);
     });
   });
 }

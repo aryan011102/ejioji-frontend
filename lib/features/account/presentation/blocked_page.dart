@@ -91,7 +91,7 @@ class _BlockedPageState extends ConsumerState<BlockedPage> {
                     children: [
                       for (final person in people)
                         AppRow(
-                          label: person.firstName ?? 'Someone',
+                          label: person.displayName,
                           subtitle: _since(person.blockedAt),
                           last: person == people.last,
                           leading: Avatar(

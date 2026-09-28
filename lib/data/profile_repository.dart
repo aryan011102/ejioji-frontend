@@ -41,6 +41,8 @@ class ProfileRepository {
     Education? education,
     Pronouns? pronouns,
     String? company,
+    Habit? smoking,
+    Habit? drinking,
   }) async {
     final body = await _api.put(
       Api.profile,
@@ -54,6 +56,8 @@ class ProfileRepository {
         'education': education?.wire,
         'pronouns': pronouns?.wire,
         'company': company,
+        'smoking': smoking?.wire,
+        'drinking': drinking?.wire,
       },
     );
     return Profile.fromJson(body);

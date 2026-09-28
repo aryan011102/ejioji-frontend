@@ -320,7 +320,7 @@ class _SentList extends ConsumerWidget {
                 children: [
                   for (final r in out.requests)
                     AppRow(
-                      label: r.person.firstName,
+                      label: r.person.displayName,
                       subtitle: r.tile == null
                           ? 'Asked ${relativeTime(r.requestedAt)} ago'
                           : 'Asked about a tile '
@@ -440,7 +440,7 @@ class _RequestCard extends StatelessWidget {
                           children: [
                             Expanded(
                               child: Text(
-                                '${person.firstName}, ${person.age}',
+                                '${person.displayName}, ${person.age}',
                                 style: AppText.title3.copyWith(fontSize: 19),
                               ),
                             ),

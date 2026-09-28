@@ -214,6 +214,30 @@ enum Pronouns {
   }
 }
 
+/// How often, for smoking and for drinking: one scale, stated by the person.
+/// Null means not stated, which shows no chip.
+///
+/// The labels are the server's (`/profile/options`) word for word, so a card
+/// reads the way the choice was put.
+enum Habit {
+  never('never', "Doesn't smoke", "Doesn't drink"),
+  socially('socially', 'Smokes socially', 'Drinks socially'),
+  regularly('regularly', 'Smokes regularly', 'Drinks regularly');
+
+  const Habit(this.wire, this.smokingLabel, this.drinkingLabel);
+
+  final String wire;
+  final String smokingLabel;
+  final String drinkingLabel;
+
+  static Habit? parse(String? raw) {
+    for (final value in values) {
+      if (value.wire == raw) return value;
+    }
+    return null;
+  }
+}
+
 enum TileCategory {
   foodDelivery('food_delivery', 'Food delivery', '🍜'),
   goingOut('going_out', 'Going out', '🎟️'),

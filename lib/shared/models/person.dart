@@ -6,6 +6,13 @@ import 'media.dart';
 import 'social.dart';
 import 'tile.dart';
 
+/// First and last name when there is a last name, the first alone when not,
+/// and null with no first name at all.
+String? fullName(String? first, String? last) {
+  if (first == null || first.isEmpty) return null;
+  return last == null || last.isEmpty ? first : '$first $last';
+}
+
 /// Someone as the feed shows them.
 ///
 /// This is everything a stranger is allowed to see, and the server decides
@@ -17,12 +24,15 @@ class Candidate {
   const Candidate({
     required this.userId,
     required this.firstName,
+    this.lastName,
     required this.age,
     required this.city,
     this.languages = const [],
     this.education,
     this.pronouns,
     this.company,
+    this.smoking,
+    this.drinking,
     required this.photos,
     required this.tiles,
     this.socials = const [],
@@ -31,16 +41,22 @@ class Candidate {
 
   final String userId;
   final String firstName;
+
+  /// Shown to everyone since 2026-09-28 (backend decision log), knowingly:
+  /// before that it was its owner's alone, because a surname beside purchase
+  /// history is the caste inference.
+  final String? lastName;
   final int age;
   final City city;
 
-  /// The same three the header shows on your own profile, so a card reads the
-  /// same way. The surname is deliberately not here: it is shown to its owner
-  /// alone, because a surname beside purchase history is the caste inference.
+  /// The same facts the header shows on your own profile, so a card reads the
+  /// same way.
   final List<Language> languages;
   final Education? education;
   final Pronouns? pronouns;
   final String? company;
+  final Habit? smoking;
+  final Habit? drinking;
   final List<MediaAsset> photos;
   final List<ProfileTile> tiles;
 
@@ -52,15 +68,22 @@ class Candidate {
   /// checked.
   final bool verified;
 
+  /// The name that labels them: first and last when there is a last name.
+  /// Sentences ("Chat with ...") use [firstName].
+  String get displayName => fullName(firstName, lastName) ?? firstName;
+
   Candidate withSocials(List<SocialLink> socials) => Candidate(
         userId: userId,
         firstName: firstName,
+        lastName: lastName,
         age: age,
         city: city,
         languages: languages,
         education: education,
         pronouns: pronouns,
         company: company,
+        smoking: smoking,
+        drinking: drinking,
         photos: photos,
         tiles: tiles,
         socials: socials,
@@ -72,6 +95,7 @@ class Candidate {
   static Candidate fromJson(Json j) => Candidate(
         userId: j.str('user_id'),
         firstName: j.str('first_name'),
+        lastName: j.strOrNull('last_name'),
         age: j.intOr('age', 0),
         city: City.parse(j.strOrNull('city')),
         languages: [
@@ -81,6 +105,8 @@ class Candidate {
         education: Education.parse(j.strOrNull('education')),
         pronouns: Pronouns.parse(j.strOrNull('pronouns')),
         company: j.strOrNull('company'),
+        smoking: Habit.parse(j.strOrNull('smoking')),
+        drinking: Habit.parse(j.strOrNull('drinking')),
         photos: MediaAsset.listFrom(j.objects('photos')),
         tiles: ProfileTile.listFrom(j.objects('tiles')),
         verified: j.flag('verified'),
@@ -109,19 +135,26 @@ class FeedPage {
 /// The small form of a person, for a chat list row.
 @immutable
 class Person {
-  const Person({required this.userId, this.firstName, this.photo});
+  const Person({
+    required this.userId,
+    this.firstName,
+    this.lastName,
+    this.photo,
+  });
 
   final String userId;
   final String? firstName;
+  final String? lastName;
   final MediaAsset? photo;
 
-  String get displayName => firstName ?? 'Someone';
+  String get displayName => fullName(firstName, lastName) ?? 'Someone';
 
   static Person fromJson(Json j) {
     final photo = j.objectOrNull('photo');
     return Person(
       userId: j.str('user_id'),
       firstName: j.strOrNull('first_name'),
+      lastName: j.strOrNull('last_name'),
       photo: photo == null ? null : MediaAsset.fromJson(photo),
     );
   }
@@ -315,15 +348,17 @@ class BlockedPerson {
     required this.userId,
     required this.blockedAt,
     this.firstName,
+    this.lastName,
     this.photo,
   });
 
   final String userId;
   final DateTime blockedAt;
   final String? firstName;
+  final String? lastName;
   final MediaAsset? photo;
 
-  String get displayName => firstName ?? 'Someone';
+  String get displayName => fullName(firstName, lastName) ?? 'Someone';
 
   static BlockedPerson fromJson(Json j) {
     final photo = j.objectOrNull('photo');
@@ -331,6 +366,7 @@ class BlockedPerson {
       userId: j.str('user_id'),
       blockedAt: j.time('blocked_at'),
       firstName: j.strOrNull('first_name'),
+      lastName: j.strOrNull('last_name'),
       photo: photo == null ? null : MediaAsset.fromJson(photo),
     );
   }

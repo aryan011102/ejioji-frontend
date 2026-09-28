@@ -272,8 +272,9 @@ class WhatOthersSeePage extends StatelessWidget {
         _Section('Anyone shown your profile', [
           (
             'About you',
-            'Your first name, age and city, and your pronouns, languages and '
-                'education if you added them.',
+            'Your first name, age and city, and your last name, pronouns, '
+                'languages, education, company, smoking and drinking if you '
+                'added them.',
           ),
           ('Your photos', 'The photos on your profile, in your order.'),
           (

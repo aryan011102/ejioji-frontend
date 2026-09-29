@@ -117,8 +117,14 @@ class MatchingRepository {
   /// Unmatching is final for both, and closes the conversation. It is kept
   /// for fourteen days before deletion, so a report filed late still has its
   /// evidence.
-  Future<void> unmatch(String matchId) =>
-      _api.deleteEmpty(Api.endMatch(matchId));
+  ///
+  /// [reason] is why, a server `UnmatchReason` key, or null for not saying.
+  /// The other person is never told it.
+  Future<void> unmatch(String matchId, {String? reason}) => _api.deleteEmpty(
+        reason == null
+            ? Api.endMatch(matchId)
+            : '${Api.endMatch(matchId)}?reason=${Uri.encodeQueryComponent(reason)}',
+      );
 
   /// Hides someone for thirty days, one-sided. Not permanent, because with
   /// one launch city permanent passes would empty the feed.

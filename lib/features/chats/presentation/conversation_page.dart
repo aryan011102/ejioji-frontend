@@ -26,6 +26,7 @@ import '../../../shared/widgets/pressable.dart';
 import '../../../shared/widgets/quoted_tile.dart';
 import '../../../shared/widgets/sheets.dart';
 import '../../../shared/widgets/states.dart';
+import 'unmatch_reason_sheet.dart';
 import 'verify_to_chat.dart';
 
 /// One conversation, from the server.
@@ -481,17 +482,43 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
     await options[choice].$2();
   }
 
+  /// Asks why, and the answer is the confirmation. A reason a moderator
+  /// should see (not genuine, rude) offers a report instead, which unmatches
+  /// too and puts it in front of the team.
   Future<void> _unmatch(String name) async {
-    final choice = await showAppActionSheet(
-      context,
-      title: 'Unmatch $name?',
-      message: 'The chat closes for both of you and cannot be reopened. You '
-          'will not be shown to each other again.',
-      actions: const [SheetAction('Unmatch', destructive: true)],
-    );
-    if (choice != 0 || !mounted) return;
+    final answer = await showUnmatchReasonSheet(context, name: name);
+    if (answer == null || !mounted) return;
+    final reason = answer.reason;
+    if (reason != null && reason.safety) {
+      final choice = await showAppActionSheet(
+        context,
+        title: 'Report $name instead?',
+        message: 'Reporting unmatches you too, and our team takes a look. '
+            '$name is never told.',
+        actions: [
+          SheetAction('Report $name', destructive: true),
+          const SheetAction('Just unmatch'),
+        ],
+      );
+      if (choice == null || !mounted) return;
+      final person = _person;
+      if (choice == 0 && person != null) {
+        unawaited(
+          context.push<void>(
+            Routes.reportFor(
+              person.userId,
+              name: person.firstName,
+              matchId: _matchId,
+            ),
+          ),
+        );
+        return;
+      }
+    }
     try {
-      await ref.read(matchingRepositoryProvider).unmatch(_matchId);
+      await ref
+          .read(matchingRepositoryProvider)
+          .unmatch(_matchId, reason: reason?.key);
       if (!mounted) return;
       ref
         ..invalidate(conversationsProvider)

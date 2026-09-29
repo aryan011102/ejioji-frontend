@@ -96,6 +96,7 @@ class MessagePage {
     required this.theirReadSeq,
     this.openers = const [],
     this.paused = false,
+    this.verificationRequired = false,
   });
 
   final List<Message> messages;
@@ -110,6 +111,11 @@ class MessagePage {
   /// the server refused in it.
   final bool paused;
 
+  /// The person reading cannot write or send a photo here until they verify
+  /// their profile. Reading is never gated. A founder conversation never needs
+  /// it.
+  final bool verificationRequired;
+
   static MessagePage fromJson(Json j) => MessagePage(
         messages: Message.listFrom(j.objects('messages')),
         hasMore: j.flag('has_more'),
@@ -117,6 +123,7 @@ class MessagePage {
         theirReadSeq: j.intOr('their_read_seq', 0),
         openers: j.objects('openers').map(Opener.fromJson).toList(growable: false),
         paused: j.flag('paused'),
+        verificationRequired: j.flag('verification_required'),
       );
 }
 

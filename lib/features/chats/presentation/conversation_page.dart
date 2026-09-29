@@ -26,6 +26,7 @@ import '../../../shared/widgets/pressable.dart';
 import '../../../shared/widgets/quoted_tile.dart';
 import '../../../shared/widgets/sheets.dart';
 import '../../../shared/widgets/states.dart';
+import 'verify_to_chat.dart';
 
 /// One conversation, from the server.
 ///
@@ -83,6 +84,11 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
   /// A photo sent here was refused as sexual, and a moderator has not looked
   /// yet. Both people can read; neither can write.
   bool _paused = false;
+
+  /// This person cannot write here until they verify their profile. They can
+  /// read. The server says so; the popup is shown once per visit.
+  bool _mustVerify = false;
+  bool _toldToVerify = false;
   bool _openingProfile = false;
   int _myRead = 0;
   int _theirRead = 0;
@@ -126,10 +132,12 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
         _myRead = page.myReadSeq;
         _theirRead = page.theirReadSeq;
         _paused = page.paused;
+        _mustVerify = page.verificationRequired;
         _loading = false;
         _loadError = null;
       });
       unawaited(_markRead());
+      if (_mustVerify && !_paused) _tellToVerifyOnce();
     } on NotFoundFailure {
       if (mounted) {
         setState(() {
@@ -159,6 +167,7 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
       setState(() {
         _theirRead = page.theirReadSeq;
         _paused = page.paused;
+        _mustVerify = page.verificationRequired;
       });
       unawaited(_markRead());
     } on NotFoundFailure {
@@ -266,6 +275,7 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
 
   Future<void> _sendPhoto() async {
     if (_ended) return;
+    if (_mustVerify) return _askToVerify();
     final picked = await _picker.pickImage(
       source: ImageSource.gallery,
       maxWidth: 2400,
@@ -289,8 +299,13 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
         if (e.code == 'media_explicit' || e.code == 'conversation_paused') {
           _paused = true;
         }
+        if (e.code == 'verification_required') _mustVerify = true;
       });
-      showAppToast(context, e.message);
+      if (e.code == 'verification_required') {
+        await _askToVerify();
+      } else {
+        showAppToast(context, e.message);
+      }
       return;
     }
     await _deliver(pending);
@@ -322,9 +337,46 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
       setState(() {
         pending.failed = true;
         if (e.code == 'conversation_paused') _paused = true;
+        if (e.code == 'verification_required') _mustVerify = true;
       });
-      showAppToast(context, e.message);
+      // Kept as failed, not dropped: once they have verified, tapping it sends
+      // the same message.
+      if (e.code == 'verification_required') {
+        await _askToVerify();
+      } else {
+        showAppToast(context, e.message);
+      }
     }
+  }
+
+  // Verifying.
+
+  /// The popup, the first time this chat is opened needing it.
+  void _tellToVerifyOnce() {
+    if (_toldToVerify) return;
+    _toldToVerify = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_askToVerify());
+    });
+  }
+
+  /// Explains, and if they choose to, takes them to verify. Coming back, the
+  /// page asks the server again, which is what decides.
+  Future<void> _askToVerify() async {
+    _toldToVerify = true;
+    final verify = await showVerifyToChatSheet(
+      context,
+      name: _founderLine ? null : _person?.firstName,
+    );
+    if (!verify || !mounted) return;
+    await _goVerify();
+  }
+
+  Future<void> _goVerify() async {
+    await context.push<void>(Routes.verify);
+    if (!mounted) return;
+    ref.invalidate(verificationProvider);
+    await _catchUp();
   }
 
   // The menu.
@@ -500,7 +552,9 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
             ? _endedNote()
             : _paused
                 ? _pausedNote()
-                : _composerBar(),
+                : _mustVerify
+                    ? VerifyToChatBar(onVerify: () => unawaited(_goVerify()))
+                    : _composerBar(),
         child: _body(),
       ),
     );

@@ -86,6 +86,45 @@ class Opener {
       );
 }
 
+/// Days in a row on which both people wrote, in Indian time. The server sends
+/// one only while it runs and from two days, so null means nothing to show.
+@immutable
+class Streak {
+  const Streak({
+    required this.days,
+    required this.startedOn,
+    this.milestone,
+    this.line,
+  });
+
+  final int days;
+
+  /// The day it began, as the server wrote it (`2026-09-27`). A streak that
+  /// breaks and starts again has a new one, so its milestones pop up again.
+  final String startedOn;
+
+  /// The highest milestone reached (3, 5, 10, 30, 50, 100), if any, and what
+  /// its popup says. Shown once per streak per phone.
+  final int? milestone;
+  final String? line;
+
+  /// Identifies the popup for this milestone of this streak.
+  String? popupKey(String matchId) =>
+      milestone == null ? null : 'streak:$matchId:$startedOn:$milestone';
+
+  static Streak? maybe(Json j, String key) {
+    final s = j.objectOrNull(key);
+    if (s == null) return null;
+    final m = s.objectOrNull('milestone');
+    return Streak(
+      days: s.intOr('days', 0),
+      startedOn: s.str('started_on'),
+      milestone: m?.intOr('days', 0),
+      line: m?.strOrNull('line'),
+    );
+  }
+}
+
 /// A page of a conversation, oldest-first, with both read marks.
 @immutable
 class MessagePage {
@@ -97,9 +136,13 @@ class MessagePage {
     this.openers = const [],
     this.paused = false,
     this.verificationRequired = false,
+    this.streak,
   });
 
   final List<Message> messages;
+
+  /// Days in a row they have both been writing, while it runs.
+  final Streak? streak;
 
   /// On every page, at most two.
   final List<Opener> openers;
@@ -124,6 +167,7 @@ class MessagePage {
         openers: j.objects('openers').map(Opener.fromJson).toList(growable: false),
         paused: j.flag('paused'),
         verificationRequired: j.flag('verification_required'),
+        streak: Streak.maybe(j, 'streak'),
       );
 }
 
@@ -165,7 +209,11 @@ class Conversation {
     required this.theirReadSeq,
     this.lastMessage,
     this.founderLine = false,
+    this.streak,
   });
+
+  /// Days in a row they have both been writing, while it runs.
+  final Streak? streak;
 
   final String matchId;
   final DateTime matchedAt;
@@ -193,6 +241,7 @@ class Conversation {
       unread: j.intOr('unread', 0),
       theirReadSeq: j.intOr('their_read_seq', 0),
       founderLine: j.flag('founder_line'),
+      streak: Streak.maybe(j, 'streak'),
     );
   }
 

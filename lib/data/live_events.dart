@@ -16,7 +16,8 @@ import 'socket/app_socket.dart';
 /// One event from the chat socket.
 ///
 /// [type] is the server's (`message.new`, `messages.read`, `typing`,
-/// `conversation.ended`, `request.new`, `match.new`), plus one of ours:
+/// `conversation.ended`, `streak.updated`, `request.new`, `match.new`), plus
+/// one of ours:
 /// `resync`, sent every time the socket (re)opens, because the socket is a
 /// live channel and not the record. Anything that shows server state refetches
 /// on it.

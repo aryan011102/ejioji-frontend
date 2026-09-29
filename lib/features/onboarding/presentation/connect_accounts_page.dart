@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -37,6 +38,10 @@ import '../../profile/presentation/social_link_sheet.dart';
 /// are not sources: nothing is read from them. They are a handle the person
 /// types or pastes, handed only to people they match with, so they sit in their
 /// own group below the sources and never count towards profile strength.
+///
+/// LinkedIn is required (2026-09-29): nobody is shown without one, so setup
+/// does not go on until it is there. The server's gate is what enforces it;
+/// this only asks at the right moment.
 ///
 /// Every source is read exactly once, when it is connected. There is no
 /// background sync: the access token lives in the server's memory for the
@@ -379,6 +384,18 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
         widget.editing ? Routes.editCategoryAt(0) : Routes.pickCategoryAt(0),
       );
 
+  /// On past this screen, once there is a LinkedIn link: asks for it first.
+  Future<void> _nextWithLinkedIn(bool hasLinkedIn) async {
+    if (!hasLinkedIn) {
+      final added = await showSocialLinkSheet(
+        context,
+        network: SocialNetwork.linkedin,
+      );
+      if (!mounted || !added) return;
+    }
+    _next();
+  }
+
   @override
   Widget build(BuildContext context) {
     final consent = ref.watch(consentProvider);
@@ -408,6 +425,8 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
         l.network: l,
     };
 
+    final hasLinkedIn = socials.containsKey(SocialNetwork.linkedin);
+
     return AppScaffold(
       navBar: widget.editing
           ? AppNavBar(backLabel: 'Profile', onBack: () => context.pop())
@@ -419,13 +438,25 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
           : Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (!hasLinkedIn)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      'Add your LinkedIn to continue. Only your matches see it.',
+                      textAlign: TextAlign.center,
+                      style: AppText.caption,
+                    ),
+                  ),
                 PrimaryButton(
-                  label: 'Next',
-                  onPressed: linked.isNotEmpty ? _next : null,
+                  label: hasLinkedIn ? 'Next' : 'Add LinkedIn',
+                  onPressed: linked.isNotEmpty || !hasLinkedIn
+                      ? () => unawaited(_nextWithLinkedIn(hasLinkedIn))
+                      : null,
                 ),
                 // Nothing connected still has a way on: every category comes
-                // back thin, so the walk is all questions.
-                if (linked.isEmpty)
+                // back thin, so the walk is all questions. LinkedIn is still
+                // asked for first.
+                if (linked.isEmpty && hasLinkedIn)
                   TextActionButton(
                     label: "I'll do this later",
                     dim: true,
@@ -466,6 +497,7 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
                   _SocialRow(
                     network: n,
                     link: socials[n],
+                    required: n == SocialNetwork.linkedin,
                     last: n == SocialNetwork.shown.last,
                     onTap: () => showSocialLinkSheet(
                       context,
@@ -955,10 +987,14 @@ class _SocialRow extends StatelessWidget {
     required this.link,
     required this.last,
     required this.onTap,
+    this.required = false,
   });
 
   final SocialNetwork network;
   final SocialLink? link;
+
+  /// Nobody is shown without it (LinkedIn).
+  final bool required;
   final bool last;
   final VoidCallback onTap;
 
@@ -966,6 +1002,10 @@ class _SocialRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = link;
     final (String line, Color tone) = switch (l) {
+      null when required => (
+          'Required · your profile link, for matches only',
+          AppColors.accent,
+        ),
       null => (
           network == SocialNetwork.linkedin
               ? 'Your profile link · for matches only'

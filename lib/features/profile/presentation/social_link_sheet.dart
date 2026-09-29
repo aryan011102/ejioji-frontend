@@ -95,7 +95,10 @@ class _SocialLinkSheetState extends ConsumerState<_SocialLinkSheet> {
     final choice = await showAppActionSheet(
       context,
       title: 'Remove your $_label?',
-      message: 'Your matches stop seeing it straight away.',
+      message: widget.network == SocialNetwork.linkedin
+          ? 'Your matches stop seeing it straight away, and your profile is '
+              'not shown to anyone until you add one again.'
+          : 'Your matches stop seeing it straight away.',
       actions: const [SheetAction('Remove', destructive: true)],
     );
     if (choice != 0 || !mounted) return;

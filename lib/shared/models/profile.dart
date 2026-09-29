@@ -98,6 +98,7 @@ class PublishBlocker {
         Blocker.tooFewCategories =>
           'Your tiles need to cover $need categories, they cover $have',
         Blocker.tooFewPhotos => 'Add $need photos, you have $have',
+        Blocker.noLinkedin => 'Add your LinkedIn profile link',
         Blocker.unknown => 'Something is still missing',
       };
 }

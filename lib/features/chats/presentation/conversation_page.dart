@@ -26,6 +26,7 @@ import '../../../shared/widgets/pressable.dart';
 import '../../../shared/widgets/quoted_tile.dart';
 import '../../../shared/widgets/sheets.dart';
 import '../../../shared/widgets/states.dart';
+import 'streak_popup.dart';
 import 'unmatch_reason_sheet.dart';
 import 'verify_to_chat.dart';
 
@@ -93,6 +94,9 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
   bool _openingProfile = false;
   int _myRead = 0;
   int _theirRead = 0;
+
+  /// Days in a row they have both been writing, while it runs.
+  Streak? _streak;
   bool _theyTyping = false;
   Timer? _typingClear;
   DateTime _lastTypingSent = DateTime.fromMillisecondsSinceEpoch(0);
@@ -134,11 +138,13 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
         _theirRead = page.theirReadSeq;
         _paused = page.paused;
         _mustVerify = page.verificationRequired;
+        _streak = page.streak;
         _loading = false;
         _loadError = null;
       });
       unawaited(_markRead());
       if (_mustVerify && !_paused) _tellToVerifyOnce();
+      _celebrate();
     } on NotFoundFailure {
       if (mounted) {
         setState(() {
@@ -169,8 +175,10 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
         _theirRead = page.theirReadSeq;
         _paused = page.paused;
         _mustVerify = page.verificationRequired;
+        _streak = page.streak;
       });
       unawaited(_markRead());
+      _celebrate();
     } on NotFoundFailure {
       if (mounted) setState(() => _ended = true);
     } on ApiException {
@@ -248,7 +256,28 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
         });
       case 'conversation.ended':
         setState(() => _ended = true);
+      case 'streak.updated':
+        setState(() => _streak = Streak.maybe(event.data, 'streak'));
+        _celebrate();
     }
+  }
+
+  /// The milestone popup, if this streak has reached one this phone has not
+  /// shown. Not over the verify popup or on a chat nobody can write in.
+  void _celebrate() {
+    final streak = _streak;
+    if (streak == null || _ended || _paused || _mustVerify) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(
+        celebrateStreakOnce(
+          context,
+          matchId: _matchId,
+          streak: streak,
+          name: _person?.firstName,
+        ),
+      );
+    });
   }
 
   // Writing.
@@ -567,6 +596,7 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
       child: AppScaffold(
         navBar: AppNavBar(
           title: name,
+          subtitle: _ended || _streak == null ? null : streakLabel(_streak!),
           // No door once the match is over: there is nothing on the other side.
           // None on a founder conversation either: it is text only.
           onTitle: _ended || _person == null || _founderLine ? null : _openProfile,

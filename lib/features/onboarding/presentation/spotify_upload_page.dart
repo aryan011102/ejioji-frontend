@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
@@ -49,8 +50,20 @@ class _SpotifyUploadPageState extends ConsumerState<SpotifyUploadPage> {
 
   Future<void> _openPrivacySettings() async {
     final opened = await launchUrl(_privacy, mode: LaunchMode.externalApplication);
-    if (!opened && mounted) {
+    if (opened) {
+      unawaited(_noteRequested());
+    } else if (mounted) {
       showAppToast(context, 'No browser would open Spotify.');
+    }
+  }
+
+  /// Starts the server's clock on the reminder push. Best effort: failing
+  /// costs a reminder, not the request, which is made on Spotify's own site.
+  Future<void> _noteRequested() async {
+    try {
+      await ref.read(sourcesRepositoryProvider).spotifyRequested();
+    } on Object catch (error) {
+      debugPrint('Spotify reminder not set ($error).');
     }
   }
 

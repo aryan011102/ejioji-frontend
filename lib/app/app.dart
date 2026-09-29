@@ -60,6 +60,12 @@ class _EjiojiAppState extends ConsumerState<EjiojiApp> {
         router.go(Routes.chats);
       case PushKind.profileViews:
         router.push(Routes.profileViews);
+      // Days after they asked Spotify for their data: straight to the upload.
+      // Someone past setup comes back the way Edit sources would send them.
+      case PushKind.spotifyUpload:
+        final editing =
+            ref.read(sessionProvider).stage == SessionStage.ready;
+        router.push(Routes.upload(Routes.spotifyUpload, editing: editing));
     }
   }
 
@@ -72,7 +78,10 @@ class _EjiojiAppState extends ConsumerState<EjiojiApp> {
     return switch (open.kind) {
       PushKind.message || PushKind.match =>
         open.id == null || open.id != OpenConversations.top,
-      PushKind.request || PushKind.profileViews => true,
+      PushKind.request ||
+      PushKind.profileViews ||
+      PushKind.spotifyUpload =>
+        true,
     };
   }
 

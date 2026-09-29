@@ -110,6 +110,10 @@ class SourcesRepository {
     return IngestionRun.fromJson(body);
   }
 
+  /// The person has gone to Spotify to ask for their data. The server pushes
+  /// them a reminder to upload it a few days later, unless they have by then.
+  Future<void> spotifyRequested() => _api.postEmpty(Api.spotifyRequested);
+
   Future<IngestionRun> run(String runId) async =>
       IngestionRun.fromJson(await _api.getJson(Api.run(runId)));
 

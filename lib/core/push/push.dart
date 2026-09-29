@@ -142,7 +142,7 @@ abstract final class Push {
 
 /// What a tapped notification was about. Ids only, which is all the server
 /// sends and all the app needs to open the right screen.
-enum PushKind { message, request, match, profileViews }
+enum PushKind { message, request, match, profileViews, spotifyUpload }
 
 @immutable
 class PushOpen {
@@ -151,12 +151,13 @@ class PushOpen {
   final PushKind kind;
 
   /// The match for a message or an accepted request, the request itself for a
-  /// new one. Null for profile views, which opens a list rather than a thing,
+  /// new one. Null for profile views and the Spotify reminder, which open a screen
+  /// rather than a thing,
   /// and when a push arrived without one, which is a server bug rather than
   /// something to crash over.
   final String? id;
 
-  /// Reads one of the four `data` payloads. Anything else is ignored: a
+  /// Reads one of the five `data` payloads. Anything else is ignored: a
   /// newer server may push a kind this build has never heard of.
   static PushOpen? from(RemoteMessage? message) {
     if (message == null) return null;
@@ -171,6 +172,8 @@ class PushOpen {
           id: data['request_id'] as String?,
         ),
       'profile_views' => const PushOpen(kind: PushKind.profileViews, id: null),
+      'spotify_upload' =>
+        const PushOpen(kind: PushKind.spotifyUpload, id: null),
       _ => null,
     };
   }

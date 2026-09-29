@@ -152,6 +152,18 @@ class _ProfileCard extends StatelessWidget {
                               style: AppText.title3.copyWith(fontSize: 19),
                             ),
                           ),
+                          // The same tick as on your profile: the server's,
+                          // derived on every read, so editing your name or birth
+                          // date takes it off here too.
+                          if (profile?.verified ?? false) ...[
+                            const SizedBox(width: 5),
+                            const Icon(
+                              Icons.verified,
+                              size: 18,
+                              color: AppColors.blue,
+                              semanticLabel: 'Verified',
+                            ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 2),

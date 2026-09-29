@@ -15,6 +15,7 @@ import '../../../shared/models/tile.dart';
 import '../../../shared/widgets/ask_about_sheet.dart';
 import '../../../shared/widgets/buttons.dart';
 import '../../../shared/widgets/controls.dart';
+import '../../../shared/widgets/fact_chips.dart';
 import '../../../shared/widgets/identity.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/pressable.dart';
@@ -412,8 +413,8 @@ class _RequestCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Everything above the two buttons opens the profile. A card is one
-            // tile and one line of a city: nobody should have to answer on that,
+            // Everything above the two buttons opens the profile. A card is a
+            // photo and a row of facts: nobody should have to answer on that,
             // and the buttons stay outside the tap so answering still takes aim.
             Pressable(
               onTap: () => _openProfile(context),
@@ -440,7 +441,7 @@ class _RequestCard extends StatelessWidget {
                           children: [
                             Expanded(
                               child: Text(
-                                '${person.displayName}, ${person.age}',
+                                person.displayName,
                                 style: AppText.title3.copyWith(fontSize: 19),
                               ),
                             ),
@@ -453,33 +454,42 @@ class _RequestCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '${person.city.label} · asked '
-                          '${relativeTime(request.requestedAt)} ago',
+                          'Asked ${relativeTime(request.requestedAt)} ago',
                           style: AppText.footnote,
                         ),
-                        if (request.tile != null) ...[
-                          const SizedBox(height: 12),
+                      ],
+                    ),
+                  ),
+                  // The same row as under the name on a profile, edge to edge
+                  // of the card. City and age live here now, not in the title.
+                  const SizedBox(height: 12),
+                  FactChipRow(
+                    facts: profileFacts(
+                      age: person.age,
+                      city: person.city,
+                      languages: person.languages,
+                      education: person.education,
+                      company: person.company,
+                      smoking: person.smoking,
+                      drinking: person.drinking,
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                  ),
+                  if (request.tile != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           QuotedTileLabel(
                             '${person.firstName} wants to chat about this',
                           ),
                           QuotedTile(tile: request.tile!),
                           if (request.note != null)
                             RequestNoteLine(request.note!),
-                        ] else if (person.tiles.isNotEmpty) ...[
-                          const SizedBox(height: 10),
-                          Text(
-                            person.tiles.first.isAnswer
-                                ? person.tiles.first.headline
-                                : '${person.tiles.first.headline} · '
-                                    '${person.tiles.first.body}',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppText.callout,
-                          ),
                         ],
-                      ],
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),

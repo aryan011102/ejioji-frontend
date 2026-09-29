@@ -23,6 +23,7 @@ import '../../../shared/models/tile_look.dart';
 import '../../../shared/widgets/ask_about_sheet.dart';
 import '../../../shared/widgets/buttons.dart';
 import '../../../shared/widgets/capture_shield.dart';
+import '../../../shared/widgets/fact_chips.dart';
 import '../../../shared/widgets/identity.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/pressable.dart';
@@ -229,7 +230,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           pronouns: person.pronouns,
           verified: person.verified,
           chips: [
-            ..._chips(
+            ...profileFacts(
               age: person.age,
               city: person.city,
               languages: person.languages,
@@ -275,7 +276,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           chips: details == null
               ? const []
               : [
-                  ..._chips(
+                  ...profileFacts(
                     age: details.age,
                     city: details.city,
                     languages: details.languages,
@@ -296,7 +297,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
   Widget _wall({
     required String name,
-    required List<_Fact> chips,
+    required List<Fact> chips,
     Pronouns? pronouns,
     bool verified = false,
     required List<MediaAsset> photos,
@@ -528,43 +529,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     );
   }
 
-  /// The facts under a name, in the order the design draws them.
-  ///
-  /// Languages collapse to "Hindi, English +1" rather than wrapping: the row
-  /// scrolls, so a long list would push the rest out of reach. Anything the
-  /// person has not stated is left out entirely instead of showing an empty
-  /// chip, which is the same rule as pronouns.
-  List<_Fact> _chips({
-    required int age,
-    required City city,
-    required List<Language> languages,
-    required Education? education,
-    required String? company,
-    required Habit? smoking,
-    required Habit? drinking,
-  }) {
-    return [
-      _Fact('📍', city.label),
-      _Fact('🎂', '$age'),
-      if (company != null && company.isNotEmpty) _Fact('💼', company),
-      if (languages.isNotEmpty)
-        _Fact(
-          '🗣',
-          languages.length <= 2
-              ? [for (final l in languages) l.label].join(', ')
-              : '${languages[0].label}, ${languages[1].label} '
-                  '+${languages.length - 2}',
-        ),
-      if (education != null) _Fact('💻', education.label),
-      if (smoking != null) _Fact('🚬', smoking.smokingLabel),
-      if (drinking != null) _Fact('🍷', drinking.drinkingLabel),
-    ];
-  }
-
   /// A chip per link, which opens the profile in its own app or the browser.
-  List<_Fact> _socialChips(List<SocialLink> links) => [
+  List<Fact> _socialChips(List<SocialLink> links) => [
         for (final l in links)
-          _Fact(
+          Fact(
             '',
             l.display,
             mark: SocialMark(l.network, size: 18),
@@ -584,7 +552,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   Widget _header(
     String name,
     Pronouns? pronouns,
-    List<_Fact> chips,
+    List<Fact> chips,
     List<MediaAsset> photos, {
     bool verified = false,
   }) {
@@ -653,18 +621,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           ),
           if (chips.isNotEmpty) ...[
             const SizedBox(height: 14),
-            // Edge to edge, so a chip scrolls off the screen rather than
-            // being cut at the gutter; the gutter is the scroll's padding.
-            SizedBox(
-              height: 34,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: Insets.gutter),
-                itemCount: chips.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 7),
-                itemBuilder: (_, i) => _FactChip(fact: chips[i]),
-              ),
-            ),
+            FactChipRow(facts: chips),
           ],
         ],
       ),
@@ -976,57 +933,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 /// One fact under the name: a glyph and a word. A social link draws its
 /// network's mark instead of a glyph, and opens when tapped.
 @immutable
-class _Fact {
-  const _Fact(this.glyph, this.label, {this.mark, this.onTap});
-
-  final String glyph;
-  final String label;
-  final Widget? mark;
-  final VoidCallback? onTap;
-}
-
-class _FactChip extends StatelessWidget {
-  const _FactChip({required this.fact});
-
-  final _Fact fact;
-
-  @override
-  Widget build(BuildContext context) {
-    // The design's pill: the quiet system fill, not the brand plum, 34 high.
-    final chip = Container(
-      height: 34,
-      padding: const EdgeInsets.symmetric(horizontal: 13),
-      decoration: BoxDecoration(
-        color: AppColors.fill2,
-        borderRadius: BorderRadius.circular(17),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          fact.mark ??
-              Text(
-                fact.glyph,
-                style: const TextStyle(fontSize: 14, height: 1.5),
-              ),
-          const SizedBox(width: 6),
-          Text(
-            fact.label,
-            style: AppText.body.copyWith(
-              fontSize: 14,
-              height: 21 / 14,
-              letterSpacing: 0,
-              color: AppColors.label,
-            ),
-          ),
-        ],
-      ),
-    );
-    final onTap = fact.onTap;
-    if (onTap == null) return chip;
-    return Pressable(onTap: onTap, semanticLabel: fact.label, child: chip);
-  }
-}
-
 /// The pronouns under the name, and on your own profile the way to set them.
 class _PronounLine extends StatelessWidget {
   const _PronounLine({

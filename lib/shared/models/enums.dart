@@ -352,6 +352,9 @@ enum Blocker {
   tooFewTiles('too_few_tiles'),
   tooFewCategories('too_few_categories'),
   tooFewPhotos('too_few_photos'),
+
+  /// No LinkedIn link yet. Required to be shown (backend, 2026-09-29).
+  noLinkedin('no_linkedin'),
   unknown('');
 
   const Blocker(this.wire);

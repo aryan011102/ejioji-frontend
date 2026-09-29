@@ -31,6 +31,7 @@ abstract final class Api {
   static String complete(String source) => '$prefix/connections/$source/complete';
   static const netflixUpload = '$prefix/connections/netflix/upload';
   static const spotifyUpload = '$prefix/connections/spotify/upload';
+  static const spotifyRequested = '$prefix/connections/spotify/requested';
   static String run(String runId) => '$prefix/ingestion/runs/$runId';
 
   // Insights. The tiles are candidates until they are picked onto the profile.

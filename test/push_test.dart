@@ -39,6 +39,14 @@ void main() {
       expect(open?.id, isNull);
     });
 
+    test('the Spotify reminder opens the upload, with no id', () {
+      final open = PushOpen.from(
+        const RemoteMessage(data: {'type': 'spotify_upload'}),
+      );
+      expect(open?.kind, PushKind.spotifyUpload);
+      expect(open?.id, isNull);
+    });
+
     test('a kind this build has never heard of is ignored', () {
       // The server can start pushing something new before this app ships.
       // Ignoring it leaves the notification itself readable and opens the app

@@ -9,32 +9,24 @@ import '../../../shared/widgets/layout.dart';
 /// One page, three entrances: the outline tick on your own profile, the locked
 /// chat button on home, and the banner on the chats list.
 ///
-/// It is prose rather than a list because the questions it answers — who sees
-/// the selfie, how long it is kept — are the ones that stop people, and a
-/// bulleted reassurance reads like a terms page.
+/// It is prose rather than a list because the questions it answers — what we
+/// see, what we keep — are the ones that stop people, and a bulleted
+/// reassurance reads like a terms page.
 class WhyMattersPage extends ConsumerWidget {
   const WhyMattersPage({super.key});
 
   static const _sections = <(String, String)>[
     (
       'What the blue tick means',
-      'One of two things was checked: either a government ID says you are who '
-          'you say, or a live selfie says the photos on this profile are of '
-          'you. Either is enough to start a conversation.',
-    ),
-    (
-      'What the gold tick means',
-      'Both. An ID and a photo. It gives no extra features and no better '
-          'placement — it exists because this is the question a family asks '
-          'first, and it deserves an answer that took more than a minute to '
-          'earn.',
+      'DigiLocker checked that your first name and date of birth are the ones '
+          'on your Aadhaar. That is enough to start a conversation.',
     ),
     (
       'What we never see',
       'DigiLocker shares your name and date of birth with us and nothing else. '
-          'Your Aadhaar number never reaches theonebytwo. The selfie is used for the '
-          'check and deleted after it, and it is never shown to another person '
-          '— not to matches, not to families, not on your profile.',
+          'Your Aadhaar number never reaches theonebytwo, and what DigiLocker '
+          'shares is never shown to another person: not to matches, not to '
+          'families, not on your profile.',
     ),
     (
       'Why chat waits for it',
@@ -45,9 +37,9 @@ class WhyMattersPage extends ConsumerWidget {
     ),
     (
       'If a check fails',
-      'Nothing happens to your profile and nobody is told. You can try again, '
-          'or use the other route. A failed check is almost always a bad photo '
-          'rather than a bad person.',
+      'Nothing happens to your profile and nobody is told. You can try again. '
+          'A failed check is almost always a name spelt differently rather than '
+          'a bad person.',
     ),
   ];
 

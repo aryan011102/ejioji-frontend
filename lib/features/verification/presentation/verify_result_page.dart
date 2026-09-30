@@ -8,31 +8,22 @@ import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/states.dart';
 import '../../../shared/widgets/steps.dart';
 
-enum VerifyRoute { digilocker, selfie }
-
-/// Two outcomes, one screen.
+/// DigiLocker's outcome.
 ///
 /// DigiLocker is instant, and this screen is only reached after the server
 /// said `verified`: the tick is the server's, never something awarded here.
-/// The selfie version describes a review that is not built yet; nothing links
-/// to it until the selfie check exists.
 class VerifyResultPage extends ConsumerWidget {
-  const VerifyResultPage({required this.route, super.key});
-
-  final VerifyRoute route;
+  const VerifyResultPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final instant = route == VerifyRoute.digilocker;
-
     return AppScaffold(
       navBar: const AppNavBar(),
       footer: Column(
         children: [
           PrimaryButton(
-            label: instant ? 'See your profile' : 'Back to browsing',
-            onPressed: () =>
-                instant ? context.go(Routes.editProfile) : context.go(Routes.home),
+            label: 'See your profile',
+            onPressed: () => context.go(Routes.editProfile),
           ),
           const SizedBox(height: 8),
           SecondaryButton(
@@ -41,24 +32,15 @@ class VerifyResultPage extends ConsumerWidget {
           ),
         ],
       ),
-      child: ResultScaffoldBody(
-        mark: ResultMark(
-          icon: instant ? Icons.check : Icons.face_retouching_natural_outlined,
-          filled: instant,
+      child: const ResultScaffoldBody(
+        mark: ResultMark(icon: Icons.check, filled: true),
+        title: 'Verified.',
+        body: 'Your name and date of birth match your Aadhaar. Your profile '
+            'now carries a blue tick.',
+        note: NoteCard(
+          text: 'Change the first name or date of birth on your profile '
+              'and the tick goes until you verify again.',
         ),
-        title: instant ? 'Verified.' : 'Under review.',
-        body: instant
-            ? 'Your name and date of birth match your Aadhaar. Your profile '
-                'now carries a blue tick.'
-            : "Usually within 24 hours, and we'll tell you either way. Nothing "
-                'else changes meanwhile: you can browse, and people can still '
-                'write to you.',
-        note: instant
-            ? const NoteCard(
-                text: 'Change the first name or date of birth on your profile '
-                    'and the tick goes until you verify again.',
-              )
-            : null,
       ),
     );
   }

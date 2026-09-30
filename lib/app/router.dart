@@ -35,7 +35,6 @@ import '../features/profile/presentation/profile_page.dart';
 import '../features/safety/presentation/report_page.dart';
 import '../features/sharing/presentation/share_page.dart';
 import '../features/verification/presentation/digilocker_page.dart';
-import '../features/verification/presentation/selfie_page.dart';
 import '../features/verification/presentation/verify_hub_page.dart';
 import '../features/verification/presentation/verify_result_page.dart';
 import '../features/verification/presentation/why_matters_page.dart';
@@ -218,19 +217,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.digilockerDone,
-        builder: (_, __) =>
-            const VerifyResultPage(route: VerifyRoute.digilocker),
-      ),
-      GoRoute(path: Routes.selfie, builder: (_, __) => const SelfieStepsPage()),
-      GoRoute(
-        path: Routes.selfieStep,
-        builder: (_, state) => SelfieCapturePage(
-          step: int.tryParse(state.pathParameters['step'] ?? '1') ?? 1,
-        ),
-      ),
-      GoRoute(
-        path: Routes.selfieDone,
-        builder: (_, __) => const VerifyResultPage(route: VerifyRoute.selfie),
+        builder: (_, __) => const VerifyResultPage(),
       ),
       GoRoute(
         path: Routes.verifyFailed,

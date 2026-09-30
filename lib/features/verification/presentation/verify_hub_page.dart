@@ -13,9 +13,7 @@ import '../../../shared/widgets/states.dart';
 /// Verification: where it stands, and the way to it.
 ///
 /// DigiLocker is live: a check of the profile's first name and date of birth
-/// against Aadhaar, which earns the blue tick. The selfie check is not built
-/// yet, so it is listed as coming rather than linked: a flow that ends in
-/// nothing is worse than one that has not started.
+/// against Aadhaar, which earns the blue tick. It is the only check for now.
 ///
 /// The status comes from the server, which derives it from the profile on
 /// every read. The app never decides on its own that someone is verified.
@@ -80,21 +78,12 @@ class VerifyHubPage extends ConsumerWidget {
                     size: 18,
                     color: AppColors.blue,
                   ),
+                  last: true,
                   onTap: v.verified ||
                           !v.available ||
                           v.status == VerificationStatus.revoked
                       ? null
                       : () => context.push(Routes.digilocker),
-                ),
-                const AppRow(
-                  label: 'Selfie check',
-                  subtitle: 'Coming soon',
-                  last: true,
-                  leading: Icon(
-                    Icons.face_retouching_natural_outlined,
-                    size: 18,
-                    color: AppColors.label3,
-                  ),
                 ),
               ],
             ),

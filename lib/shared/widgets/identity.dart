@@ -8,9 +8,9 @@ import 'pressable.dart';
 
 /// Which check passed.
 ///
-/// Blue is one — either a government ID or a live selfie. Gold is both. The
-/// shape never changes, only the fill: a tick that changes shape reads as a
-/// different promise, and this one is the same promise twice over.
+/// Blue is DigiLocker. Gold was meant for an ID plus a selfie check, which is
+/// parked, so nothing awards it today. The shape never changes, only the fill:
+/// a tick that changes shape reads as a different promise.
 enum VerificationTier { none, blue, gold }
 
 class VerifiedTick extends StatelessWidget {
@@ -172,7 +172,7 @@ class PhotoFrame extends StatelessWidget {
 }
 
 /// The empty 3:4 well from Create profile, reused wherever a photo is asked
-/// for — editing your info, and the gallery step of the selfie check.
+/// for, such as editing your info.
 /// A photo slot that can be picked up and dropped on another one.
 ///
 /// This is how the main photo is chosen: the first slot is what people see

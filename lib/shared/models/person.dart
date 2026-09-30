@@ -60,8 +60,8 @@ class Candidate {
   final List<MediaAsset> photos;
   final List<ProfileTile> tiles;
 
-  /// Their Instagram, X and LinkedIn. Empty for everyone but a match: the
-  /// server hands these over only with a match, never on a card or a request.
+  /// Their links. On every card, their LinkedIn (backend, 2026-09-30: shown to
+  /// everyone). Instagram and X only with a match, which replaces this list.
   final List<SocialLink> socials;
 
   /// DigiLocker agreed with their name and age. Only the tick, never what was
@@ -109,6 +109,9 @@ class Candidate {
         drinking: Habit.parse(j.strOrNull('drinking')),
         photos: MediaAsset.listFrom(j.objects('photos')),
         tiles: ProfileTile.listFrom(j.objects('tiles')),
+        socials: SocialLink.listFrom([
+          if (j.objectOrNull('linkedin') case final linkedin?) linkedin,
+        ]),
         verified: j.flag('verified'),
       );
 

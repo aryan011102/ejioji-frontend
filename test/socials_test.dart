@@ -36,8 +36,22 @@ void main() {
     expect(link.shown, isTrue);
   });
 
-  test('a feed card has no socials', () {
+  test('a feed card without a LinkedIn has no socials', () {
     expect(Candidate.fromJson(_card()).socials, isEmpty);
+  });
+
+  test('a feed card carries their LinkedIn', () {
+    final card = Candidate.fromJson({
+      ..._card(),
+      'linkedin': {
+        'network': 'linkedin',
+        'display': 'ananya-garg',
+        'url': 'https://www.linkedin.com/in/ananya-garg/',
+      },
+    });
+    final link = card.socials.single;
+    expect(link.network, SocialNetwork.linkedin);
+    expect(link.url, 'https://www.linkedin.com/in/ananya-garg/');
   });
 
   test('your own link keeps its handle and switch', () {

@@ -239,8 +239,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               smoking: person.smoking,
               drinking: person.drinking,
             ),
-            // Only a match's card carries any: the server hands socials over with
-            // a match and never with a feed card or a request.
+            // Every card carries their LinkedIn; a match's also carries the
+            // Instagram and X they switched on.
             ..._socialChips(person.socials),
           ],
           photos: person.photos,
@@ -251,11 +251,12 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     }
 
     final mine = ref.watch(myProfileProvider);
-    // Your own wall shows what your matches would see: the links that are on.
+    // Your own wall shows what your matches would see: the links that are on,
+    // and LinkedIn, which everyone sees.
     final mySocials = [
       for (final l
           in ref.watch(mySocialsProvider).valueOrNull ?? const <SocialLink>[])
-        if (l.shown) l,
+        if (l.shown || l.network == SocialNetwork.linkedin) l,
     ];
 
     return mine.when(

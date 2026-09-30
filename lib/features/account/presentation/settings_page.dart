@@ -136,12 +136,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 network: n,
                 existing: link,
               ),
-              control: AppSwitch(
-                value: link.shown,
-                onChanged: _switching == null
-                    ? (v) => _setShown(n, v)
-                    : null,
-              ),
+              // LinkedIn is shown to everyone, so it has no switch.
+              control: n == SocialNetwork.linkedin
+                  ? null
+                  : AppSwitch(
+                      value: link.shown,
+                      onChanged: _switching == null
+                          ? (v) => _setShown(n, v)
+                          : null,
+                    ),
             )
           else
             AppRow(

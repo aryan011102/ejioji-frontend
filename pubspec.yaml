@@ -68,6 +68,11 @@ dependencies:
   # matched to the build it came from.
   package_info_plus: ^9.0.1
 
+  # Buying Premium in the App Store. RevenueCat checks the receipt with Apple
+  # and tells our server; the server, not this package, decides who has
+  # Premium. Asleep in a build without REVENUECAT_IOS_KEY.
+  purchases_flutter: ^10.13.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

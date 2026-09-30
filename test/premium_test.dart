@@ -1,8 +1,90 @@
+import 'package:ejioji/features/account/presentation/subscription_page.dart';
 import 'package:ejioji/shared/models/person.dart';
 import 'package:ejioji/shared/models/premium.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('premium in the App Store', () {
+    PremiumStatus sold({String? plan, String? source}) =>
+        PremiumStatus.fromJson({
+          'active': plan != null,
+          'plan': plan,
+          'ends_at': plan == null ? null : '2026-11-30T08:00:00Z',
+          'source': source,
+          'free_for_now': false,
+          'plans': [
+            {
+              'key': 'd3',
+              'unit': 'day',
+              'count': 3,
+              'price_paise': 19900,
+              'product_id': 'theonebytwo_premium_d3',
+              'renews': false,
+            },
+            {
+              'key': 'm1',
+              'unit': 'month',
+              'count': 1,
+              'price_paise': 79900,
+              'product_id': 'theonebytwo_premium_m1',
+              'renews': true,
+            },
+            {
+              'key': 'm12',
+              'unit': 'month',
+              'count': 12,
+              'price_paise': 499900,
+              'product_id': 'theonebytwo_premium_m12',
+              'renews': true,
+            },
+          ],
+        });
+
+    test('each plan names its product and whether it renews', () {
+      final status = sold();
+      expect(
+        [for (final p in status.plans) (p.productId, p.renews)],
+        [
+          ('theonebytwo_premium_d3', false),
+          ('theonebytwo_premium_m1', true),
+          ('theonebytwo_premium_m12', true),
+        ],
+      );
+    });
+
+    test('the terms say the price, the length and how it renews', () {
+      final [pass, month, year] = sold().plans;
+      expect(pass.terms('₹199.00'), '₹199.00 once, for 3 days. Does not renew.');
+      expect(month.terms('₹799.00'), startsWith('₹799.00 every month. Renews'));
+      expect(year.terms('₹4,999.00'), startsWith('₹4,999.00 every 12 months.'));
+      expect(month.terms('x'), contains('24 hours'));
+      expect(pass.storeSubtitle, 'Once, for 3 days. Does not renew');
+      expect(month.storeSubtitle, 'Renews every month');
+    });
+
+    test('a store plan knows it came from the store', () {
+      final status = sold(plan: 'm1', source: 'app_store');
+      expect(status.fromStore, isTrue);
+      expect(status.current?.renews, isTrue);
+      expect(sold(plan: 'm1', source: 'free').fromStore, isFalse);
+    });
+
+    test('the subscription page says who to cancel with, and when not to', () {
+      expect(
+        SubscriptionPage.footer(sold(plan: 'm1', source: 'app_store')),
+        startsWith('Bought in the App Store. It renews on its own'),
+      );
+      expect(
+        SubscriptionPage.footer(sold(plan: 'd3', source: 'app_store')),
+        startsWith('Bought in the App Store, once. It does not renew.'),
+      );
+      expect(
+        SubscriptionPage.footer(sold(plan: 'm1', source: 'free')),
+        startsWith('This plan was free.'),
+      );
+    });
+  });
+
   group('premium', () {
     test('plans come from the server with their length and price', () {
       final status = PremiumStatus.fromJson({

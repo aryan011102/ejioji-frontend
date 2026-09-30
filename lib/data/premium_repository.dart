@@ -4,9 +4,10 @@ import '../shared/models/premium.dart';
 
 /// Premium: what is on offer, whether you have it, and starting it.
 ///
-/// There is no payment yet (no Razorpay), so starting a plan is free and the
-/// server records it at ₹0. When prices exist this is where the payment step
-/// goes; the server still decides whether it went through.
+/// Two ways in. While the server says `free_for_now`, [start] grants a plan
+/// for nothing. Once prices are live a plan is bought in the App Store
+/// (`core/purchases`), and [sync] asks the server to check the store and
+/// answer with what it found. Either way the server decides.
 class PremiumRepository {
   const PremiumRepository(this._api);
 
@@ -17,7 +18,13 @@ class PremiumRepository {
 
   /// 409 `premium_active` while a plan is still running: a second free plan
   /// on top of the first is not something to hand out before prices exist.
+  /// 403 `free_plans_ended` once plans are bought in the App Store.
   Future<PremiumStatus> start(String plan) async => PremiumStatus.fromJson(
         await _api.post(Api.premiumPurchases, body: {'plan': plan}),
       );
+
+  /// After an App Store purchase or restore: the server reads the store and
+  /// says what this person holds now.
+  Future<PremiumStatus> sync() async =>
+      PremiumStatus.fromJson(await _api.post(Api.premiumSync));
 }

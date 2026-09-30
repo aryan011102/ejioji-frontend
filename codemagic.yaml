@@ -12,6 +12,8 @@ workflows:
   #   FCM_SENDER_ID      Firebase sender id, the project number
   #   FCM_IOS_APP_ID     GOOGLE_APP_ID from GoogleService-Info.plist
   #   FCM_IOS_API_KEY    API_KEY from the same file
+  #   REVENUECAT_IOS_KEY RevenueCat's public Apple key (appl_...), for buying
+  #                      Premium. Not a secret; unset means buying is off.
   #
   # The four FCM values are not secrets (every app ships them), but they are not
   # in the repository either: GoogleService-Info.plist is gitignored, and this
@@ -51,12 +53,14 @@ workflows:
             "FCM_PROJECT_ID": "$FCM_PROJECT_ID",
             "FCM_SENDER_ID": "$FCM_SENDER_ID",
             "FCM_IOS_APP_ID": "$FCM_IOS_APP_ID",
-            "FCM_IOS_API_KEY": "$FCM_IOS_API_KEY"
+            "FCM_IOS_API_KEY": "$FCM_IOS_API_KEY",
+            "REVENUECAT_IOS_KEY": "$REVENUECAT_IOS_KEY"
           }
           EOF
           # Not fatal: a build with push off is a valid build, and a silent one
           # is worse than a noisy one.
           test -n "$FCM_IOS_APP_ID" || echo "WARNING: no FCM_IOS_APP_ID. This build cannot receive notifications."
+          test -n "$REVENUECAT_IOS_KEY" || echo "WARNING: no REVENUECAT_IOS_KEY. This build cannot buy Premium."
       - name: Point the push entitlement at production APNs
         script: |
           set -e

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/purchases/store_purchases.dart';
+import '../../../core/session/session.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
 import '../../../data/providers.dart';
@@ -16,10 +19,11 @@ import '../../../shared/widgets/states.dart';
 
 /// Four things, and none of them unlock something we took away.
 ///
-/// The plans and their prices come from the server. Until there is a payment
-/// provider the prices are shown and nothing is charged: starting a plan
-/// grants it for that long, and the server records it as a free purchase. The app never sets Premium in
-/// its own state; it asks, and reads the answer back.
+/// The plans come from the server. While it says `free_for_now`, starting a
+/// plan grants it for that long at no charge. After that a plan is bought in
+/// the App Store (one, three and twelve months renew; three days is a one-off
+/// pass), and the server is asked to check the store. The app never sets
+/// Premium in its own state; it asks, and reads the answer back.
 ///
 /// Nothing is capped on free — anyone can write to anyone, and replying stays
 /// optional whether or not somebody pays. A paywall that removes an artificial
@@ -59,29 +63,121 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
     ),
   ];
 
+  static final _privacy = Uri.parse('https://theonebytwo.com/privacy');
+  static final _terms = Uri.parse('https://theonebytwo.com/terms');
+  static final _manage =
+      Uri.parse('https://apps.apple.com/account/subscriptions');
+
   static String _subtitle(PremiumPlan plan, {required bool freeForNow}) {
     if (freeForNow) return 'Free for now';
-    if (plan.unit == 'month' && plan.count > 1) {
-      return '₹${plan.pricePaise ~/ 100 ~/ plan.count} a month';
-    }
-    return 'For ${plan.title}';
+    return plan.storeSubtitle;
   }
 
-  Future<void> _start() async {
+  Future<void> _open(Uri url) async {
+    final opened = await launchUrl(url, mode: LaunchMode.externalApplication);
+    if (!opened && mounted) {
+      showAppToast(context, 'Could not open ${url.host}${url.path}.');
+    }
+  }
+
+  Future<void> _start(PremiumStatus status) async {
     setState(() => _starting = true);
     try {
-      await ref.read(premiumRepositoryProvider).start(_plan);
-      ref
-        ..invalidate(premiumProvider)
-        ..invalidate(profileViewsProvider);
-      if (!mounted) return;
-      showAppToast(context, 'Premium is on.');
-      context.pop();
+      if (status.freeForNow) {
+        await ref.read(premiumRepositoryProvider).start(_plan);
+        _done('Premium is on.');
+      } else {
+        await _buy(status);
+      }
     } on ApiException catch (e) {
+      if (mounted) showAppToast(context, e.message);
+    } on StoreFailure catch (e) {
       if (mounted) showAppToast(context, e.message);
     } finally {
       if (mounted) setState(() => _starting = false);
     }
+  }
+
+  Future<void> _buy(PremiumStatus status) async {
+    final plan = status.plans.where((p) => p.key == _plan).firstOrNull;
+    final userId = ref.read(sessionProvider).userId;
+    if (plan == null || userId == null) return;
+    final outcome = await ref.read(storePurchasesProvider).buy(
+          userId: userId,
+          productId: plan.productId,
+          renews: plan.renews,
+        );
+    if (outcome == BuyOutcome.cancelled) return;
+    await _checkStore(
+      found: 'Premium is on.',
+      notYet: 'Paid. Premium turns on in a minute or two.',
+    );
+  }
+
+  Future<void> _restore() async {
+    final userId = ref.read(sessionProvider).userId;
+    if (userId == null) return;
+    setState(() => _starting = true);
+    try {
+      await ref.read(storePurchasesProvider).restore(userId: userId);
+      await _checkStore(
+        found: 'Premium restored.',
+        notYet: 'Nothing to restore on this Apple ID.',
+      );
+    } on StoreFailure catch (e) {
+      if (mounted) showAppToast(context, e.message);
+    } finally {
+      if (mounted) setState(() => _starting = false);
+    }
+  }
+
+  /// The payment is Apple's; whether it counts is the server's. If the server
+  /// cannot see it yet, RevenueCat's notification will reach it shortly.
+  Future<void> _checkStore({
+    required String found,
+    required String notYet,
+  }) async {
+    try {
+      final synced = await ref.read(premiumRepositoryProvider).sync();
+      if (synced.active) {
+        _done(found);
+        return;
+      }
+    } on ApiException {
+      // Checked again when the notification lands; the page re-reads then.
+    }
+    ref.invalidate(premiumProvider);
+    if (mounted) showAppToast(context, notYet);
+  }
+
+  void _done(String message) {
+    ref
+      ..invalidate(premiumProvider)
+      ..invalidate(profileViewsProvider);
+    if (!mounted) return;
+    showAppToast(context, message);
+    context.pop();
+  }
+
+  String _note(PremiumStatus? status, Map<String, String> prices) {
+    if (status == null) return '';
+    final ends = status.endsAt;
+    final current = status.current;
+    if (status.active && ends != null) {
+      final day = dayLabel(ends.toLocal());
+      if (!status.fromStore) {
+        return 'Until $day. Nothing renews and nothing is charged.';
+      }
+      return current != null && current.renews
+          ? 'Renews on $day. Cancel any time in the App Store.'
+          : 'Until $day. Does not renew.';
+    }
+    if (status.freeForNow) {
+      return 'Free for now. Nothing renews and nothing is charged.';
+    }
+    final plan = status.plans.where((p) => p.key == _plan).firstOrNull;
+    if (plan == null) return '';
+    return plan.terms(prices[plan.productId] ?? plan.price);
   }
 
   @override
@@ -89,7 +185,10 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
     final premium = ref.watch(premiumProvider);
     final status = premium.valueOrNull;
     final active = status?.active ?? false;
-    final ends = status?.endsAt;
+    final selling = status != null && !status.freeForNow;
+    final renewing =
+        status != null && status.fromStore && (status.current?.renews ?? false);
+    final prices = ref.watch(storePricesProvider).valueOrNull ?? const {};
 
     return AppScaffold(
       navBar: AppNavBar(
@@ -101,19 +200,42 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
           PrimaryButton(
             label: active ? 'You have Premium' : 'Start Premium',
             busy: _starting,
-            onPressed: status == null || active || _starting ? null : _start,
+            onPressed: status == null || active || _starting
+                ? null
+                : () => _start(status),
           ),
           const SizedBox(height: 9),
           Text(
-            active && ends != null
-                ? 'Until ${dayLabel(ends.toLocal())}. Nothing renews and '
-                    'nothing is charged.'
-                : status?.freeForNow ?? true
-                ? 'Free for now. Nothing renews and nothing is charged.'
-                : 'Nothing renews.',
+            _note(status, prices),
             textAlign: TextAlign.center,
             style: AppText.micro,
           ),
+          if (active && renewing)
+            TextActionButton(
+              label: 'Manage subscription',
+              onPressed: () => _open(_manage),
+            ),
+          if (selling && !active)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TextActionButton(
+                  label: 'Restore purchases',
+                  dim: true,
+                  onPressed: _starting ? null : _restore,
+                ),
+                TextActionButton(
+                  label: 'Terms',
+                  dim: true,
+                  onPressed: () => _open(_terms),
+                ),
+                TextActionButton(
+                  label: 'Privacy',
+                  dim: true,
+                  onPressed: () => _open(_privacy),
+                ),
+              ],
+            ),
         ],
       ),
       child: premium.hasError
@@ -182,7 +304,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
                     padding: const EdgeInsets.only(bottom: 9),
                     child: _PlanRow(
                       title: plan.title,
-                      price: plan.price,
+                      price: prices[plan.productId] ?? plan.price,
                       subtitle: _subtitle(
                         plan,
                         freeForNow: status?.freeForNow ?? true,

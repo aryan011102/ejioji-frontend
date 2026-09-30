@@ -93,6 +93,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             // Resend countdown matches what it will actually allow.
             retryAfterSeconds: int.tryParse(q['retry'] ?? '') ?? 60,
             debugCode: q['debug'],
+            verificationId: q['vid'],
           );
         },
       ),

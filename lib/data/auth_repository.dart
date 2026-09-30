@@ -123,6 +123,42 @@ class AuthRepository {
       throw WrongCodeFailure(e.serverMessage);
     }
 
+    return _signedIn(body);
+  }
+
+  /// Which sign-in the server wants: `otp` (our own code by SMS) or
+  /// `firebase` (Google sends and checks the code). Asked on every sign-in, so
+  /// the server can switch between them without a release.
+  Future<String> signInMethod() async {
+    try {
+      return (await _api.getJson(Api.authMethods)).strOrNull('phone') ?? 'otp';
+    } on ApiException {
+      // An older server has no such endpoint, and only ever did our own codes.
+      return 'otp';
+    }
+  }
+
+  /// Exchanges the ID token Firebase gave us after it checked the code for our
+  /// own session, and stores the pair.
+  Future<SignedIn> signInWithFirebase(String idToken) async {
+    final Json body;
+    try {
+      body = await _api.post(
+        Api.firebaseSignIn,
+        anonymous: true,
+        body: {
+          'id_token': idToken,
+          'device_key': await _device.key(),
+          'platform': DeviceIdentity.platform,
+        },
+      );
+    } on UnauthorisedFailure catch (e) {
+      throw WrongCodeFailure(e.serverMessage);
+    }
+    return _signedIn(body);
+  }
+
+  Future<SignedIn> _signedIn(Json body) async {
     final tokens = body.object('tokens');
     await _tokens.save(
       access: tokens.str('access_token'),

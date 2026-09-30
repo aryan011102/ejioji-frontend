@@ -73,6 +73,12 @@ dependencies:
   # Premium. Asleep in a build without REVENUECAT_IOS_KEY.
   purchases_flutter: ^10.13.2
 
+  # Phone sign-in codes sent and checked by Google, while the server says
+  # "firebase" (the bridge until our own SMS is DLT-registered). Only its ID
+  # token is used: our server trades it for our own session, and Firebase's
+  # is signed out straight away.
+  firebase_auth: ^6.7.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

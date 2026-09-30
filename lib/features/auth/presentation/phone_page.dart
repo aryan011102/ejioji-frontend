@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/routes.dart';
+import '../../../core/auth/firebase_phone.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
@@ -71,11 +72,30 @@ class _PhonePageState extends ConsumerState<PhonePage> {
     if (!_ready || _busy) return;
     setState(() => _busy = true);
     try {
+      final auth = ref.read(authRepositoryProvider);
+      // The server says who sends the code: us, or Firebase while our own SMS
+      // is not yet registered. Asked each time, so it can switch without a
+      // release.
+      if (await auth.signInMethod() == 'firebase') {
+        final verificationId = await FirebasePhone.send(_e164);
+        if (!mounted) return;
+        context.push(
+          Uri(
+            path: Routes.otp,
+            queryParameters: {
+              'phone': _digits,
+              'dial': _c.dial,
+              'retry': '60',
+              'vid': verificationId,
+            },
+          ).toString(),
+        );
+        return;
+      }
       // The server rate-limits per number, per device and per address. A
       // refusal here is a real answer, so the client never retries on its own:
       // every send costs an SMS, and bots hammer this endpoint.
-      final challenge =
-          await ref.read(authRepositoryProvider).requestCode(_e164);
+      final challenge = await auth.requestCode(_e164);
       if (!mounted) return;
       context.push(
         Uri(
@@ -89,6 +109,9 @@ class _PhonePageState extends ConsumerState<PhonePage> {
         ).toString(),
       );
     } on ApiException catch (e) {
+      if (!mounted) return;
+      showAppToast(context, e.message);
+    } on PhoneCodeFailure catch (e) {
       if (!mounted) return;
       showAppToast(context, e.message);
     } finally {

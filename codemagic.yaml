@@ -61,6 +61,26 @@ workflows:
           # is worse than a noisy one.
           test -n "$FCM_IOS_APP_ID" || echo "WARNING: no FCM_IOS_APP_ID. This build cannot receive notifications."
           test -n "$REVENUECAT_IOS_KEY" || echo "WARNING: no REVENUECAT_IOS_KEY. This build cannot buy Premium."
+      - name: Register the URL scheme Firebase phone sign-in returns through
+        script: |
+          set -e
+          # When Firebase cannot prove the app with a silent push, it falls back to
+          # a captcha in Safari and comes back through a URL scheme made from the
+          # iOS app id ("1:123:ios:abc" becomes "app-1-123-ios-abc"). Without it
+          # the app crashes at that point. Written here because the app id is a
+          # build secret, not a file in the repository.
+          if [ -z "$FCM_IOS_APP_ID" ]; then
+            echo "No FCM_IOS_APP_ID: Firebase is off in this build, no scheme needed."
+            exit 0
+          fi
+          PLIST="$CM_BUILD_DIR/ios/Runner/Info.plist"
+          SCHEME="app-$(echo "$FCM_IOS_APP_ID" | tr ':' '-')"
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" "$PLIST" 2>/dev/null || true
+          N=$(/usr/libexec/PlistBuddy -c "Print :CFBundleURLTypes" "$PLIST" | grep -c "Dict {" || true)
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:$N dict" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:$N:CFBundleURLSchemes array" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:$N:CFBundleURLSchemes:0 string $SCHEME" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleURLTypes" "$PLIST"
       - name: Point the push entitlement at production APNs
         script: |
           set -e

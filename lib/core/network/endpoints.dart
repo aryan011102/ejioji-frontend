@@ -14,6 +14,10 @@ abstract final class Api {
   // Auth. `logout` signs out every device and takes no body.
   static const otpStart = '$prefix/auth/otp/start';
   static const otpVerify = '$prefix/auth/otp/verify';
+  // Which of the two sign-ins the server wants ("otp" or "firebase"), and the
+  // Firebase one's exchange of Google's ID token for our own session.
+  static const authMethods = '$prefix/auth/methods';
+  static const firebaseSignIn = '$prefix/auth/firebase';
   static const refresh = '$prefix/auth/refresh';
   static const logout = '$prefix/auth/logout';
   static const me = '$prefix/auth/me';

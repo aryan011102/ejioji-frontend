@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/auth/firebase_phone.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/session/session.dart';
 import '../../../core/theme/tokens.dart';
@@ -20,8 +21,13 @@ class OtpPage extends ConsumerStatefulWidget {
     required this.dialCode,
     this.retryAfterSeconds = 60,
     this.debugCode,
+    this.verificationId,
     super.key,
   });
+
+  /// Set when Firebase sent the code (the server said `firebase`): Firebase's
+  /// id for this attempt, which checking the code needs.
+  final String? verificationId;
 
   final String phone;
   final String dialCode;
@@ -49,9 +55,13 @@ class _OtpPageState extends ConsumerState<OtpPage> {
 
   String get _e164 => '${widget.dialCode}${widget.phone}';
 
+  /// Firebase's id for the latest code it sent; a resend replaces it.
+  String? _verificationId;
+
   @override
   void initState() {
     super.initState();
+    _verificationId = widget.verificationId;
     _startCountdown(widget.retryAfterSeconds);
   }
 
@@ -79,10 +89,15 @@ class _OtpPageState extends ConsumerState<OtpPage> {
       _error = null;
     });
     try {
-      final signedIn = await ref.read(authRepositoryProvider).verifyCode(
-            phone: _e164,
-            code: _code,
-          );
+      final auth = ref.read(authRepositoryProvider);
+      final vid = _verificationId;
+      // Firebase checks its own code and hands back a token our server trusts;
+      // our own code goes straight to our server.
+      final signedIn = vid != null
+          ? await auth.signInWithFirebase(
+              await FirebasePhone.idToken(verificationId: vid, code: _code),
+            )
+          : await auth.verifyCode(phone: _e164, code: _code);
       if (!mounted) return;
       // The tokens are already stored. Where this person lands is decided by
       // whether they have a profile, which the session reads next, and the
@@ -99,6 +114,12 @@ class _OtpPageState extends ConsumerState<OtpPage> {
         _code = '';
         _error = e.message;
       });
+    } on PhoneCodeFailure catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _code = '';
+        _error = e.message;
+      });
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -108,16 +129,25 @@ class _OtpPageState extends ConsumerState<OtpPage> {
     if (_busy || _secondsLeft > 0) return;
     setState(() => _busy = true);
     try {
-      final challenge =
-          await ref.read(authRepositoryProvider).requestCode(_e164);
-      if (!mounted) return;
-      _startCountdown(challenge.retryAfter.inSeconds);
+      if (_verificationId != null) {
+        _verificationId = await FirebasePhone.send(_e164);
+        if (!mounted) return;
+        _startCountdown(60);
+      } else {
+        final challenge =
+            await ref.read(authRepositoryProvider).requestCode(_e164);
+        if (!mounted) return;
+        _startCountdown(challenge.retryAfter.inSeconds);
+      }
       setState(() {
         _code = '';
         _error = null;
       });
       showAppToast(context, 'Sent again.');
     } on ApiException catch (e) {
+      if (!mounted) return;
+      showAppToast(context, e.message);
+    } on PhoneCodeFailure catch (e) {
       if (!mounted) return;
       showAppToast(context, e.message);
     } finally {

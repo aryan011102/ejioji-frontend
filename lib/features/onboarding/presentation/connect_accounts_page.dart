@@ -24,6 +24,7 @@ import '../../../shared/widgets/social_mark.dart';
 import '../../../shared/widgets/states.dart';
 import '../../insights/presentation/category_page.dart';
 import '../../profile/presentation/social_link_sheet.dart';
+import 'ai_consent_sheet.dart';
 
 /// What the profile is actually made of, and the one screen that deals with it.
 ///
@@ -137,6 +138,18 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
 
   /// The one inbox being refreshed or removed, when there are several.
   String? _busyInbox;
+
+  @override
+  void initState() {
+    super.initState();
+    // The AI question, during setup, before anything is read: a yes then
+    // covers the first source's insights (ai_consent_sheet.dart).
+    if (!widget.editing) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(askAboutAiOnce(context, ref));
+      });
+    }
+  }
 
   void _refetch() {
     ref
@@ -384,9 +397,10 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
         widget.editing ? Routes.editCategoryAt(0) : Routes.pickCategoryAt(0),
       );
 
-  /// On past this screen, once there is a LinkedIn link: asks for it first.
-  Future<void> _nextWithLinkedIn(bool hasLinkedIn) async {
-    if (!hasLinkedIn) {
+  /// On past this screen, once LinkedIn is settled: asks for it first when it
+  /// is required and missing.
+  Future<void> _nextWithLinkedIn(bool linkedInSettled) async {
+    if (!linkedInSettled) {
       final added = await showSocialLinkSheet(
         context,
         network: SocialNetwork.linkedin,
@@ -426,6 +440,14 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
     };
 
     final hasLinkedIn = socials.containsKey(SocialNetwork.linkedin);
+    // Required only while the server says so: a profile without one is held
+    // back by `no_linkedin` in its blocking list. The server switched it off for
+    // App Review (PROFILE_REQUIRES_LINKEDIN), and turns it back on without a
+    // release. Until the profile has loaded, it is asked for as before.
+    final linkedInRequired =
+        ref.watch(myProfileProvider).valueOrNull?.publish.needsLinkedIn ??
+            !hasLinkedIn;
+    final mustAddLinkedIn = !hasLinkedIn && linkedInRequired;
 
     return AppScaffold(
       navBar: widget.editing
@@ -438,7 +460,7 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
           : Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (!hasLinkedIn)
+                if (mustAddLinkedIn)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Text(
@@ -446,17 +468,28 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
                       textAlign: TextAlign.center,
                       style: AppText.caption,
                     ),
+                  )
+                else if (!hasLinkedIn)
+                  TextActionButton(
+                    label: 'Add your LinkedIn · only your matches see it',
+                    dim: true,
+                    onPressed: () => unawaited(
+                      showSocialLinkSheet(
+                        context,
+                        network: SocialNetwork.linkedin,
+                      ),
+                    ),
                   ),
                 PrimaryButton(
-                  label: hasLinkedIn ? 'Next' : 'Add LinkedIn',
-                  onPressed: linked.isNotEmpty || !hasLinkedIn
-                      ? () => unawaited(_nextWithLinkedIn(hasLinkedIn))
+                  label: mustAddLinkedIn ? 'Add LinkedIn' : 'Next',
+                  onPressed: linked.isNotEmpty || mustAddLinkedIn
+                      ? () => unawaited(_nextWithLinkedIn(!mustAddLinkedIn))
                       : null,
                 ),
                 // Nothing connected still has a way on: every category comes
                 // back thin, so the walk is all questions. LinkedIn is still
-                // asked for first.
-                if (linked.isEmpty && hasLinkedIn)
+                // asked for first where it is required.
+                if (linked.isEmpty && !mustAddLinkedIn)
                   TextActionButton(
                     label: "I'll do this later",
                     dim: true,

@@ -297,11 +297,13 @@ class _SentList extends ConsumerWidget {
                 14,
               ),
               child: Text(
-                out.leftToday > 0
-                    ? '${out.leftToday} more ${out.leftToday == 1 ? 'request' : 'requests'} today. '
-                        'They come back ${timeUntil(out.resetsAt)}.'
-                    : 'No requests left today. They come back '
-                        '${timeUntil(out.resetsAt)}.',
+                out.unlimited
+                    ? 'Unlimited requests with onebytwo plus.'
+                    : out.leftToday > 0
+                        ? '${out.leftToday} more ${out.leftToday == 1 ? 'request' : 'requests'} today. '
+                            'They come back ${timeUntil(out.resetsAt)}.'
+                        : 'No requests left today. They come back '
+                            '${timeUntil(out.resetsAt)}.',
                 style: AppText.callout,
               ),
             ),

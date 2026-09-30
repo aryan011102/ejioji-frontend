@@ -24,7 +24,7 @@ class WhyMattersPage extends ConsumerWidget {
     (
       'What we never see',
       'DigiLocker shares your name and date of birth with us and nothing else. '
-          'Your Aadhaar number never reaches theonebytwo, and what DigiLocker '
+          'Your Aadhaar number never reaches onebytwo, and what DigiLocker '
           'shares is never shown to another person: not to matches, not to '
           'families, not on your profile.',
     ),

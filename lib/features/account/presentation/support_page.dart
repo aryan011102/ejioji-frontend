@@ -5,7 +5,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/routes.dart';
 import '../../../core/theme/tokens.dart';
-import '../../../core/theme/typography.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/sheets.dart';
 
@@ -50,45 +49,19 @@ class SupportPage extends ConsumerWidget {
       child: ListView(
         padding: const EdgeInsets.only(top: 18, bottom: 40),
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              Insets.titleGutter,
-              0,
-              Insets.titleGutter,
-              20,
-            ),
-            child: Text(
-              'theonebytwo builds a profile out of things you already did: '
-              'orders, bookings, listening and watching. What follows says '
-              'exactly what is read, what is shown, and what never is.',
-              style: AppText.callout,
-            ),
-          ),
           SectionGroup(
-            header: 'Your data',
+            header: 'The data ones',
             children: [
               AppRow(
                 label: 'What we read from linked accounts',
-                subtitle: 'Per app, in plain language',
+                last: true,
                 leading: _lead(Icons.description_outlined),
                 onTap: () => context.push(Routes.supportRead),
-              ),
-              AppRow(
-                label: 'What other people can see',
-                leading: _lead(Icons.visibility_outlined),
-                onTap: () => context.push(Routes.supportSeen),
-              ),
-              AppRow(
-                label: 'What is never shown',
-                subtitle: 'Spending, addresses, contacts',
-                last: true,
-                leading: _lead(Icons.visibility_off_outlined),
-                onTap: () => context.push(Routes.supportNever),
               ),
             ],
           ),
           SectionGroup(
-            header: 'Safety',
+            header: 'The safety ones',
             children: [
               AppRow(
                 label: 'Safety tips',

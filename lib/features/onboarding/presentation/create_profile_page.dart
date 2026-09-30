@@ -181,6 +181,8 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
             smoking: _smoking,
             drinking: _drinking,
           );
+      // No screen for matching: it is granted here, once (Aryan, 2026-09-30).
+      await ref.read(consentRepositoryProvider).grantMatchingIfNeverAsked();
       final profile = await ref.read(profileRepositoryProvider).load();
       if (!mounted) return;
       ref.read(sessionProvider.notifier).onProfileChanged(profile);
@@ -226,11 +228,7 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
       child: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
-          const LargeTitle(
-            'The basics',
-            subtitle: 'This is the only part you fill in by hand. The rest '
-                'comes from what you already did.',
-          ),
+          const LargeTitle('The basics'),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: Insets.gutter),
             child: Column(

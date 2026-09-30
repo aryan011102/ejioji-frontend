@@ -457,7 +457,7 @@ class PremiumChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(11),
       ),
       child: Text(
-        'PREMIUM',
+        'PLUS',
         style: AppText.micro.copyWith(
           color: AppColors.accent,
           fontWeight: FontWeight.w700,

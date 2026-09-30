@@ -54,10 +54,10 @@ class SavedPage extends ConsumerWidget {
                   const SectionGroup(
                     footer: 'Keep someone to come back to later. They are '
                         'never told. Anyone you saved before is kept for when '
-                        'you have Premium again.',
+                        'you have onebytwo plus again.',
                     children: [
                       AppRow(
-                        label: 'Saved profiles are part of Premium',
+                        label: 'Saved profiles are part of onebytwo plus',
                         last: true,
                       ),
                     ],
@@ -66,7 +66,7 @@ class SavedPage extends ConsumerWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: Insets.gutter),
                     child: PrimaryButton(
-                      label: "See what's in Premium",
+                      label: "See what's in onebytwo plus",
                       onPressed: () => context.push(Routes.premium),
                     ),
                   ),

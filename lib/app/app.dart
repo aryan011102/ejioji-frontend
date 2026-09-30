@@ -90,7 +90,7 @@ class _EjiojiAppState extends ConsumerState<EjiojiApp> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: AppTheme.overlay,
       child: MaterialApp.router(
-        title: 'theonebytwo',
+        title: 'onebytwo',
         debugShowCheckedModeBanner: false,
         routerConfig: ref.watch(routerProvider),
         theme: AppTheme.dark,

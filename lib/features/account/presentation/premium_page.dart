@@ -17,7 +17,7 @@ import '../../../shared/widgets/pressable.dart';
 import '../../../shared/widgets/sheets.dart';
 import '../../../shared/widgets/states.dart';
 
-/// Four things, and none of them unlock something we took away.
+/// A little more access. A lot more control.
 ///
 /// The plans come from the server. While it says `free_for_now`, starting a
 /// plan grants it for that long at no charge. After that a plan is bought in
@@ -48,7 +48,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
     (
       Icons.visibility_off_outlined,
       'Stealth mode',
-      "Browse without appearing in anyone's feed — and without landing on "
+      "Browse without appearing in anyone's feed, and without landing on "
           'their views list.',
     ),
     (
@@ -60,6 +60,11 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
       Icons.bookmark_border,
       'Saved profiles',
       'Keep someone to come back to. They are never told.',
+    ),
+    (
+      Icons.all_inclusive,
+      'Unlimited Requests',
+      'No daily limit, request as many people you like',
     ),
   ];
 
@@ -85,7 +90,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
     try {
       if (status.freeForNow) {
         await ref.read(premiumRepositoryProvider).start(_plan);
-        _done('Premium is on.');
+        _done('onebytwo plus is on.');
       } else {
         await _buy(status);
       }
@@ -109,8 +114,8 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
         );
     if (outcome == BuyOutcome.cancelled) return;
     await _checkStore(
-      found: 'Premium is on.',
-      notYet: 'Paid. Premium turns on in a minute or two.',
+      found: 'onebytwo plus is on.',
+      notYet: 'Paid. onebytwo plus turns on in a minute or two.',
     );
   }
 
@@ -121,7 +126,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
     try {
       await ref.read(storePurchasesProvider).restore(userId: userId);
       await _checkStore(
-        found: 'Premium restored.',
+        found: 'onebytwo plus restored.',
         notYet: 'Nothing to restore on this Apple ID.',
       );
     } on StoreFailure catch (e) {
@@ -198,7 +203,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
       footer: Column(
         children: [
           PrimaryButton(
-            label: active ? 'You have Premium' : 'Start Premium',
+            label: active ? 'You have onebytwo plus' : 'Start onebytwo plus',
             busy: _starting,
             onPressed: status == null || active || _starting
                 ? null
@@ -265,7 +270,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
                     ),
                     const SizedBox(width: 9),
                     Text(
-                      'THEONEBYTWO PREMIUM',
+                      'ONEBYTWO PLUS',
                       style: AppText.micro.copyWith(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -277,8 +282,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'Four things, and none of them unlock something we took '
-                  'away.',
+                  'A little more access. A lot more control.',
                   style: AppText.title1.copyWith(fontSize: 31, height: 37 / 31),
                 ),
               ],

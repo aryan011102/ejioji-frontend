@@ -102,7 +102,7 @@ class StorePurchases {
     required bool renews,
   }) async {
     if (!available) {
-      throw const StoreFailure('Premium can be bought in the iPhone app.');
+      throw const StoreFailure('onebytwo plus can be bought in the iPhone app.');
     }
     try {
       await _ensure();
@@ -124,7 +124,7 @@ class StorePurchases {
       return switch (PurchasesErrorHelper.getErrorCode(e)) {
         PurchasesErrorCode.purchaseCancelledError => BuyOutcome.cancelled,
         PurchasesErrorCode.paymentPendingError => throw const StoreFailure(
-            'Your payment is waiting for approval. Premium starts when it '
+            'Your payment is waiting for approval. onebytwo plus starts when it '
             'goes through.',
           ),
         PurchasesErrorCode.purchaseNotAllowedError => throw const StoreFailure(

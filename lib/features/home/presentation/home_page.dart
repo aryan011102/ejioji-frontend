@@ -89,12 +89,12 @@ class HomePage extends ConsumerWidget {
       return AppScaffold(
         child: EmptyState(
           icon: Icons.visibility_off_outlined,
-          title: 'You are not showing yet',
+          title: 'You are not discoverable yet',
           body: session.isUnderReview
               ? 'A moderator is looking at your profile. It is hidden until '
                   'that is finished.'
-              : 'Finish your profile and publish it. Until you do, you can '
-                  'look around but nobody is shown you.',
+              : 'Finish your profile. Till then, you may look around but no '
+                  'one can see your profile.',
           primaryLabel: session.isUnderReview ? null : 'Finish my profile',
           onPrimary: session.isUnderReview
               ? null

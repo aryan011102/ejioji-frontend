@@ -43,7 +43,7 @@ class SubscriptionPage extends ConsumerWidget {
       Uri.parse('https://apps.apple.com/account/subscriptions');
 
   static const _afterwards = 'When it ends you are back on free, and anything '
-      'Premium turned on, like stealth, turns off with it.';
+      'onebytwo plus turned on, like stealth, turns off with it.';
 
   /// What the footer says depends on where the plan came from: a free plan
   /// and a pass just end, a subscription renews until it is cancelled in
@@ -69,7 +69,7 @@ class SubscriptionPage extends ConsumerWidget {
         header: 'Current plan',
         footer: footer(status),
         children: [
-          const AppRow(label: 'Plan', value: 'Premium'),
+          const AppRow(label: 'Plan', value: 'onebytwo plus'),
           if (plan != null) AppRow(label: 'Length', value: plan),
           AppRow(
             label: renews ? 'Renews' : 'Ends',
@@ -93,15 +93,12 @@ class SubscriptionPage extends ConsumerWidget {
   List<Widget> _free(BuildContext context) => [
         const SectionGroup(
           header: 'Current plan',
-          footer: 'Everything the product is for works on free: anyone can '
-              'write to you, you can write to anyone, and replying is '
-              'optional.',
           children: [AppRow(label: 'Plan', value: 'Free', last: true)],
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: Insets.gutter),
           child: PrimaryButton(
-            label: "See what's in Premium",
+            label: "See what's in onebytwo plus",
             onPressed: () => context.push(Routes.premium),
           ),
         ),

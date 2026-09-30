@@ -354,8 +354,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     title: _theirs ? 'Nothing on show' : 'Your wall is empty',
                     body: _theirs
                         ? 'This person has not put anything on their profile.'
-                        : 'Connect something, or answer a few questions, and '
-                            'pick what goes on your wall.',
+                        : 'Connect an app and pick what goes on your wall.',
                     primaryLabel: _theirs ? null : 'Pick your tiles',
                     onPrimary: _theirs
                         ? null
@@ -670,9 +669,23 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         icon: Icons.visibility_off_outlined,
         text: publish.blocking.isEmpty
             ? 'Your profile is hidden. Show it again from the You tab.'
-            : publish.blocking.map((b) => b.message).join('. '),
+            : _blockingText(publish.blocking),
       ),
     );
+  }
+
+  /// The tile count and the category count are one rule, so they are one
+  /// sentence here rather than the server's two. Anything else is the
+  /// server's own message.
+  static String _blockingText(List<PublishBlocker> blocking) {
+    const tileRule = {Blocker.tooFewTiles, Blocker.tooFewCategories};
+    return [
+      if (blocking.any((b) => tileRule.contains(b.code)))
+        'To make your profile discoverable, add at least 6 insight tiles '
+            'across at least 3 categories',
+      for (final b in blocking)
+        if (!tileRule.contains(b.code)) b.message,
+    ].join('. ');
   }
 
   Widget _foot(
@@ -708,36 +721,22 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     }
 
     if (widget.mode == ProfileMode.review) {
-      final ready = publish?.canPublish ?? false;
-      return Column(
+      return Row(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: SecondaryButton(
-                  label: 'Edit profile',
-                  onPressed: () => context.push(Routes.editSources),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                flex: 2,
-                child: PrimaryButton(
-                  label: 'Done',
-                  onPressed: _done,
-                ),
-              ),
-            ],
-          ),
-          if (!ready && publish != null && publish.blocking.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Others see you once this is done: '
-              '${publish.blocking.first.message}',
-              textAlign: TextAlign.center,
-              style: AppText.caption,
+          Expanded(
+            child: SecondaryButton(
+              label: 'Edit profile',
+              onPressed: () => context.push(Routes.editSources),
             ),
-          ],
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            flex: 2,
+            child: PrimaryButton(
+              label: 'Done',
+              onPressed: _done,
+            ),
+          ),
         ],
       );
     }

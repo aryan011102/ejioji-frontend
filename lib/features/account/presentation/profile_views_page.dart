@@ -63,7 +63,7 @@ class ProfileViewsPage extends ConsumerWidget {
                     header: seen.total == 1
                         ? '1 person has looked'
                         : '${seen.total} people have looked',
-                    footer: 'Names and faces are part of Premium. The count '
+                    footer: 'Names and faces are part of onebytwo plus. The count '
                         'is always free.',
                     children: [
                       for (var i = 0; i < seen.total.clamp(1, 3); i++)
@@ -83,7 +83,7 @@ class ProfileViewsPage extends ConsumerWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: Insets.gutter),
                     child: PrimaryButton(
-                      label: 'See who with Premium',
+                      label: 'See who with onebytwo plus',
                       onPressed: () => context.push(Routes.premium),
                     ),
                   ),

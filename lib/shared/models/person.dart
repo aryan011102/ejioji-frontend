@@ -289,16 +289,21 @@ class OutgoingRequests {
     required this.requests,
     required this.leftToday,
     required this.resetsAt,
+    this.unlimited = false,
   });
 
   final List<PendingRequest> requests;
   final int leftToday;
   final DateTime resetsAt;
 
+  /// onebytwo plus: no daily cap. [leftToday] is still sent, and means nothing.
+  final bool unlimited;
+
   static OutgoingRequests fromJson(Json j) => OutgoingRequests(
         requests: PendingRequest.listFrom(j.objects('requests')),
         leftToday: j.intOr('requests_left_today', 0),
         resetsAt: j.time('resets_at'),
+        unlimited: j.flag('unlimited_requests'),
       );
 }
 

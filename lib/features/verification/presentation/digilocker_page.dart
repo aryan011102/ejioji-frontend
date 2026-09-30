@@ -32,21 +32,18 @@ class DigilockerStepsPage extends ConsumerStatefulWidget {
 class _DigilockerStepsPageState extends ConsumerState<DigilockerStepsPage> {
   bool _checking = false;
 
-  /// Consent first, always. The server refuses to start a check without an
-  /// open identity_verification grant, so asking here is the only order that
-  /// works, and the notice's words are the server's.
+  /// The server refuses to start a check without an open
+  /// identity_verification grant. Tapping Continue is the person choosing to
+  /// verify, so it is granted then, with no screen of its own (Aryan,
+  /// 2026-09-30).
   Future<void> _continue() async {
     setState(() => _checking = true);
     try {
-      final consent = await ref.read(consentProvider.future);
+      await ref
+          .read(consentRepositoryProvider)
+          .grantNow(ConsentPurpose.identityVerification);
+      ref.invalidate(consentProvider);
       if (!mounted) return;
-      if (!consent.isGranted(ConsentPurpose.identityVerification)) {
-        final granted = await context.push<bool>(
-          '${Routes.consent}?purpose=${ConsentPurpose.identityVerification.wire}',
-        );
-        if (granted != true || !mounted) return;
-        ref.invalidate(consentProvider);
-      }
       await context.push(Routes.digilockerHandoff);
     } on ApiException catch (e) {
       if (mounted) showAppToast(context, e.message);
@@ -90,7 +87,7 @@ class _DigilockerStepsPageState extends ConsumerState<DigilockerStepsPage> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Two steps, about a minute.',
+            'Two steps, one minute.',
             style: AppText.title1.copyWith(fontSize: 27, height: 33 / 27),
           ),
           const SizedBox(height: 8),
@@ -117,7 +114,7 @@ class _DigilockerStepsPageState extends ConsumerState<DigilockerStepsPage> {
           const SizedBox(height: 26),
           const NoteCard(
             icon: Icons.lock_outline,
-            text: 'DigiLocker is run by the Government of India. theonebytwo '
+            text: 'DigiLocker is run by the Government of India. onebytwo '
                 'never sees your password or your OTP.',
           ),
         ],

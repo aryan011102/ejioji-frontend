@@ -121,7 +121,7 @@ class _ReportProblemPageState extends ConsumerState<ReportProblemPage> {
                 hintText: switch (_topic) {
                   FeedbackTopic.bug =>
                     'What were you doing, and what went wrong?',
-                  FeedbackTopic.idea => 'What would make theonebytwo better?',
+                  FeedbackTopic.idea => 'What would make onebytwo better?',
                   FeedbackTopic.other => 'Whatever is on your mind.',
                 },
                 hintStyle: AppText.body.copyWith(

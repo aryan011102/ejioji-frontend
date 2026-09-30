@@ -54,7 +54,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
     (
       Icons.auto_awesome,
       'Priority in feeds',
-      'Your profile is shown to more people, sooner.',
+      'Your profile gets priority over others.',
     ),
     (
       Icons.bookmark_border,

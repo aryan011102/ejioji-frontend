@@ -84,6 +84,12 @@ class AuthRepository {
   final TokenStore _tokens;
   final DeviceIdentity _device;
 
+  /// The Terms and Privacy Policy version the first screen asks people to
+  /// tick, sent with every sign-in so the server records who agreed to what.
+  /// Nobody reaches sign-in without ticking it. Moves with the server's
+  /// `accounts.terms.TERMS_VERSION`, when the documents change.
+  static const termsVersion = 1;
+
   /// Sends a code. The phone goes up in whatever form the field produced; the
   /// server is the one that normalises it.
   Future<OtpChallenge> requestCode(String phone) async {
@@ -115,6 +121,7 @@ class AuthRepository {
           'code': code,
           'device_key': await _device.key(),
           'platform': DeviceIdentity.platform,
+          'accept_terms_version': termsVersion,
         },
       );
     } on UnauthorisedFailure catch (e) {
@@ -150,6 +157,7 @@ class AuthRepository {
           'id_token': idToken,
           'device_key': await _device.key(),
           'platform': DeviceIdentity.platform,
+          'accept_terms_version': termsVersion,
         },
       );
     } on UnauthorisedFailure catch (e) {

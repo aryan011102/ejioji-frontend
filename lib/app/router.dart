@@ -107,10 +107,16 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.consent,
         builder: (_, state) {
-          // A single purpose when a source needs one; all of them otherwise.
-          final one = state.uri.queryParameters['purpose'];
+          // A single purpose when a source needs one; every one from Settings
+          // (Privacy choices); onboarding's set otherwise.
+          final q = state.uri.queryParameters;
+          final one = q['purpose'];
           return ConsentPage(
-            purposes: one == null ? null : [ConsentPurpose.parse(one)],
+            purposes: one != null
+                ? [ConsentPurpose.parse(one)]
+                : q['all'] == '1'
+                    ? ConsentPage.everything
+                    : null,
           );
         },
       ),

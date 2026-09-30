@@ -316,6 +316,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ),
                 onTap: () => context.push(Routes.support),
               ),
+              // Every permission, each with its switch. The consent notices
+              // name this row as where to withdraw, and withdrawing must be as
+              // easy as agreeing (DPDP), so it sits here, not inside a source.
+              AppRow(
+                label: 'Privacy choices',
+                leading: const Icon(
+                  Icons.privacy_tip_outlined,
+                  size: 18,
+                  color: AppColors.label2,
+                ),
+                onTap: () => context.push('${Routes.consent}?all=1'),
+              ),
               AppRow(
                 label: 'Rate theonebytwo on the App Store',
                 last: true,

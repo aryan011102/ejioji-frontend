@@ -40,6 +40,16 @@ class ConsentPage extends ConsumerStatefulWidget {
   /// case.
   final List<ConsentPurpose>? purposes;
 
+  /// Every permission, for Settings, Privacy choices: the one place anybody
+  /// can see and take back everything they agreed to, which the published
+  /// notices point at. Verification is here too, though onboarding never asks
+  /// for it there.
+  static List<ConsentPurpose> get everything => [
+        for (final p in _ConsentPageState._order)
+          if (p != ConsentPurpose.appleMusicImport || AppleMusicKit.isAvailable) p,
+        ConsentPurpose.identityVerification,
+      ];
+
   @override
   ConsumerState<ConsentPage> createState() => _ConsentPageState();
 }

@@ -89,6 +89,13 @@
 	<key>NSAppleMusicUsageDescription</key>
 	<string>If you connect Apple Music, to read the songs and albums in your library once for your music insights. Also to pick a file you choose to share.</string>
 
+	<!-- Never asked either: nothing in the app reads location. A library in
+	     the build references the location API, and Apple warned on build 25
+	     (ITMS-90683) that a build linking it needs this key. The string is
+	     true, so if iOS ever does show it, it says what actually happens. -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>theonebytwo does not use your location. Your city is the one you choose on your profile.</string>
+
 	<!-- url_launcher checks whether it can open a link before opening it, and
 	     on iOS that check needs the scheme declared. Only https: the consent
 	     pages are the only thing this app opens. -->

@@ -306,6 +306,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     PublishState? publish,
   }) {
     final shown = _ordered(tiles);
+    final photosItem = _photosItem(photos);
 
     return AppScaffold(
       navBar: _topBar(context, person),
@@ -363,6 +364,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 )
               else if (_arranging)
                 ArrangeWall(
+                  photos: photosItem,
                   tiles: shown,
                   mediaOf: _media,
                   onReorder: (moved, target) => _reorder(tiles, moved, target),
@@ -376,26 +378,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               else
                 BentoGrid(
                   children: [
-                    // First, so it is always in the top row: the grid packs
-                    // from the top, so the first item takes the top left.
-                    // Always square, whatever else is on the wall, so a photo
-                    // is never cropped wide. The rows may then come out one
-                    // square short at the foot of the wall.
-                    // Every photo on the profile, the main one included, so
-                    // the tile is the one place to page through all of them.
-                    // The main one goes last rather than first: it is already
-                    // the round picture beside the name, and the tile opening
-                    // on it again reads as the same photo twice.
-                    if (photos.isNotEmpty)
-                      BentoItem(
-                        size: TileSize.small,
-                        child: PhotosTile(
-                          photoUrls: [
-                            for (final p in [...photos.skip(1), photos.first])
-                              p.stillUrl,
-                          ],
-                        ),
-                      ),
+                    if (photosItem != null) photosItem,
                     for (final t in shown)
                       BentoItem(
                         size: t.tileSize,
@@ -463,6 +446,29 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   /// uploads, so a new photo is there before the profile is pulled again; a
   /// viewer sees only what the server sent, because tile keys are shared
   /// between people and your upload is not theirs.
+  /// The photos tile, first so it is always in the top row: the grid packs
+  /// from the top, so the first item takes the top left. Always square,
+  /// whatever else is on the wall, so a photo is never cropped wide. The rows
+  /// may then come out one square short at the foot of the wall.
+  ///
+  /// Every photo on the profile, the main one included, so the tile is the one
+  /// place to page through all of them. The main one goes last rather than
+  /// first: it is already the round picture beside the name, and the tile
+  /// opening on it again reads as the same photo twice.
+  ///
+  /// Arrange mode shows it too, pinned, so every other tile packs where it
+  /// does on the wall.
+  BentoItem? _photosItem(List<MediaAsset> photos) => photos.isEmpty
+      ? null
+      : BentoItem(
+          size: TileSize.small,
+          child: PhotosTile(
+            photoUrls: [
+              for (final p in [...photos.skip(1), photos.first]) p.stillUrl,
+            ],
+          ),
+        );
+
   MediaAsset? _media(api.ProfileTile t) => _theirs
       ? t.media
       : ref.watch(tileMediaProvider).resolve(t.kind, t.key, t.media);

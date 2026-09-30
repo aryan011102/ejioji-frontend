@@ -20,8 +20,13 @@ const kMinTiles = 6;
 ///
 /// Dragging is long-press rather than immediate, because the wall scrolls: an
 /// immediate drag would fight every scroll gesture on the screen.
+///
+/// The photos tile sits first, as on the wall, and does not move. Leaving it
+/// out would make every other tile pack into a different place than the one
+/// it is being arranged for.
 class ArrangeWall extends StatefulWidget {
   const ArrangeWall({
+    required this.photos,
     required this.tiles,
     required this.mediaOf,
     required this.onReorder,
@@ -29,6 +34,9 @@ class ArrangeWall extends StatefulWidget {
     required this.onFloorHit,
     super.key,
   });
+
+  /// The wall's photos tile, or null when there are no photos. Pinned.
+  final BentoItem? photos;
 
   /// In the order they are shown. A tile is identified by its key, which is
   /// stable across a refresh, so rearranging and then re-pulling a source
@@ -66,9 +74,12 @@ class _ArrangeWallState extends State<ArrangeWall>
   @override
   Widget build(BuildContext context) {
     final canRemove = widget.tiles.length > kMinTiles;
+    final photos = widget.photos;
 
     return BentoGrid(
       children: [
+        if (photos != null)
+          BentoItem(size: photos.size, child: _Pinned(child: photos.child)),
         for (final tile in widget.tiles)
           BentoItem(
             size: tile.tileSize,
@@ -85,6 +96,43 @@ class _ArrangeWallState extends State<ArrangeWall>
                   canRemove ? widget.onRemove(tile.key) : widget.onFloorHit(),
             ),
           ),
+      ],
+    );
+  }
+}
+
+/// A tile that stays put: no wobble, no ✕, not a drop target, and a lock
+/// where the ✕ would be, so it reads as fixed rather than broken.
+class _Pinned extends StatelessWidget {
+  const _Pinned({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned.fill(child: child),
+        Positioned(
+          top: 9,
+          left: 9,
+          child: Semantics(
+            label: 'Photos stay first',
+            child: Container(
+              width: 26,
+              height: 26,
+              decoration: const BoxDecoration(
+                color: Color(0x8C000000),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.lock_outline,
+                size: 14,
+                color: AppColors.label,
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }

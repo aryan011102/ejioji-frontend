@@ -115,8 +115,16 @@ class MediaRepository {
 
   /// Turns the uploaded bytes into an asset. This is where the server reads,
   /// re-encodes and deletes the original, so it is slower than it looks.
-  Future<MediaAsset> complete(String mediaId) async =>
-      MediaAsset.fromJson(await _api.post(Api.mediaComplete(mediaId)));
+  ///
+  /// It gets 90 seconds, not the client's 20: a chat video is re-encoded here,
+  /// and every photo goes through the content check, so a slow server is the
+  /// realistic failure rather than a dead one.
+  Future<MediaAsset> complete(String mediaId) async => MediaAsset.fromJson(
+        await _api.post(
+          Api.mediaComplete(mediaId),
+          receiveTimeout: const Duration(seconds: 90),
+        ),
+      );
 
   /// Deletes the asset and its blobs. A photo on the profile comes off it in
   /// the same transaction.

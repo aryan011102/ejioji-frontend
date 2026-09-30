@@ -8,5 +8,7 @@
   "FCM_ANDROID_APP_ID": "",
   "FCM_ANDROID_API_KEY": "",
   "FCM_IOS_APP_ID": "",
-  "FCM_IOS_API_KEY": ""
+  "FCM_IOS_API_KEY": "",
+
+  "REVENUECAT_IOS_KEY": ""
 }

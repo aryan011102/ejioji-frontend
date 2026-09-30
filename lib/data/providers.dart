@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/network/api_client.dart';
+import '../core/purchases/store_purchases.dart';
 import '../core/session/session.dart';
 import '../core/storage/device.dart';
 import '../core/storage/token_store.dart';
@@ -200,6 +201,26 @@ final savedProvider = FutureProvider.autoDispose<SavedProfiles>(
 /// plan, together with the views list, which it unlocks.
 final premiumProvider = FutureProvider.autoDispose<PremiumStatus>(
   (ref) => ref.watch(premiumRepositoryProvider).status(),
+);
+
+/// The App Store's own price for each plan, by product id, formatted by Apple
+/// for this person. Empty until it loads, and wherever the store is not set
+/// up; the Premium page then shows the server's list price.
+final storePricesProvider = FutureProvider.autoDispose<Map<String, String>>(
+  (ref) async {
+    final status = await ref.watch(premiumProvider.future);
+    if (status.freeForNow) return const {};
+    return ref.read(storePurchasesProvider).prices(
+          subscriptions: [
+            for (final p in status.plans)
+              if (p.renews && p.productId.isNotEmpty) p.productId,
+          ],
+          oneOffs: [
+            for (final p in status.plans)
+              if (!p.renews && p.productId.isNotEmpty) p.productId,
+          ],
+        );
+  },
 );
 
 final conversationsProvider = FutureProvider.autoDispose<List<Conversation>>(

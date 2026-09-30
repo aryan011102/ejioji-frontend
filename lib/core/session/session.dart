@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/providers.dart';
 import '../../shared/models/profile.dart';
 import '../network/api_exception.dart';
+import '../purchases/store_purchases.dart';
 import '../storage/token_store.dart';
 
 /// How far through the app a person is.
@@ -141,6 +142,8 @@ class SessionController extends Notifier<Session> {
     // the only place it happens, so somebody who signed in on a build without
     // push gets asked the next time they open the app.
     unawaited(ref.read(pushRegistrationProvider).start());
+    // App Store purchases belong to the account, not the phone.
+    unawaited(ref.read(storePurchasesProvider).logIn(userId));
   }
 
   /// Called by anything that has just changed the profile, so the router and
@@ -160,6 +163,7 @@ class SessionController extends Notifier<Session> {
   /// it does not navigate itself.
   Future<void> onSessionLost() async {
     await ref.read(pushRegistrationProvider).stop();
+    await ref.read(storePurchasesProvider).logOut();
     await ref.read(tokenStoreProvider).clear();
     state = const Session(stage: SessionStage.signedOut);
   }
@@ -174,6 +178,8 @@ class SessionController extends Notifier<Session> {
     // The phone forgets its token whatever the server says, so no push can
     // reach the next person to sign in on this install.
     await ref.read(pushRegistrationProvider).stop();
+    // And the next person on this phone does not inherit this one's purchases.
+    await ref.read(storePurchasesProvider).logOut();
     try {
       await auth.clearPushToken();
     } on ApiException {

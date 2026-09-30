@@ -39,6 +39,13 @@ abstract final class Env {
       .where((p) => p.isNotEmpty)
       .toList(growable: false);
 
+  /// RevenueCat's public iOS key (`appl_...`), for buying Premium in the App
+  /// Store. Not a secret: it can only start purchases and read what this
+  /// install bought, and the server re-checks everything with its own secret
+  /// key. Empty means buying is off in this build.
+  static const String revenueCatIosKey =
+      String.fromEnvironment('REVENUECAT_IOS_KEY');
+
   /// Firebase, for push notifications only.
   ///
   /// None of these is a secret: every Android app ships them in plain sight

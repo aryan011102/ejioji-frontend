@@ -158,11 +158,19 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Future<void> _delete() async {
+    // Apple requires saying this: erasing the account does not stop the App
+    // Store charging for a subscription, which only the person can cancel.
+    // Said whenever we cannot tell they have none.
+    final premium = ref.read(premiumProvider).valueOrNull;
+    final mayRenew = premium == null ||
+        (premium.fromStore && (premium.current?.renews ?? true));
     final choice = await showAppActionSheet(
       context,
       title: 'Delete your account?',
       message: 'Your profile, your insights, your photos and every chat go '
-          'with it. This cannot be undone.',
+          'with it. This cannot be undone.'
+          '${mayRenew ? " Deleting does not cancel an App Store subscription: "
+              "cancel it first in your Apple ID's Subscriptions." : ""}',
       actions: const [
         SheetAction('Delete everything', destructive: true),
         // Offered next to the ending, because most people who open this sheet

@@ -157,6 +157,35 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
+  /// Waiting on the server to end the sessions.
+  bool _signingOut = false;
+
+  /// Signs out on every phone, not just this one: the server ends every
+  /// session, because the reason someone logs out of a matrimonial app is
+  /// often that someone else has had their phone. The sheet says so, since
+  /// "log out" usually means this device only.
+  ///
+  /// The router moves to the start once the session is signed out, so nothing
+  /// here navigates.
+  Future<void> _signOut() async {
+    if (_signingOut) return;
+    final choice = await showAppActionSheet(
+      context,
+      title: 'Log out?',
+      message: 'This logs you out on every phone signed in to your account. '
+          'Your profile, matches and chats stay as they are.',
+      actions: const [SheetAction('Log out', destructive: true)],
+    );
+    if (choice != 0 || !mounted) return;
+    setState(() => _signingOut = true);
+    try {
+      // The phone forgets the session whatever the server says.
+      await ref.read(sessionProvider.notifier).signOut();
+    } finally {
+      if (mounted) setState(() => _signingOut = false);
+    }
+  }
+
   Future<void> _delete() async {
     // Apple requires saying this: erasing the account does not stop the App
     // Store charging for a subscription, which only the person can cancel.
@@ -347,6 +376,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
           SectionGroup(
             children: [
+              AppRow(
+                label: 'Log out',
+                leading: const Icon(
+                  Icons.logout,
+                  size: 18,
+                  color: AppColors.label2,
+                ),
+                control: _signingOut ? const _RowSpinner() : null,
+                onTap: _signOut,
+              ),
               AppRow(
                 label: 'Delete account',
                 destructive: true,

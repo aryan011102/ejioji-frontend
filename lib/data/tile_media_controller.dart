@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/network/api_exception.dart';
+import '../core/session/session.dart';
 import '../shared/models/enums.dart';
 import '../shared/models/media.dart';
 import 'providers.dart';
@@ -50,7 +51,11 @@ class TileMediaController extends Notifier<TileMedia> {
   final _picker = ImagePicker();
 
   @override
-  TileMedia build() => const TileMedia();
+  TileMedia build() {
+    // Starts empty for each account, like the feed and the photo pool.
+    ref.watch(sessionProvider.select((s) => s.userId));
+    return const TileMedia();
+  }
 
   /// Picks from [source] and puts it behind the tile. A cancelled picker is
   /// not an error and says nothing.

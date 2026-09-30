@@ -48,7 +48,7 @@ class PremiumPlan {
           "least 24 hours before it ends, in your Apple ID's Subscriptions."
       : '$price once, for $title. Does not renew.';
 
-  /// "₹1,799": rupees, grouped the Indian way.
+  /// "₹1,499": rupees, grouped the Indian way.
   String get price => '₹${_indian(pricePaise ~/ 100)}';
 
   static String _indian(int n) {

@@ -100,6 +100,7 @@ class _SplashPageState extends ConsumerState<SplashPage> {
                                 style: AppText.micro.copyWith(
                                   fontSize: 13,
                                   height: 18 / 13,
+                                  color: AppColors.label2,
                                 ),
                                 children: [
                                   const TextSpan(
@@ -162,7 +163,7 @@ class _Tick extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: on ? AppColors.fill : null,
-          border: on ? null : Border.all(color: AppColors.label4, width: 1.5),
+          border: on ? null : Border.all(color: AppColors.label2, width: 1.5),
         ),
         child: on
             ? const Icon(Icons.check, size: 14, color: AppColors.onAccent)

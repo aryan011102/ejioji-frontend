@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/network/api_exception.dart';
+import '../core/session/session.dart';
 import '../shared/models/media.dart';
 import 'providers.dart';
 
@@ -52,6 +53,10 @@ class PhotoController extends Notifier<PhotoPool> {
 
   @override
   PhotoPool build() {
+    // As with the feed: another account's photos must not outlive a sign-out.
+    if (ref.watch(sessionProvider.select((s) => s.userId)) == null) {
+      return const PhotoPool();
+    }
     Future.microtask(load);
     return const PhotoPool();
   }

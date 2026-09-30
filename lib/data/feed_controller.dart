@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/network/api_exception.dart';
+import '../core/session/session.dart';
 import '../shared/models/person.dart';
 import '../shared/models/tile.dart';
 import 'providers.dart';
@@ -73,6 +74,12 @@ class FeedController extends Notifier<FeedState> {
 
   @override
   FeedState build() {
+    // Rebuilt when the account changes, so the next person to sign in on this
+    // phone never sees the last one's deck. Signed out, there is nothing to
+    // fetch.
+    if (ref.watch(sessionProvider.select((s) => s.userId)) == null) {
+      return const FeedState();
+    }
     Future.microtask(refresh);
     return const FeedState();
   }

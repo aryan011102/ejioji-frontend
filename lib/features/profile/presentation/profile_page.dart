@@ -318,7 +318,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             padding: EdgeInsets.only(bottom: _viewer ? _actionsHeight : 24),
             children: [
               _header(name, pronouns, chips, photos, verified: verified),
-              if (!_viewer) ...[
+              if (!_theirs) ...[
                 if (publish != null) _publishState(publish),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(
@@ -350,13 +350,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   padding: const EdgeInsets.only(top: 60),
                   child: EmptyState(
                     icon: Icons.grid_view_outlined,
-                    title: _viewer ? 'Nothing on show' : 'Your wall is empty',
-                    body: _viewer
+                    title: _theirs ? 'Nothing on show' : 'Your wall is empty',
+                    body: _theirs
                         ? 'This person has not put anything on their profile.'
                         : 'Connect something, or answer a few questions, and '
                             'pick what goes on your wall.',
-                    primaryLabel: _viewer ? null : 'Pick your tiles',
-                    onPrimary: _viewer
+                    primaryLabel: _theirs ? null : 'Pick your tiles',
+                    onPrimary: _theirs
                         ? null
                         : () => context.push(Routes.editSources),
                   ),
@@ -417,7 +417,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                           // The source glyph is for the owner sorting their
                           // own wall. A viewer is being introduced to a person
                           // and does not need a filing system on the photos.
-                          categoryGlyph: _viewer ? null : t.glyph,
+                          categoryGlyph: _theirs ? null : t.glyph,
                           ),
                         ),
                       ),
@@ -425,7 +425,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 ),
               // The design's closing line on your own wall: what a stranger
               // does not see, and who sees the socials.
-              if (!_viewer && shown.isNotEmpty)
+              if (!_theirs && shown.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
                   child: Row(
@@ -463,7 +463,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   /// uploads, so a new photo is there before the profile is pulled again; a
   /// viewer sees only what the server sent, because tile keys are shared
   /// between people and your upload is not theirs.
-  MediaAsset? _media(api.ProfileTile t) => _viewer
+  MediaAsset? _media(api.ProfileTile t) => _theirs
       ? t.media
       : ref.watch(tileMediaProvider).resolve(t.kind, t.key, t.media);
 
@@ -558,7 +558,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }) {
     // Their profile shows what they stated and nothing else. Your own offers the
     // way in, because a field nobody can find is a field nobody fills.
-    final pronounLine = pronouns?.label ?? (_viewer ? null : 'Add pronouns');
+    final pronounLine = pronouns?.label ?? (_theirs ? null : 'Add pronouns');
 
     return Padding(
       padding: const EdgeInsets.only(top: 4),
@@ -609,7 +609,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                         const SizedBox(height: 3),
                         _PronounLine(
                           text: pronounLine,
-                          editable: !_viewer,
+                          editable: !_theirs,
                           onTap: () => context.push(Routes.editInfo),
                         ),
                       ],

@@ -79,9 +79,9 @@ class _SharePageState extends ConsumerState<SharePage> {
         final box = context.findRenderObject() as RenderBox?;
         await SharePlus.instance.share(
           ShareParams(
-            text: "$_them's profile on theonebytwo. The link works for two "
+            text: "$_them's profile on onebytwo. The link works for two "
                 'days: ${made.url}',
-            subject: '$_them on theonebytwo',
+            subject: '$_them on onebytwo',
             sharePositionOrigin: box == null
                 ? null
                 : box.localToGlobal(Offset.zero) & box.size,

@@ -71,7 +71,7 @@ class VerifyHubPage extends ConsumerWidget {
                   subtitle: v.verified
                       ? 'Done. Your name and age match your Aadhaar.'
                       : v.available
-                          ? 'Your name and date of birth, about a minute'
+                          ? null
                           : 'Not available right now',
                   leading: const Icon(
                     Icons.description_outlined,

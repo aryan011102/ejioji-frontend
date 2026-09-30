@@ -64,7 +64,7 @@ class VerifyToChatCard extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Only verified people can send messages on theonebytwo. You can '
+          'Only verified people can send messages on onebytwo. You can '
           'still read what is written to you.',
           style: AppText.callout,
         ),

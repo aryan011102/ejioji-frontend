@@ -394,11 +394,14 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                                   'behind any of them.',
                       style: AppText.callout.copyWith(fontSize: 14),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      _tally(_elsewhere + picked.length),
-                      style: AppText.caption,
-                    ),
+                    // Not where we asked: the questions are the page there.
+                    if (!asking) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        _tally(_elsewhere + picked.length),
+                        style: AppText.caption,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -438,18 +441,20 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                   media: media,
                   saved: saved,
                 ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(Insets.titleGutter, 16, Insets.titleGutter, 0),
-                child: Text(
-                  widget.editing
-                      ? 'Dropping a tile takes it off your profile. It stays here, '
-                          'and you can put it back any time.'
-                      : 'Nothing here is public until you pick it. Anything left '
-                          'unpicked never appears on your profile, but still '
-                          'informs matching.',
-                  style: AppText.caption,
+              // Not where we asked on setup: there is nothing unpicked to explain.
+              if (widget.editing || !asking)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(Insets.titleGutter, 16, Insets.titleGutter, 0),
+                  child: Text(
+                    widget.editing
+                        ? 'Dropping a tile takes it off your profile. It stays here, '
+                            'and you can put it back any time.'
+                        : 'Nothing here is public until you pick it. Anything left '
+                            'unpicked never appears on your profile, but still '
+                            'informs matching.',
+                    style: AppText.caption,
+                  ),
                 ),
-              ),
             ],
           ),
           if (_capNote case final note?)

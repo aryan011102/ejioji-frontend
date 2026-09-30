@@ -73,7 +73,7 @@ class AccountPage extends ConsumerWidget {
                   : 'Get verified',
               body: profile.valueOrNull?.verified ?? false
                   ? 'Your profile carries the blue tick.'
-                  : 'Check your name and age with DigiLocker, about a minute.',
+                  : 'Take a minute to check your name and age with DigiLocker.',
               onTap: () => context.push(Routes.verify),
             ),
             _PremiumPromo(onTap: () => context.push(Routes.premium)),
@@ -122,8 +122,7 @@ class _ProfileCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = profile?.profile?.displayName ?? '';
-    final photos = profile?.photos.length ?? 0;
-    final tiles = profile?.tiles.length ?? 0;
+    final pronouns = profile?.profile?.pronouns?.label ?? '';
 
     return SectionGroup(
       children: [
@@ -166,12 +165,13 @@ class _ProfileCard extends StatelessWidget {
                           ],
                         ],
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '$tiles ${tiles == 1 ? 'tile' : 'tiles'} · '
-                        '$photos ${photos == 1 ? 'photo' : 'photos'}',
-                        style: AppText.footnote.copyWith(fontSize: 13.5),
-                      ),
+                      if (pronouns.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          pronouns,
+                          style: AppText.footnote.copyWith(fontSize: 13.5),
+                        ),
+                      ],
                       const SizedBox(height: 5),
                       Text(
                         'View and edit profile',
@@ -296,15 +296,14 @@ class _PremiumPromo extends StatelessWidget {
                   ),
                   const SizedBox(width: 9),
                   Text(
-                    'theonebytwo Premium',
+                    'onebytwo plus',
                     style: AppText.title3.copyWith(fontSize: 18),
                   ),
                 ],
               ),
               const SizedBox(height: 6),
               Text(
-                'See who viewed you, browse unseen, and put more of yourself '
-                'on the wall.',
+                'See who viewed you, discover more profiles, and more',
                 style: AppText.footnote.copyWith(
                   fontSize: 13.5,
                   color: const Color(0xC7FFFFFF),

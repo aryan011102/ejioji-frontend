@@ -120,7 +120,7 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
         (
           provider: SourceProvider.netflix,
           name: 'Netflix',
-          note: 'Manual · no public API since 2014',
+          note: 'The watch history you download',
         ),
       ],
     ),
@@ -633,9 +633,8 @@ class _ReadOnceCard extends StatelessWidget {
                         ),
                       ),
                       const TextSpan(
-                        text: ', then disconnected. We keep the taste we '
-                            'derive, never your messages, and we can never '
-                            'post as you. ',
+                        text: ', then disconnected. We keep insights, never '
+                            'your messages, and we can never post as you. ',
                       ),
                       TextSpan(
                         text: 'What we read',

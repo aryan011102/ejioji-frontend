@@ -699,7 +699,7 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
         padding: EdgeInsets.only(bottom: 12),
         child: NoteCard(
           icon: Icons.shield_outlined,
-          text: 'Keep it in the app for now. Nobody from theonebytwo will ever '
+          text: 'Keep it in the app for now. Nobody from onebytwo will ever '
               'ask for money, documents or an OTP. Report anyone who does.',
         ),
       ),

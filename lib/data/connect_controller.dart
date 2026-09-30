@@ -109,7 +109,7 @@ class ConnectController extends Notifier<SourceProvider?> {
     } on AppleMusicDenied catch (e) {
       if (!e.inSettings) return null;
       throw const ValidationFailure(
-        'Apple Music access is off for theonebytwo. Turn it on in Settings, '
+        'Apple Music access is off for onebytwo. Turn it on in Settings, '
         'under Privacy & Security, Media & Apple Music, then try again.',
         code: 'apple_music_denied',
       );
@@ -156,7 +156,7 @@ String appleMusicTrouble(String? detail) => switch (detail) {
         'Sign in to Apple Music on this iPhone, in the Music app, then try '
             'again. (not_signed_in)',
       'developer_token' =>
-        "Apple did not accept theonebytwo's Apple Music setup. That is on us, "
+        "Apple did not accept onebytwo's Apple Music setup. That is on us, "
             'not you. (developer_token)',
       _ => 'Apple Music did not answer. Check this phone is signed in to '
           'Apple Music, then try again. (${detail ?? 'no reason'})',

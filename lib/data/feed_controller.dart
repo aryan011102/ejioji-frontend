@@ -87,6 +87,14 @@ class FeedController extends Notifier<FeedState> {
   Future<void> refresh() async {
     state = const FeedState();
     await _fetch(reset: true);
+    // Matching has no screen of its own any more: someone who was never asked
+    // (set up before it was granted at setup) is granted here and asked again.
+    // Someone who withdrew it keeps the refusal.
+    if (state.error case ApiException(code: 'consent_required')) {
+      await ref.read(consentRepositoryProvider).grantMatchingIfNeverAsked();
+      state = const FeedState();
+      await _fetch(reset: true);
+    }
   }
 
   Future<void> _fetch({bool reset = false}) async {

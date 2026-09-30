@@ -90,7 +90,7 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
               'in your playlists. Not your watch history, and not the names of '
               'your playlists.',
         ConsentPurpose.gmailReceipts =>
-          'Zomato and Swiggy receipts, Myntra, Zara and H&M orders, and '
+          'Zomato and Swiggy receipts, Myntra and other fashion orders, and '
               'booking confirmations (flights, trains, stays, tickets, '
               'District), found by searching for those senders only. '
               'Bookings are read from their subject line, never opened. No '
@@ -271,16 +271,6 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
                         onTap: () => _showNotice(notice),
                       ),
                 ],
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: Insets.titleGutter,
-                ),
-                child: Text(
-                  'Tap any row to read the full notice. We keep a record of '
-                  'which version you agreed to and when.',
-                  style: AppText.caption,
-                ),
               ),
             ],
           );

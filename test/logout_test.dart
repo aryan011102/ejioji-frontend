@@ -61,6 +61,9 @@ Future<_Session> _openSettings(WidgetTester tester) async {
   );
   await tester.pumpAndSettle();
   await tester.scrollUntilVisible(find.text('Log out'), 200);
+  // Partly in view is enough for scrollUntilVisible, not for a tap.
+  await tester.ensureVisible(find.text('Log out'));
+  await tester.pumpAndSettle();
   await tester.tap(find.text('Log out'));
   await tester.pumpAndSettle();
   return session;

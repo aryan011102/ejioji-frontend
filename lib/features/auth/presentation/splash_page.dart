@@ -72,7 +72,7 @@ class _SplashPageState extends ConsumerState<SplashPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Spacer(),
-            Text('theonebytwo', style: AppText.largeTitle.copyWith(fontSize: 44)),
+            Text('onebytwo', style: AppText.largeTitle.copyWith(fontSize: 44)),
             const SizedBox(height: 14),
             Text(
               'A profile built from what you already did, not what you would '

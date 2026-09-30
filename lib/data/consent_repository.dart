@@ -53,6 +53,35 @@ class ConsentRepository {
     return ConsentGrant.listFrom(body);
   }
 
+  /// Matching is granted at setup without a screen (Aryan, 2026-09-30).
+  ///
+  /// Only for someone who has never answered it: a grant that was withdrawn
+  /// stays withdrawn, and the screen in Settings is still the way back. Quiet
+  /// on failure, because the feed asks again if it is still missing.
+  Future<void> grantMatchingIfNeverAsked() async {
+    try {
+      final state = await load();
+      final asked =
+          state.grants.any((g) => g.purpose == ConsentPurpose.matching);
+      final notice = state.noticeFor(ConsentPurpose.matching);
+      if (asked || notice == null) return;
+      await grant({ConsentPurpose.matching: notice.version});
+    } on Exception {
+      return;
+    }
+  }
+
+  /// Grants [purpose] at the current notice unless it is already open. For a
+  /// step the person has just chosen to take, where a permission screen of its
+  /// own was cut (DigiLocker, Aryan, 2026-09-30).
+  Future<void> grantNow(ConsentPurpose purpose) async {
+    final state = await load();
+    if (state.isGranted(purpose)) return;
+    final notice = state.noticeFor(purpose);
+    if (notice == null) return;
+    await grant({purpose: notice.version});
+  }
+
   /// Withdrawal reaches the data in the same transaction: revoking a source
   /// purges what it produced, not just the link. There is nothing for the
   /// client to clean up afterwards beyond refetching.

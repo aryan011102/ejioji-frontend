@@ -123,8 +123,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     };
     return SectionGroup(
       header: 'Socials',
-      footer: 'Shown only to people you match with, and only while the '
-          'switch is on. Never on your profile card or in the feed.',
       children: [
         for (final n in SocialNetwork.shown)
           if (links[n] case final link?)
@@ -237,6 +235,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     final premium = ref.watch(premiumProvider).valueOrNull;
+    final stealthOn = ref.watch(sessionProvider).publish?.stealth ?? false;
 
     return AppScaffold(
       navBar: AppNavBar(
@@ -267,21 +266,35 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ),
                 onTap: () => context.push(Routes.profileViews),
               ),
-              AppRow(
-                label: 'Stealth mode',
-                subtitle: premium?.active ?? false
-                    ? 'Only people you ask can see you'
-                    : 'Premium. Only people you ask can see you',
-                leading: const Icon(
-                  Icons.visibility_off_outlined,
-                  size: 18,
-                  color: AppColors.label2,
+              // Without Plus the switch is replaced by the Plus chip, so it does
+              // not look free and then refuse. Someone already in stealth keeps
+              // the switch, so they can always turn it off.
+              if ((premium?.active ?? false) || stealthOn)
+                AppRow(
+                  label: 'Stealth mode',
+                  subtitle: 'Only matches can see you',
+                  leading: const Icon(
+                    Icons.visibility_off_outlined,
+                    size: 18,
+                    color: AppColors.label2,
+                  ),
+                  control: AppSwitch(
+                    value: stealthOn,
+                    onChanged: _stealthBusy ? null : _setStealth,
+                  ),
+                )
+              else
+                AppRow(
+                  label: 'Stealth mode',
+                  subtitle: 'Only matches can see you',
+                  premium: true,
+                  leading: const Icon(
+                    Icons.visibility_off_outlined,
+                    size: 18,
+                    color: AppColors.label2,
+                  ),
+                  onTap: () => context.push(Routes.premium),
                 ),
-                control: AppSwitch(
-                  value: ref.watch(sessionProvider).publish?.stealth ?? false,
-                  onChanged: _stealthBusy ? null : _setStealth,
-                ),
-              ),
               AppRow(
                 label: 'Blocked users',
                 leading: const Icon(
@@ -293,7 +306,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
               AppRow(
                 label: 'Subscription details',
-                value: premium?.active ?? false ? 'Premium' : 'Free',
+                value: premium?.active ?? false ? 'onebytwo plus' : 'Free',
                 last: true,
                 leading: const Icon(
                   Icons.credit_card,
@@ -312,7 +325,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             children: [
               AppRow(
                 label: 'Dark',
-                subtitle: 'theonebytwo is dark only, for now',
+                subtitle: 'onebytwo is dark only, for now',
                 last: true,
                 leading: Icon(
                   Icons.nightlight_round,
@@ -358,7 +371,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 onTap: () => context.push('${Routes.consent}?all=1'),
               ),
               AppRow(
-                label: 'Rate theonebytwo on the App Store',
+                label: 'Rate onebytwo on the App Store',
                 last: true,
                 leading: const Icon(
                   Icons.star_outline,
@@ -402,8 +415,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           Center(
             child: Text(
               switch (ref.watch(appVersionProvider)) {
-                AsyncData(value: final v?) => 'theonebytwo $v',
-                _ => 'theonebytwo',
+                AsyncData(value: final v?) => 'onebytwo $v',
+                _ => 'onebytwo',
               },
               style: AppText.micro,
             ),

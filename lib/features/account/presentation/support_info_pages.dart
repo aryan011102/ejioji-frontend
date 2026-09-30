@@ -247,7 +247,7 @@ class WhatWeReadPage extends StatelessWidget {
           ),
           (
             'It never counts',
-            'Every number on your profile is counted by theonebytwo. The AI '
+            'Every number on your profile is counted by onebytwo. The AI '
                 'only suggests what to count.',
           ),
         ]),
@@ -437,7 +437,7 @@ class SafetyTipsPage extends StatelessWidget {
           ),
           (
             'Keep your address to yourself',
-            'And your workplace, until you know them.',
+            'And your sensitive information.',
           ),
         ]),
         _Section(
@@ -451,6 +451,11 @@ class SafetyTipsPage extends StatelessWidget {
             (
               'In danger',
               'Call 112, India\'s emergency number.',
+            ),
+            (
+              'Women helpline',
+              'Call 181, the national women helpline, any time of day or '
+                  'night.',
             ),
             (
               'Lost money',

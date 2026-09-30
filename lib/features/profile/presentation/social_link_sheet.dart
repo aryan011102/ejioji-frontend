@@ -183,37 +183,40 @@ class _SocialLinkSheetState extends ConsumerState<_SocialLinkSheet> {
               ),
             ),
           ),
-          const SizedBox(height: 18),
-          Container(
-            padding: const EdgeInsets.fromLTRB(14, 10, 12, 10),
-            decoration: BoxDecoration(
-              color: AppColors.row,
-              borderRadius: BorderRadius.circular(Radii.row),
+          // LinkedIn has no choice here (Aryan, 2026-09-30): it stays shown.
+          if (widget.network == SocialNetwork.linkedin) ...[
+            const SizedBox(height: 18),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                'To maintain trust and credibility, everyone can see your '
+                'LinkedIn profile. This cannot be changed.',
+                style: AppText.caption.copyWith(color: AppColors.label3),
+              ),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Show to matches', style: AppText.body),
-                      const SizedBox(height: 2),
-                      Text(
-                        _shown
-                            ? 'Your matches can open it'
-                            : 'Saved, and shown to nobody',
-                        style: AppText.caption,
-                      ),
-                    ],
+          ] else ...[
+            const SizedBox(height: 18),
+            Container(
+              padding: const EdgeInsets.fromLTRB(14, 10, 12, 10),
+              decoration: BoxDecoration(
+                color: AppColors.row,
+                borderRadius: BorderRadius.circular(Radii.row),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text("Don't show to matches", style: AppText.body),
                   ),
-                ),
-                AppSwitch(
-                  value: _shown,
-                  onChanged: _saving ? null : (v) => setState(() => _shown = v),
-                ),
-              ],
+                  // Worded as the opt-out, so on means hidden.
+                  AppSwitch(
+                    value: !_shown,
+                    onChanged:
+                        _saving ? null : (v) => setState(() => _shown = !v),
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
           if (widget.existing != null) ...[
             const SizedBox(height: 24),
             Center(

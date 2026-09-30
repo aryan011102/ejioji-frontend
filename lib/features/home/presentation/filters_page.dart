@@ -270,10 +270,6 @@ class _FiltersFormState extends ConsumerState<_FiltersForm> {
                 ),
               ],
             ),
-            note: _ageIsDefault
-                ? 'Around your own age. It moves with your birthday until you '
-                    'change it.'
-                : null,
           ),
           _group(
             'City',
@@ -283,8 +279,7 @@ class _FiltersFormState extends ConsumerState<_FiltersForm> {
             ]),
             note: _cities.isEmpty
                 ? 'Left empty, you are shown people in your own city.'
-                : 'Your own city is always included. Someone in another city '
-                    'sees you only if they picked yours too.',
+                : 'Your own city is always included.',
           ),
           _group(
             'Languages',
@@ -308,17 +303,6 @@ class _FiltersFormState extends ConsumerState<_FiltersForm> {
                   () => _toggle(_education, level),
                 ),
             ]),
-            note: 'Left empty, education is not used to narrow anything.',
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: Insets.titleGutter,
-            ),
-            child: Text(
-              'Filters narrow who appears. They never reorder anything. That '
-              'is what the insights are for.',
-              style: AppText.caption,
-            ),
           ),
         ],
       ),

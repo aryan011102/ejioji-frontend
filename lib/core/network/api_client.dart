@@ -34,13 +34,26 @@ class ApiClient {
   /// [anonymous] is for the calls made before anyone is signed in (asking for
   /// and checking a code): no bearer is sent, and a 401 is passed through as
   /// the answer rather than taken as a session to refresh.
-  Future<Json> post(String path, {Object? body, bool anonymous = false}) async =>
+  ///
+  /// [receiveTimeout] is for the few calls the server does real work inside,
+  /// such as finishing an upload; everything else keeps the client's default.
+  Future<Json> post(
+    String path, {
+    Object? body,
+    bool anonymous = false,
+    Duration? receiveTimeout,
+  }) async =>
       asJson(
         await _body(
           () => _dio.post<Object?>(
             path,
             data: body,
-            options: anonymous ? Options(extra: {'anonymous': true}) : null,
+            options: anonymous || receiveTimeout != null
+                ? Options(
+                    extra: anonymous ? {'anonymous': true} : null,
+                    receiveTimeout: receiveTimeout,
+                  )
+                : null,
           ),
         ),
       );

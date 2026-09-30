@@ -18,5 +18,21 @@ void main() {
     expect(publish.visible, isFalse);
     expect(publish.blocking.single.code, Blocker.noLinkedin);
     expect(publish.blocking.single.message, 'Add your LinkedIn profile link');
+    expect(publish.needsLinkedIn, isTrue);
+  });
+
+  test('with the rule off on the server, LinkedIn is not needed', () {
+    // PROFILE_REQUIRES_LINKEDIN=false (App Review, 2026-09-30): the same
+    // profile, and the server simply never lists it.
+    final publish = PublishState.fromJson({
+      'published': true,
+      'visible': false,
+      'under_review': false,
+      'stealth': false,
+      'blocking': [
+        {'code': 'too_few_photos', 'have': 2, 'need': 3},
+      ],
+    });
+    expect(publish.needsLinkedIn, isFalse);
   });
 }

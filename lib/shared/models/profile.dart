@@ -133,6 +133,12 @@ class PublishState {
 
   bool get canPublish => blocking.isEmpty;
 
+  /// Whether the server is holding this profile back for want of a LinkedIn
+  /// link. The only place the app learns if LinkedIn is required: the server
+  /// switched the rule off for App Review and turns it back on without a
+  /// release (PROFILE_REQUIRES_LINKEDIN).
+  bool get needsLinkedIn => blocking.any((b) => b.code == Blocker.noLinkedin);
+
   static PublishState fromJson(Json j) => PublishState(
         published: j.flag('published'),
         visible: j.flag('visible'),

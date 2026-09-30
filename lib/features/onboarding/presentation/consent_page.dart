@@ -90,9 +90,11 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
               'in your playlists. Not your watch history, and not the names of '
               'your playlists.',
         ConsentPurpose.gmailReceipts =>
-          'Zomato and Swiggy food receipts and Myntra delivery emails only, '
-              'found by searching for those senders. No other mail is read, '
-              'ever.',
+          'Zomato and Swiggy receipts, Myntra, Zara and H&M orders, and '
+              'booking confirmations (flights, trains, stays, tickets, '
+              'District), found by searching for those senders only. '
+              'Bookings are read from their subject line, never opened. No '
+              'other mail is read, ever.',
         ConsentPurpose.netflixUpload =>
           'The viewing activity file you download from your own Netflix '
               'profile and upload here.',
@@ -104,8 +106,10 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
           'The songs and albums saved in your Apple Music library, read once. '
               'Not your playlists, and Apple has no listening history to give.',
         ConsentPurpose.aiProcessing =>
-          'Lets an AI suggest what is worth counting, and write the captions. '
-              'It never invents a number: every value is computed here.',
+          'Sends summaries of what you connect (totals and the names behind '
+              'them) to Claude, an AI made by Anthropic, to suggest insights '
+              'and write their captions. Never your emails, messages or '
+              'photos, and it never invents a number.',
         ConsentPurpose.matching =>
           'Lets us suggest people to you and show you to them. Tiles you hide '
               'from your profile still count towards who you are matched with.',

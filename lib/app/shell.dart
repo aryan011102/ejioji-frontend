@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../core/theme/tokens.dart';
 import '../data/live_events.dart';
 import '../data/providers.dart';
+import '../features/onboarding/presentation/ai_consent_sheet.dart';
 import '../shared/widgets/app_tab_bar.dart';
 import 'routes.dart';
 
@@ -43,6 +44,11 @@ class _AppShellState extends ConsumerState<AppShell> {
   void initState() {
     super.initState();
     _events = ref.read(liveEventsProvider).events.listen(_onEvent);
+    // Everyone who finished setup before the AI question existed is asked it
+    // once, here (ai_consent_sheet.dart). Anyone who has answered is not.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(askAboutAiOnce(context, ref));
+    });
   }
 
   void _onEvent(LiveEvent event) {

@@ -95,7 +95,7 @@ void main() {
         'plans': [
           {'key': 'd3', 'unit': 'day', 'count': 3, 'price_paise': 19900},
           {'key': 'm1', 'unit': 'month', 'count': 1, 'price_paise': 79900},
-          {'key': 'm3', 'unit': 'month', 'count': 3, 'price_paise': 179900},
+          {'key': 'm3', 'unit': 'month', 'count': 3, 'price_paise': 149900},
           {'key': 'm12', 'unit': 'month', 'count': 12, 'price_paise': 499900},
         ],
       });
@@ -108,7 +108,7 @@ void main() {
       );
       expect(
         [for (final p in status.plans) p.price],
-        ['₹199', '₹799', '₹1,799', '₹4,999'],
+        ['₹199', '₹799', '₹1,499', '₹4,999'],
       );
     });
 

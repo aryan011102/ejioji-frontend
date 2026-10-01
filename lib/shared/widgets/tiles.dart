@@ -871,64 +871,169 @@ class StaggeredGrid extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final cell = (constraints.maxWidth - gap) / 2;
-        final occupied = <int, List<bool>>{};
-        final placed = <Widget>[];
-        var maxRow = 0;
-
-        bool free(int row, int col, int w, int h) {
-          for (var r = row; r < row + h; r++) {
-            final line = occupied[r] ??= [false, false];
-            for (var c = col; c < col + w; c++) {
-              if (c > 1 || line[c]) return false;
-            }
-          }
-          return true;
-        }
-
-        void take(int row, int col, int w, int h) {
-          for (var r = row; r < row + h; r++) {
-            final line = occupied[r] ??= [false, false];
-            for (var c = col; c < col + w; c++) {
-              line[c] = true;
-            }
-          }
-          maxRow = maxRow > row + h ? maxRow : row + h;
-        }
-
-        for (final item in items) {
-          final w = item.size.crossAxisCells;
-          final h = item.size.mainAxisCells;
-          var row = 0;
-          var col = 0;
-          var found = false;
-          while (!found && row < 200) {
-            for (col = 0; col + w <= 2; col++) {
-              if (free(row, col, w, h)) {
-                found = true;
-                break;
-              }
-            }
-            if (!found) row++;
-          }
-          take(row, col, w, h);
-          placed.add(
-            Positioned(
-              left: col * (cell + gap),
-              top: row * (rowHeight + gap),
-              width: w * cell + (w - 1) * gap,
-              height: h * rowHeight + (h - 1) * gap,
-              child: item.child,
-            ),
-          );
-        }
-
+        final slots = pack([for (final i in items) i.size]);
+        final rows = slots.fold<int>(0, (m, s) => m > s.bottom ? m : s.bottom);
         return SizedBox(
-          height: maxRow * rowHeight + (maxRow - 1).clamp(0, 99) * gap,
-          child: Stack(children: placed),
+          height: rows * rowHeight + (rows - 1).clamp(0, 99) * gap,
+          child: Stack(
+            children: [
+              for (final (i, s) in slots.indexed)
+                Positioned(
+                  left: s.col * (cell + gap),
+                  top: s.row * (rowHeight + gap),
+                  width: s.w * cell + (s.w - 1) * gap,
+                  height: s.h * rowHeight + (s.h - 1) * gap,
+                  child: items[i].child,
+                ),
+            ],
+          ),
         );
       },
     );
   }
+
+  /// Where each tile goes, in the order given, with no gaps (Aryan,
+  /// 2026-10-01).
+  ///
+  /// Dense first-fit, then every hole the packing left is covered by
+  /// stretching a neighbour into it: sideways first (a lone tile becomes
+  /// wide), then down from the tile above, then up from the tile below. A
+  /// hole none of those can reach always sits beside a tall tile, which is
+  /// then cut to the row the hole is not in, and a row left empty closes up.
+  /// A tile is never more than two by two, and its type keeps the size it
+  /// asked for. Checked for every order of up to eight tiles.
+  static List<Slot> pack(List<TileSize> sizes) {
+    final slots = <Slot>[];
+    // Tiles cut to one row, which may still widen but never grow back down
+    // or up into the row they were cut from; that is what makes this end.
+    final cut = <int>{};
+
+    Map<(int, int), int> grid() => {
+          for (final (i, s) in slots.indexed)
+            for (var r = s.row; r < s.bottom; r++)
+              for (var c = s.col; c < s.col + s.w; c++) (r, c): i,
+        };
+
+    bool free(Map<(int, int), int> g, int row, int col, int w, int h) {
+      for (var r = row; r < row + h; r++) {
+        for (var c = col; c < col + w; c++) {
+          if (c > 1 || g.containsKey((r, c))) return false;
+        }
+      }
+      return true;
+    }
+
+    int rows() => slots.fold<int>(0, (m, s) => m > s.bottom ? m : s.bottom);
+
+    for (final size in sizes) {
+      final w = size.crossAxisCells;
+      final h = size.mainAxisCells;
+      final g = grid();
+      var row = 0;
+      int? col;
+      while (col == null) {
+        for (var c = 0; c + w <= 2; c++) {
+          if (free(g, row, c, w, h)) {
+            col = c;
+            break;
+          }
+        }
+        if (col == null) row++;
+      }
+      slots.add(Slot(row: row, col: col, w: w, h: h));
+    }
+
+    // One stretch into a hole, or false when none is left to make.
+    bool grow() {
+      final g = grid();
+      for (var r = 0; r < rows(); r++) {
+        for (var c = 0; c < 2; c++) {
+          if (g.containsKey((r, c))) continue;
+          if (g[(r, 1 - c)] case final i?) {
+            final s = slots[i];
+            if (s.w == 1 && free(g, s.row, c, 1, s.h)) {
+              slots[i] = Slot(row: s.row, col: 0, w: 2, h: s.h);
+              return true;
+            }
+          }
+          if (g[(r - 1, c)] case final i? when !cut.contains(i)) {
+            final s = slots[i];
+            if (s.h == 1 && free(g, r, s.col, s.w, 1)) {
+              slots[i] = Slot(row: s.row, col: s.col, w: s.w, h: 2);
+              return true;
+            }
+          }
+          if (g[(r + 1, c)] case final i? when !cut.contains(i)) {
+            final s = slots[i];
+            if (s.h == 1 && free(g, r, s.col, s.w, 1)) {
+              slots[i] = Slot(row: r, col: s.col, w: s.w, h: 2);
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    }
+
+    while (true) {
+      while (grow()) {}
+      // Close up any row left empty.
+      var g = grid();
+      for (var r = rows() - 1; r >= 0; r--) {
+        if (!g.containsKey((r, 0)) && !g.containsKey((r, 1))) {
+          for (final (i, s) in slots.indexed) {
+            if (s.row > r) {
+              slots[i] = Slot(row: s.row - 1, col: s.col, w: s.w, h: s.h);
+            }
+          }
+        }
+      }
+      g = grid();
+      (int, int)? hole;
+      for (var r = 0; r < rows() && hole == null; r++) {
+        for (var c = 0; c < 2; c++) {
+          if (!g.containsKey((r, c))) {
+            hole = (r, c);
+            break;
+          }
+        }
+      }
+      if (hole == null) return slots;
+      // The cell beside it is a tall tile: cut it to the row the hole is
+      // not in.
+      final (r, c) = hole;
+      final i = g[(r, 1 - c)]!;
+      final s = slots[i];
+      slots[i] = Slot(row: s.row, col: s.col, w: s.w, h: 1);
+      cut.add(i);
+    }
+  }
+}
+
+/// A tile's place on the wall, in cells.
+class Slot {
+  const Slot({required this.row, required this.col, required this.w, required this.h});
+
+  final int row;
+  final int col;
+  final int w;
+  final int h;
+
+  int get bottom => row + h;
+
+  @override
+  bool operator ==(Object other) =>
+      other is Slot &&
+      other.row == row &&
+      other.col == col &&
+      other.w == w &&
+      other.h == h;
+
+  @override
+  int get hashCode => Object.hash(row, col, w, h);
+
+  @override
+  String toString() => 'Slot($row, $col, ${w}x$h)';
 }
 
 /// The photos tile, first on the wall so it is always in the top row.

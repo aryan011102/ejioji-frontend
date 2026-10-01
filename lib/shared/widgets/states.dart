@@ -14,7 +14,7 @@ class EmptyState extends StatelessWidget {
   const EmptyState({
     required this.icon,
     required this.title,
-    required this.body,
+    this.body,
     this.primaryLabel,
     this.onPrimary,
     this.secondaryLabel,
@@ -25,7 +25,8 @@ class EmptyState extends StatelessWidget {
 
   final IconData icon;
   final String title;
-  final String body;
+  /// Null for a title that says it all.
+  final String? body;
   final String? primaryLabel;
   final VoidCallback? onPrimary;
   final String? secondaryLabel;
@@ -56,8 +57,10 @@ class EmptyState extends StatelessWidget {
               textAlign: TextAlign.center,
               style: AppText.title2.copyWith(fontSize: 24, height: 30 / 24),
             ),
-            const SizedBox(height: 9),
-            Text(body, textAlign: TextAlign.center, style: AppText.callout),
+            if (body case final body?) ...[
+              const SizedBox(height: 9),
+              Text(body, textAlign: TextAlign.center, style: AppText.callout),
+            ],
             if (extra != null) ...[const SizedBox(height: 18), extra!],
             if (primaryLabel != null) ...[
               const SizedBox(height: 24),

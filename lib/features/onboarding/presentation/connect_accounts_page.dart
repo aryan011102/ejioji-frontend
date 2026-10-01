@@ -916,13 +916,13 @@ class _SourceRow extends StatelessWidget {
   /// which is what tells two inboxes apart at a glance.
   (String, Color) _found(Connection c) {
     final run = c.latestRun;
-    if (run == null) return ('Connected', AppColors.ok);
+    if (run == null) return ('Connected', AppColors.label3);
     final receipts = c.receipts?.line();
-    if (receipts != null) return (receipts, AppColors.ok);
+    if (receipts != null) return (receipts, AppColors.label3);
     return switch (run.sufficiency) {
       Sufficiency.strong ||
       Sufficiency.moderate =>
-        ('Read ${run.itemsFound} things', AppColors.ok),
+        ('Read ${run.itemsFound} things', AppColors.label3),
       Sufficiency.weak => (
           'Only found ${run.itemsFound}. That may be too little to say much',
           AppColors.label3,
@@ -1044,7 +1044,7 @@ class _SocialRow extends StatelessWidget {
               : 'Your handle · for matches only',
           AppColors.label3,
         ),
-      _ when l.shown => ('${l.display} · shown to matches', AppColors.ok),
+      _ when l.shown => ('${l.display} · shown to matches', AppColors.label3),
       _ => ('${l.display} · hidden from matches', AppColors.label3),
     };
     return Column(

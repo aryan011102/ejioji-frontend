@@ -160,14 +160,20 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
   }
 
   Future<void> _connect(SourceProvider provider, ConsentState consent) async {
-    // Consent first, always. The server refuses to authorize a source whose
-    // purpose is not open, so asking here is not a courtesy: it is the only
-    // order that works.
+    // Consent first, always: the server refuses to authorize a source whose
+    // purpose is not open. Tapping the source is the yes (Aryan, 2026-10-01):
+    // it is granted at the current notice with no screen of its own, as
+    // Matching and DigiLocker are. It is still its own row, recorded with the
+    // notice version, and still withdrawn in Settings or by disconnecting.
     if (!consent.canConnect(provider)) {
-      final granted = await context.push<bool>(
-        '${Routes.consent}?purpose=${provider.purpose.wire}',
-      );
-      if (granted != true || !mounted) return;
+      try {
+        await ref.read(consentRepositoryProvider).grantNow(provider.purpose);
+      } on ApiException catch (e) {
+        if (mounted) showAppToast(context, e.message);
+        return;
+      }
+      ref.invalidate(consentProvider);
+      if (!mounted) return;
     }
     await _read(provider, declined: 'No problem. Nothing was read.');
   }

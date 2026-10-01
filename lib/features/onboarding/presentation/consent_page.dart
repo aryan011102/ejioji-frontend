@@ -131,8 +131,6 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(notice.purpose.label, style: AppText.title3),
-            const SizedBox(height: 4),
-            Text('Version ${notice.version}', style: AppText.micro),
             const SizedBox(height: 12),
             Flexible(
               child: SingleChildScrollView(

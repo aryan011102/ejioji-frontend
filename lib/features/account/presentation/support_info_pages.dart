@@ -419,11 +419,6 @@ class SafetyTipsPage extends StatelessWidget {
                 'and block here.',
           ),
           (
-            'Video call first',
-            'Before meeting. Someone who keeps finding reasons not to is worth '
-                'noticing.',
-          ),
-          (
             'The tick',
             'A verified tick means their name and date of birth matched '
                 'DigiLocker. It is not a promise about the person.',

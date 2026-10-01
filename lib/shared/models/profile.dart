@@ -239,6 +239,10 @@ class PromptBank {
     required this.answers,
     this.askedCategories = const [],
     this.askBelowTiles = 2,
+    this.tilesPerCategory = 2,
+    this.maxProfileTiles = 10,
+    this.publishMinTiles = 6,
+    this.publishMinCategories = 3,
   });
 
   final List<Prompt> prompts;
@@ -256,6 +260,14 @@ class PromptBank {
   /// How few computed tiles a category may have before it is asked about
   /// instead. One tile is a thin section, so one is not enough.
   final int askBelowTiles;
+
+  /// The tile rules, from the server: how many tiles one category may put on
+  /// a profile, how many a profile shows in all, and what it takes to be
+  /// shown. The defaults are only for a server that does not send them yet.
+  final int tilesPerCategory;
+  final int maxProfileTiles;
+  final int publishMinTiles;
+  final int publishMinCategories;
 
   PromptAnswer? answerFor(String promptKey) {
     for (final a in answers) {
@@ -285,5 +297,9 @@ class PromptBank {
               c,
         ],
         askBelowTiles: j.intOr('ask_below_tiles', 2),
+        tilesPerCategory: j.intOr('tiles_per_category', 2),
+        maxProfileTiles: j.intOr('max_profile_tiles', 10),
+        publishMinTiles: j.intOr('publish_min_tiles', 6),
+        publishMinCategories: j.intOr('publish_min_categories', 3),
       );
 }

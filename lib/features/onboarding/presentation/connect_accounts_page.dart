@@ -139,6 +139,11 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
   /// The one inbox being refreshed or removed, when there are several.
   String? _busyInbox;
 
+  /// Which groups of "Your tiles" are open: an app, or null for the
+  /// categories only questions fill. All closed to start, so the list is a
+  /// handful of apps rather than every category.
+  final Set<SourceProvider?> _openTiles = {};
+
   @override
   void initState() {
     super.initState();
@@ -160,14 +165,20 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
   }
 
   Future<void> _connect(SourceProvider provider, ConsentState consent) async {
-    // Consent first, always. The server refuses to authorize a source whose
-    // purpose is not open, so asking here is not a courtesy: it is the only
-    // order that works.
+    // Consent first, always: the server refuses to authorize a source whose
+    // purpose is not open. Tapping the source is the yes (Aryan, 2026-10-01):
+    // it is granted at the current notice with no screen of its own, as
+    // Matching and DigiLocker are. It is still its own row, recorded with the
+    // notice version, and still withdrawn in Settings or by disconnecting.
     if (!consent.canConnect(provider)) {
-      final granted = await context.push<bool>(
-        '${Routes.consent}?purpose=${provider.purpose.wire}',
-      );
-      if (granted != true || !mounted) return;
+      try {
+        await ref.read(consentRepositoryProvider).grantNow(provider.purpose);
+      } on ApiException catch (e) {
+        if (mounted) showAppToast(context, e.message);
+        return;
+      }
+      ref.invalidate(consentProvider);
+      if (!mounted) return;
     }
     await _read(provider, declined: 'No problem. Nothing was read.');
   }
@@ -375,23 +386,87 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
     if (candidates == null || profile == null || bank == null) return null;
     final categories = pickableCategories(candidates, bank.answers, bank);
     if (categories.isEmpty) return null;
-    return _Group(
-      header: 'Your tiles · ${profile.tiles.length} of 10 on your profile',
-      children: [
-        for (final (i, c) in categories.indexed)
-          AppRow(
-            leading: Text(c.glyph, style: const TextStyle(fontSize: 17)),
-            label: c.label,
-            value: switch (profile.tiles.where((t) => t.category == c).length) {
-              0 => null,
-              final n => '$n on profile',
-            },
-            last: i == categories.length - 1,
-            onTap: () => context.push(Routes.editCategoryOnly(i)),
+
+    // Grouped by the app the tiles came from (Aryan, 2026-10-01): Gmail opens
+    // to food delivery, going out, travel, shopping; YouTube and Netflix to
+    // what they fill. Read off the tiles themselves, so a category two apps
+    // feed sits under both. Whatever no app fills (questions only) is last.
+    final groups = <(SourceProvider?, List<TileCategory>)>[
+      for (final source in _tileSources)
+        if (categoriesOf(source, candidates, categories) case final cs
+            when cs.isNotEmpty)
+          (source, cs),
+    ];
+    final fed = {for (final (_, cs) in groups) ...cs};
+    final asked = [
+      for (final c in categories)
+        if (!fed.contains(c)) c,
+    ];
+    if (asked.isNotEmpty) groups.add((null, asked));
+
+    int onProfile(Iterable<TileCategory> cs) =>
+        profile.tiles.where((t) => cs.contains(t.category)).length;
+    String? count(int n) => n == 0 ? null : '$n on profile';
+
+    final rows = <Widget>[];
+    for (final (g, (source, cs)) in groups.indexed) {
+      final open = _openTiles.contains(source);
+      final lastGroup = g == groups.length - 1;
+      rows.add(
+        AppRow(
+          leading: source == null
+              ? const Icon(Icons.edit_note, size: 22, color: AppColors.label2)
+              : _BrandMark(source),
+          label: switch (source) {
+            null => 'Your answers',
+            SourceProvider.gmail => 'Gmail',
+            SourceProvider s => s.label,
+          },
+          value: count(onProfile(cs)),
+          control: Icon(
+            open ? Icons.expand_less : Icons.expand_more,
+            size: 20,
+            color: AppColors.label4,
           ),
-      ],
+          last: lastGroup && !open,
+          onTap: () => setState(() {
+            if (!_openTiles.remove(source)) _openTiles.add(source);
+          }),
+        ),
+      );
+      if (!open) continue;
+      for (final (j, c) in cs.indexed) {
+        rows.add(
+          Padding(
+            padding: const EdgeInsets.only(left: 16),
+            child: AppRow(
+              leading: Text(c.glyph, style: const TextStyle(fontSize: 17)),
+              label: c.label,
+              value: count(onProfile([c])),
+              last: lastGroup && j == cs.length - 1,
+              onTap: () => context.push(
+                Routes.editCategoryOnly(categories.indexOf(c)),
+              ),
+            ),
+          ),
+        );
+      }
+    }
+    return _Group(
+      header: 'Your tiles · ${profile.tiles.length}/${bank.maxProfileTiles} '
+          'on your profile',
+      children: rows,
     );
   }
+
+  /// The apps, in the order their groups appear under "Your tiles".
+  static const _tileSources = [
+    SourceProvider.gmail,
+    SourceProvider.youtube,
+    SourceProvider.netflix,
+    SourceProvider.spotify,
+    SourceProvider.appleMusic,
+  ];
 
   void _next() => context.push(
         widget.editing ? Routes.editCategoryAt(0) : Routes.pickCategoryAt(0),
@@ -579,9 +654,8 @@ class _Heading extends StatelessWidget {
           Text('Complete your profile', style: AppText.largeTitle),
           const SizedBox(height: 6),
           Text(
-            'We match on how you actually live, so we read it from what you '
-            'already use — not from a form about yourself. Connect whatever '
-            'you are comfortable with.',
+            'We match on how you actually live, based on real data from the '
+            'apps you already use. Connect the apps you are comfortable with.',
             style: AppText.callout.copyWith(height: 20 / 15),
           ),
         ],
@@ -909,20 +983,20 @@ class _SourceRow extends StatelessWidget {
     );
   }
 
-  /// What a finished read found. Green when it found enough to say something,
-  /// quiet when it did not, because a green "found 3" would overclaim.
+  /// What a finished read found, in grey: the tick beside it is the only green
+  /// on the row (Aryan, 2026-10-01).
   ///
   /// A Gmail inbox says what it held instead ("88 receipts · travel only"),
   /// which is what tells two inboxes apart at a glance.
   (String, Color) _found(Connection c) {
     final run = c.latestRun;
-    if (run == null) return ('Connected', AppColors.ok);
+    if (run == null) return ('Connected', AppColors.label3);
     final receipts = c.receipts?.line();
-    if (receipts != null) return (receipts, AppColors.ok);
+    if (receipts != null) return (receipts, AppColors.label3);
     return switch (run.sufficiency) {
       Sufficiency.strong ||
       Sufficiency.moderate =>
-        ('Read ${run.itemsFound} things', AppColors.ok),
+        ('Read ${run.itemsFound} things', AppColors.label3),
       Sufficiency.weak => (
           'Only found ${run.itemsFound}. That may be too little to say much',
           AppColors.label3,
@@ -1044,7 +1118,7 @@ class _SocialRow extends StatelessWidget {
               : 'Your handle · for matches only',
           AppColors.label3,
         ),
-      _ when l.shown => ('${l.display} · shown to matches', AppColors.ok),
+      _ when l.shown => ('${l.display} · shown to matches', AppColors.label3),
       _ => ('${l.display} · hidden from matches', AppColors.label3),
     };
     return Column(

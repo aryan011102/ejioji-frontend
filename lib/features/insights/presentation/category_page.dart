@@ -100,24 +100,23 @@ class CategoryPage extends ConsumerStatefulWidget {
 typedef _Choice = ({TileKind kind, String key});
 
 class _CategoryPageState extends ConsumerState<CategoryPage> {
-  /// The server's rules too: two to a category, so every category gets a
-  /// turn, and ten on the profile in all. Photos are not tiles and do not
-  /// count.
-  static const _perCategory = 2;
-  static const _maxTiles = 10;
-
-  /// And what it takes to be shown at all (`PUBLISH_MIN_TILES` and
-  /// `PUBLISH_MIN_CATEGORIES`). Said up front on every category, because a
-  /// rule you only meet as a refusal reads as the app being difficult.
-  static const _minTiles = 6;
-  static const _minCategories = 3;
+  /// The server's tile rules, sent with the prompt bank: how many to a
+  /// category, so every category gets a turn, and how many on the profile in
+  /// all (photos are not tiles and do not count). Then what it takes to be
+  /// shown at all, said up front on every category, because a rule you only
+  /// meet as a refusal reads as the app being difficult.
+  PromptBank? get _bank => ref.read(promptBankProvider).valueOrNull;
+  int get _perCategory => _bank?.tilesPerCategory ?? 2;
+  int get _maxTiles => _bank?.maxProfileTiles ?? 10;
+  int get _minTiles => _bank?.publishMinTiles ?? 6;
+  int get _minCategories => _bank?.publishMinCategories ?? 3;
 
   /// The running count under the heading: everything on the profile, this
   /// category's picks included, against the rules.
   String _tally(int total) => total < _minTiles
       ? '$total of $_minTiles needed to be shown, from at least '
           '$_minCategories categories. Up to $_maxTiles in all.'
-      : '$total on your profile, up to $_maxTiles. Enough to be shown.';
+      : '$total/$_maxTiles tiles across all categories.';
 
   Set<_Choice>? _picked;
 
@@ -135,11 +134,11 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
     setState(() {
       if (picked.remove(choice)) return;
       if (picked.length >= _perCategory) {
-        note = 'Two to a category, so every category gets a turn. Drop one '
-            'to swap it.';
+        note = '$_perCategory to a category, so every category gets a turn. '
+            'Drop one to swap it.';
       } else if (_elsewhere + picked.length >= _maxTiles) {
-        note = 'Ten tiles is the most a profile shows. Drop one here or in '
-            'another category to add this.';
+        note = '$_maxTiles tiles is the most a profile shows. Drop one here '
+            'or in another category to add this.';
       } else {
         picked.add(choice);
       }
@@ -385,13 +384,13 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                     const SizedBox(height: 7),
                     Text(
                       widget.editing
-                          ? '${picked.length} on your profile. Tap to add or '
-                              'drop one.'
+                          ? '${picked.length}/$_perCategory tiles of this '
+                              'category are on your profile.'
                           : asking
                               ? 'Not enough here to say anything true. So we '
                                   'would rather ask.'
-                              : 'Pick up to two, and put a photo or video '
-                                  'behind any of them.',
+                              : 'Pick up to $_perCategory, and put a photo or '
+                                  'video behind any of them.',
                       style: AppText.callout.copyWith(fontSize: 14),
                     ),
                     // Not where we asked: the questions are the page there.

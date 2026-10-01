@@ -144,9 +144,14 @@ class _SocialLinkSheetState extends ConsumerState<_SocialLinkSheet> {
             ],
           ),
           const SizedBox(height: 10),
+          // LinkedIn has no choice here (Aryan, 2026-09-30): it stays shown.
           Text(
-            'Only people you match with see this, as a link to your '
-            '$_label. It is never on your profile card or in anyone\'s feed.',
+            widget.network == SocialNetwork.linkedin
+                ? 'To maintain trust and credibility, everyone can see your '
+                    'LinkedIn profile. This cannot be changed.'
+                : 'Only people you match with see this, as a link to your '
+                    '$_label. It is never on your profile card or in anyone\'s '
+                    'feed.',
             style: AppText.callout.copyWith(height: 20 / 15),
           ),
           const SizedBox(height: 18),
@@ -183,18 +188,7 @@ class _SocialLinkSheetState extends ConsumerState<_SocialLinkSheet> {
               ),
             ),
           ),
-          // LinkedIn has no choice here (Aryan, 2026-09-30): it stays shown.
-          if (widget.network == SocialNetwork.linkedin) ...[
-            const SizedBox(height: 18),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Text(
-                'To maintain trust and credibility, everyone can see your '
-                'LinkedIn profile. This cannot be changed.',
-                style: AppText.caption.copyWith(color: AppColors.label3),
-              ),
-            ),
-          ] else ...[
+          if (widget.network != SocialNetwork.linkedin) ...[
             const SizedBox(height: 18),
             Container(
               padding: const EdgeInsets.fromLTRB(14, 10, 12, 10),

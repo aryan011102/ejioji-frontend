@@ -289,11 +289,16 @@ class OutgoingRequests {
     required this.requests,
     required this.leftToday,
     required this.resetsAt,
+    this.perDay = 8,
     this.unlimited = false,
   });
 
   final List<PendingRequest> requests;
   final int leftToday;
+
+  /// The daily cap, from the server. Falls back to 8 for a server that
+  /// does not send it yet.
+  final int perDay;
   final DateTime resetsAt;
 
   /// onebytwo plus: no daily cap. [leftToday] is still sent, and means nothing.
@@ -303,6 +308,7 @@ class OutgoingRequests {
         requests: PendingRequest.listFrom(j.objects('requests')),
         leftToday: j.intOr('requests_left_today', 0),
         resetsAt: j.time('resets_at'),
+        perDay: j.intOr('requests_per_day', 8),
         unlimited: j.flag('unlimited_requests'),
       );
 }

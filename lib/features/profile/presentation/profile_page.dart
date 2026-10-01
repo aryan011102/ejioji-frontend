@@ -354,7 +354,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     title: _theirs ? 'Nothing on show' : 'Your wall is empty',
                     body: _theirs
                         ? 'This person has not put anything on their profile.'
-                        : 'Connect an app and pick what goes on your wall.',
+                        : 'Connect an app and pick what goes on your wall',
                     primaryLabel: _theirs ? null : 'Pick your tiles',
                     onPrimary: _theirs
                         ? null

@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -296,16 +297,12 @@ class _SentList extends ConsumerWidget {
                 Insets.titleGutter,
                 14,
               ),
-              child: Text(
-                out.unlimited
-                    ? 'Unlimited requests with onebytwo plus.'
-                    : out.leftToday > 0
-                        ? '${out.leftToday} more ${out.leftToday == 1 ? 'request' : 'requests'} today. '
-                            'They come back ${timeUntil(out.resetsAt)}.'
-                        : 'No requests left today. They come back '
-                            '${timeUntil(out.resetsAt)}.',
-                style: AppText.callout,
-              ),
+              child: out.unlimited
+                  ? Text(
+                      'Unlimited requests with onebytwo plus.',
+                      style: AppText.callout,
+                    )
+                  : _Allowance(out),
             ),
             if (out.requests.isEmpty)
               const Padding(
@@ -371,6 +368,54 @@ class _SentList extends ConsumerWidget {
 /// The point of this section is that someone is seen properly before being
 /// answered, and a one-line row with a name on it is not enough to decide
 /// something final.
+/// How many requests are left today, with a link to plus for more.
+class _Allowance extends StatefulWidget {
+  const _Allowance(this.out);
+
+  final OutgoingRequests out;
+
+  @override
+  State<_Allowance> createState() => _AllowanceState();
+}
+
+class _AllowanceState extends State<_Allowance> {
+  late final TapGestureRecognizer _openPlus = TapGestureRecognizer()
+    ..onTap = () => context.push(Routes.premium);
+
+  @override
+  void dispose() {
+    _openPlus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final out = widget.out;
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: 'You have ${out.leftToday}/${out.perDay} requests remaining. '
+                'Requests renew ${timeUntil(out.resetsAt)}. For unlimited '
+                'requests, switch to ',
+          ),
+          TextSpan(
+            text: 'onebytwo plus',
+            style: const TextStyle(
+              color: AppColors.accent,
+              decoration: TextDecoration.underline,
+              decorationColor: AppColors.accent,
+            ),
+            recognizer: _openPlus,
+          ),
+          const TextSpan(text: '.'),
+        ],
+      ),
+      style: AppText.callout,
+    );
+  }
+}
+
 class _RequestCard extends StatelessWidget {
   const _RequestCard({
     required this.request,

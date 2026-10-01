@@ -54,5 +54,6 @@ void main() {
     expect(text, contains('Terms'));
     expect(text, contains('Privacy Policy'));
     expect(text, contains('18 or over'));
+    expect(text, contains('consent'));
   });
 }

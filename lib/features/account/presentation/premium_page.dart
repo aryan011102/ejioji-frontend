@@ -282,7 +282,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'A little more access. A lot more control.',
+                  'A little more access.\nA lot more control.',
                   style: AppText.title1.copyWith(fontSize: 31, height: 37 / 31),
                 ),
               ],

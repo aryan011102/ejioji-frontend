@@ -103,7 +103,7 @@ class _SplashPageState extends ConsumerState<SplashPage> {
                                 ),
                                 children: [
                                   const TextSpan(
-                                    text: 'I am 18 or over, and I agree to the ',
+                                    text: 'I am 18 or over. I agree to the ',
                                   ),
                                   TextSpan(
                                     text: 'Terms',
@@ -116,7 +116,14 @@ class _SplashPageState extends ConsumerState<SplashPage> {
                                     style: link,
                                     recognizer: _openPrivacy,
                                   ),
-                                  const TextSpan(text: '.'),
+                                  // The connect page has no permission screen
+                                  // of its own (Aryan, 2026-10-01): this is
+                                  // where people are told tapping is the yes.
+                                  const TextSpan(
+                                    text: ', and that tapping an app to connect '
+                                        'it is my consent for it to be read as '
+                                        'they describe.',
+                                  ),
                                 ],
                               ),
                             ),

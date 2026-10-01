@@ -303,7 +303,7 @@ class _PremiumPromo extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                'See who viewed you, discover more profiles, and more',
+                'See who viewed you, discover more profiles, and more exclusive features',
                 style: AppText.footnote.copyWith(
                   fontSize: 13.5,
                   color: const Color(0xC7FFFFFF),

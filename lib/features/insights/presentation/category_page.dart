@@ -292,9 +292,9 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
     final asking = bank.requireValue.asks(category, inCategory.length);
     final questions =
         asking ? bank.requireValue.inCategory(category) : const <Prompt>[];
-    // Asked with nothing found at all: the page is only the questions, so it
-    // says so rather than counting tiles there are none of.
-    final noData = asking && inCategory.isEmpty;
+    // Every page that asks says why, in one line (Aryan, 2026-10-01), in
+    // place of the tile count.
+    final noData = asking;
 
     return AppScaffold(
       navBar: AppNavBar(

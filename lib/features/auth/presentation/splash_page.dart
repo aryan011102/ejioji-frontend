@@ -75,8 +75,7 @@ class _SplashPageState extends ConsumerState<SplashPage> {
             Text('onebytwo', style: AppText.largeTitle.copyWith(fontSize: 44)),
             const SizedBox(height: 14),
             Text(
-              'A profile built from what you already did, not what you would '
-              'like to claim.',
+              'a date-to-marry app with actual data, not just prompts',
               style: AppText.callout.copyWith(fontSize: 19, height: 26 / 19),
             ),
             const Spacer(),

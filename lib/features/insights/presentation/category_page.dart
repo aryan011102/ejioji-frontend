@@ -117,7 +117,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
   String _tally(int total) => total < _minTiles
       ? '$total of $_minTiles needed to be shown, from at least '
           '$_minCategories categories. Up to $_maxTiles in all.'
-      : '$total on your profile, up to $_maxTiles. Enough to be shown.';
+      : '$total/$_maxTiles tiles across all categories.';
 
   Set<_Choice>? _picked;
 
@@ -385,8 +385,8 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                     const SizedBox(height: 7),
                     Text(
                       widget.editing
-                          ? '${picked.length} on your profile. Tap to add or '
-                              'drop one.'
+                          ? '${picked.length}/$_perCategory tiles of this '
+                              'category are on your profile.'
                           : asking
                               ? 'Not enough here to say anything true. So we '
                                   'would rather ask.'

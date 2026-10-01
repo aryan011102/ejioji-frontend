@@ -68,11 +68,9 @@ class VerifyHubPage extends ConsumerWidget {
               children: [
                 AppRow(
                   label: 'DigiLocker',
-                  subtitle: v.verified
-                      ? 'Done. Your name and age match your Aadhaar.'
-                      : v.available
-                          ? null
-                          : 'Not available right now',
+                  subtitle: v.verified || v.available
+                      ? null
+                      : 'Not available right now',
                   leading: const Icon(
                     Icons.description_outlined,
                     size: 18,
@@ -111,8 +109,8 @@ class VerifyHubPage extends ConsumerWidget {
 
   String _body(VerificationStatus status) => switch (status) {
         VerificationStatus.verified =>
-          'Your profile carries a blue tick: DigiLocker agreed with your first '
-              'name and date of birth.',
+          'Your profile carries a blue tick. That means your name and age '
+              'match your Aadhaar.',
         VerificationStatus.outdated =>
           'Your first name or date of birth changed after you verified, so the '
               'tick is off until DigiLocker agrees with the new one.',

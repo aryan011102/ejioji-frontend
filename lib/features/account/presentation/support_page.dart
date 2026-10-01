@@ -70,7 +70,6 @@ class SupportPage extends ConsumerWidget {
               ),
               AppRow(
                 label: 'Report a problem',
-                subtitle: 'Something broken, or an idea',
                 last: true,
                 leading: _lead(Icons.warning_amber_rounded),
                 onTap: () => context.push(Routes.reportProblem),

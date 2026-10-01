@@ -909,8 +909,8 @@ class _SourceRow extends StatelessWidget {
     );
   }
 
-  /// What a finished read found. Green when it found enough to say something,
-  /// quiet when it did not, because a green "found 3" would overclaim.
+  /// What a finished read found, in grey: the tick beside it is the only green
+  /// on the row (Aryan, 2026-10-01).
   ///
   /// A Gmail inbox says what it held instead ("88 receipts · travel only"),
   /// which is what tells two inboxes apart at a glance.

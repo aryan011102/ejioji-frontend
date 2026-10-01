@@ -79,9 +79,6 @@ class SupportPage extends ConsumerWidget {
           ),
           SectionGroup(
             header: 'The legal ones',
-            footer:
-                "Questions this page doesn't answer go to pritika@theonebytwo.com, "
-                'which is a person.',
             children: [
               AppRow(
                 label: 'Privacy policy',

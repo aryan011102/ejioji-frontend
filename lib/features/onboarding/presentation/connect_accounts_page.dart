@@ -579,9 +579,8 @@ class _Heading extends StatelessWidget {
           Text('Complete your profile', style: AppText.largeTitle),
           const SizedBox(height: 6),
           Text(
-            'We match on how you actually live, so we read it from what you '
-            'already use — not from a form about yourself. Connect whatever '
-            'you are comfortable with.',
+            'We match on how you actually live, based on real data from the '
+            'apps you already use. Connect the apps you are comfortable with.',
             style: AppText.callout.copyWith(height: 20 / 15),
           ),
         ],

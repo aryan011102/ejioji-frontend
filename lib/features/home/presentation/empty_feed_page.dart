@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/routes.dart';
-import '../../../data/providers.dart';
-import '../../../shared/widgets/controls.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/states.dart';
 
@@ -28,18 +26,6 @@ class EmptyFeedPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final filtered = kind == EmptyFeedKind.filtered;
-    // The real filters, read from the server. Naming them beats telling
-    // somebody to go and look at them, and inventing a plausible list would
-    // send people to widen filters they never set.
-    final preferences = ref.watch(preferencesProvider).valueOrNull;
-
-    final chips = <String>[
-      if (preferences != null) ...[
-        for (final g in preferences.showGenders) g.label,
-        if (preferences.ageMin != null && preferences.ageMax != null)
-          '${preferences.ageMin} to ${preferences.ageMax}',
-      ],
-    ];
 
     return AppScaffold(
       navBar: onRetry == null
@@ -47,24 +33,15 @@ class EmptyFeedPage extends ConsumerWidget {
           : const AppNavBar(),
       child: EmptyState(
         icon: filtered ? Icons.search_off : Icons.schedule,
-        title: filtered
-            ? 'Nobody matches yet.'
-            : 'That is everyone for now.',
+        // Filtered: the title alone (Aryan, 2026-10-01); the buttons below
+        // already say what to do about it.
+        title: filtered ? 'No people nearby.' : 'That is everyone for now.',
         body: filtered
-            ? 'Widening any one of these usually brings people back. We are '
-                'also opening one city at a time, so there may simply not be '
-                'many people here yet.'
+            ? null
             : 'You have seen every profile that matches. People join every '
                 'day, so this fills back up on its own.',
-        extra: filtered && chips.isNotEmpty
-            ? Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 7,
-                runSpacing: 7,
-                children: [
-                  for (final f in chips) AppChip(label: f, selected: false),
-                ],
-              )
+        extra: filtered
+            ? null
             : const NoteCard(
                 icon: Icons.chat_bubble_outline,
                 text: 'Nothing is waiting on you here. Anyone who asked to '

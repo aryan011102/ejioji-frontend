@@ -292,6 +292,9 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
     final asking = bank.requireValue.asks(category, inCategory.length);
     final questions =
         asking ? bank.requireValue.inCategory(category) : const <Prompt>[];
+    // Every page that asks says why, in one line (Aryan, 2026-10-01), in
+    // place of the tile count.
+    final noData = asking;
 
     return AppScaffold(
       navBar: AppNavBar(
@@ -383,7 +386,10 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                     ),
                     const SizedBox(height: 7),
                     Text(
-                      widget.editing
+                      noData
+                          ? "We couldn't find any relevant data. You may "
+                              'choose to answer the below questions instead.'
+                          : widget.editing
                           ? '${picked.length}/$_perCategory tiles of this '
                               'category are on your profile.'
                           : asking
@@ -441,7 +447,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                   saved: saved,
                 ),
               // Not where we asked on setup: there is nothing unpicked to explain.
-              if (widget.editing || !asking)
+              if ((widget.editing && !noData) || !asking)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(Insets.titleGutter, 16, Insets.titleGutter, 0),
                   child: Text(

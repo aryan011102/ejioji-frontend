@@ -173,15 +173,7 @@ class _ConversationList extends ConsumerWidget {
         error: e,
         onRetry: () => ref.invalidate(conversationsProvider),
       ),
-      data: (all) {
-        // A founder conversation nobody has written in is left out (Aryan,
-        // 2026-10-01): tapping "Message the founder" opens it, and it should
-        // reach either person's list only once someone says something. The
-        // provider keeps it, so the conversation page still finds its name.
-        final rows = [
-          for (final c in all)
-            if (!(c.founderLine && c.isNew)) c,
-        ];
+      data: (rows) {
         if (rows.isEmpty) {
           return const EmptyState(
             icon: Icons.forum_outlined,

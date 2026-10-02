@@ -4,10 +4,12 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/routes.dart';
 import '../../../core/native/apple_music_kit.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/session/session.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
 import '../../../data/connect_controller.dart';
@@ -139,9 +141,59 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
   /// The one inbox being refreshed or removed, when there are several.
   String? _busyInbox;
 
+  /// Tile keys this person has already been shown in Edit tiles, kept on
+  /// this phone. A tile not in it is new: a refresh found it. Null until
+  /// read, and on the first visit it is filled with everything on screen, so
+  /// nothing is called new until something actually arrives.
+  Set<String>? _seen;
+  bool _seenRead = false;
+
+  String? get _seenKey => switch (ref.read(sessionProvider).userId) {
+        final id? => 'tiles_seen:$id',
+        null => null,
+      };
+
+  Future<void> _readSeen() async {
+    final key = _seenKey;
+    Set<String>? stored;
+    try {
+      if (key != null) {
+        stored = (await SharedPreferences.getInstance())
+            .getStringList(key)
+            ?.toSet();
+      }
+    } on Object {
+      // No storage: nothing is ever called new, which is the quiet failure.
+    }
+    if (mounted) {
+      setState(() {
+        _seen = stored;
+        _seenRead = true;
+      });
+    }
+  }
+
+  /// Remembers [keys] as seen, keeping only tiles that still exist so the
+  /// list does not grow forever.
+  void _markSeen(Iterable<String> keys, Iterable<String> current) {
+    final now = {...?_seen, ...keys}.intersection(current.toSet());
+    setState(() => _seen = now);
+    final key = _seenKey;
+    if (key == null) return;
+    unawaited(() async {
+      try {
+        await (await SharedPreferences.getInstance())
+            .setStringList(key, now.toList());
+      } on Object {
+        // Shown as new again next time; nothing worse.
+      }
+    }());
+  }
+
   @override
   void initState() {
     super.initState();
+    if (widget.editing) unawaited(_readSeen());
     // The AI question, during setup, before anything is read: a yes then
     // covers the first source's insights (ai_consent_sheet.dart).
     if (!widget.editing) {
@@ -372,23 +424,25 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
     ];
   }
 
-  /// Edit tiles: the categories, grouped by the apps that fill them, always
-  /// open (Aryan, 2026-10-01). Null until the four reads land, and then the
-  /// page falls back to the plain list of sources.
+  /// Edit tiles: the categories, grouped by the apps that fill them, each
+  /// group its own box, always open (Aryan, 2026-10-01). Null until the four
+  /// reads land, and then the page falls back to the plain list of sources.
   ///
   /// A group is a set of apps: Gmail holds food, going out, travel, shopping
-  /// and moving; YouTube holds watching; Music is filled by YouTube, Spotify
-  /// and Apple Music together, so it is one group with all three stacked in
-  /// its header rather than a Music row under each of them. Read off the tiles
-  /// themselves, so a person whose music comes only from Spotify sees it
+  /// and moving; Netflix holds Netflix; Music is filled by YouTube, Spotify
+  /// and Apple Music together, so it is one box with their marks stacked in
+  /// its header rather than a Music row under each of them. Read off the
+  /// tiles themselves, so a person whose music comes only from Spotify sees it
   /// under Spotify. An app on this phone that fills nothing yet (not
-  /// connected, or nothing found) still gets a header, which is how it is
-  /// connected from here. Categories only questions fill come last, and only
-  /// the ones the person answered.
+  /// connected, or nothing found) joins the box of the category it would fill
+  /// (Spotify and Apple Music the Music box), or gets a header of its own,
+  /// which is how it is connected from here. Categories only questions fill
+  /// come last, and only the ones the person answered.
   ///
   /// A header opens what can be done to its apps; a category row opens the
-  /// category.
-  Widget? _tilesGroup({
+  /// category. Tiles a refresh brought in carry "New" on their app's header
+  /// and on their category until that category is opened.
+  List<Widget>? _tilesGroup({
     required Map<SourceProvider, Connection> linked,
     required List<Connection> inboxes,
     required ConsentState? consent,
@@ -399,6 +453,25 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
     final bank = ref.watch(promptBankProvider).valueOrNull;
     if (candidates == null || profile == null || bank == null) return null;
     final categories = pickableCategories(candidates, bank.answers, bank);
+
+    // New since this phone last showed them. The first visit only remembers.
+    final allKeys = [for (final c in candidates) c.key];
+    if (_seenRead && _seen == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _seen == null) _markSeen(allKeys, allKeys);
+      });
+    }
+    final seen = _seen;
+    final fresh = [
+      for (final c in candidates)
+        if (seen != null && !seen.contains(c.key)) c,
+    ];
+    bool isNew(Iterable<SourceProvider> apps, TileCategory? category) =>
+        fresh.any(
+          (c) =>
+              (category == null || c.category == category) &&
+              c.providers.any(apps.contains),
+        );
 
     // Which apps fill each category, in the order the apps are listed.
     List<SourceProvider> appsOf(TileCategory c) => [
@@ -425,79 +498,121 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
         groups[i].$2.add(c);
       }
     }
-    // One app's own group first, in app order, then the shared ones; an app
-    // that fills nothing on its own sits where its own group would be.
+    // An app filling nothing joins the box of the category it would fill.
     final shown = {for (final (apps, _) in groups) ...apps};
-    final ordered = <(List<SourceProvider>, List<TileCategory>)>[
-      for (final source in _tileSources)
-        if (groups.where((g) => _sameApps(g.$1, [source])).firstOrNull
-            case final g?)
-          g
-        else if (!shown.contains(source) && _onThisPhone(source))
-          ([source], const <TileCategory>[]),
-      for (final g in groups)
-        if (g.$1.length > 1) g,
-      if (asked.isNotEmpty) (const <SourceProvider>[], asked),
-    ];
+    for (final source in _tileSources) {
+      if (shown.contains(source) || !_onThisPhone(source)) continue;
+      final home = _homeOf[source];
+      final i = home == null
+          ? -1
+          : groups.indexWhere(
+              (g) =>
+                  g.$2.contains(home) ||
+                  (g.$2.isEmpty && g.$1.any((a) => _homeOf[a] == home)),
+            );
+      if (i < 0) {
+        groups.add(([source], <TileCategory>[]));
+      } else {
+        groups[i] = (
+          [
+            for (final a in _tileSources)
+              if (groups[i].$1.contains(a) || a == source) a,
+          ],
+          groups[i].$2,
+        );
+      }
+    }
+    // In app order, a box of one app before a shared one; questions last.
+    int first(List<SourceProvider> apps) =>
+        apps.map(_tileSources.indexOf).reduce(math.min);
+    groups.sort((x, y) {
+      final byApp = first(x.$1).compareTo(first(y.$1));
+      return byApp != 0 ? byApp : x.$1.length.compareTo(y.$1.length);
+    });
+    if (asked.isNotEmpty) groups.add((const <SourceProvider>[], asked));
 
     int onProfile(Iterable<TileCategory> cs) =>
         profile.tiles.where((t) => cs.contains(t.category)).length;
     String? count(int n) => n == 0 ? null : '$n on profile';
 
-    final rows = <Widget>[];
-    for (final (g, (apps, cs)) in ordered.indexed) {
-      final lastGroup = g == ordered.length - 1;
-      final connected = apps.any(linked.containsKey);
-      rows.add(
-        AppRow(
-          leading: switch (apps) {
-            [] => const Icon(Icons.edit_note, size: 22, color: AppColors.label2),
-            [final one] => _BrandMark(one),
-            _ => _StackedMarks(apps),
-          },
-          label: switch (apps) {
-            [] => 'Your answers',
-            [final one] => _appName(one),
-            _ => apps.map(_appName).join(' · '),
-          },
-          subtitle: apps.isNotEmpty && !connected ? 'Not connected' : null,
-          value: count(onProfile(cs)),
-          last: lastGroup && cs.isEmpty,
-          onTap: apps.isEmpty || locked
-              ? null
-              : () => unawaited(
-                    _openApps(
-                      apps,
-                      linked: linked,
-                      inboxes: inboxes,
-                      consent: consent,
-                    ),
+    return [
+      for (final (g, (apps, cs)) in groups.indexed)
+        _Group(
+          header: g == 0
+              ? 'Your tiles · ${profile.tiles.length}/${bank.maxProfileTiles} '
+                  'on your profile'
+              : null,
+          top: g == 0 ? 26 : 12,
+          children: [
+            AppRow(
+              leading: switch (apps) {
+                [] => const Icon(
+                    Icons.edit_note,
+                    size: 22,
+                    color: AppColors.label2,
                   ),
-        ),
-      );
-      for (final (j, c) in cs.indexed) {
-        rows.add(
-          Padding(
-            padding: const EdgeInsets.only(left: 16),
-            child: AppRow(
-              leading: Text(c.glyph, style: const TextStyle(fontSize: 17)),
-              label: c.label,
-              value: count(onProfile([c])),
-              last: lastGroup && j == cs.length - 1,
-              onTap: () => context.push(
-                Routes.editCategoryOnly(categories.indexOf(c)),
-              ),
+                [final one] => _BrandMark(one),
+                _ => _StackedMarks(apps),
+              },
+              label: switch (apps) {
+                [] => 'Your answers',
+                [final one] => _appName(one),
+                _ => apps.map(_appName).join(' · '),
+              },
+              tag: isNew(apps, null) ? 'New' : null,
+              subtitle: apps.isNotEmpty && !apps.any(linked.containsKey)
+                  ? 'Not connected'
+                  : null,
+              value: count(onProfile(cs)),
+              last: cs.isEmpty,
+              onTap: apps.isEmpty || locked
+                  ? null
+                  : () => unawaited(
+                        _openApps(
+                          apps,
+                          linked: linked,
+                          inboxes: inboxes,
+                          consent: consent,
+                        ),
+                      ),
             ),
-          ),
-        );
-      }
-    }
-    return _Group(
-      header: 'Your tiles · ${profile.tiles.length}/${bank.maxProfileTiles} '
-          'on your profile',
-      children: rows,
-    );
+            for (final (j, c) in cs.indexed)
+              Padding(
+                padding: const EdgeInsets.only(left: 16),
+                child: AppRow(
+                  leading: Text(c.glyph, style: const TextStyle(fontSize: 17)),
+                  label: c.label,
+                  tag: isNew(apps, c) ? 'New' : null,
+                  value: count(onProfile([c])),
+                  last: j == cs.length - 1,
+                  onTap: () {
+                    _markSeen(
+                      [
+                        for (final i in candidates)
+                          if (i.category == c) i.key,
+                      ],
+                      allKeys,
+                    );
+                    context.push(
+                      Routes.editCategoryOnly(categories.indexOf(c)),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+    ];
   }
+
+  /// The category an app's tiles would land in, so an app that has filled
+  /// nothing yet can sit in that category's box. Gmail fills several, so it
+  /// stands on its own.
+  static const _homeOf = <SourceProvider, TileCategory>{
+    SourceProvider.youtube: TileCategory.watching,
+    SourceProvider.netflix: TileCategory.netflix,
+    SourceProvider.spotify: TileCategory.music,
+    SourceProvider.appleMusic: TileCategory.music,
+  };
 
   static bool _sameApps(List<SourceProvider> a, List<SourceProvider> b) =>
       a.length == b.length && a.every(b.contains);
@@ -700,7 +815,7 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
             // Edit tiles: the tiles grouped by app, every app reached from its
             // header, in place of the list of sources (Aryan, 2026-10-01).
             if (tiles != null)
-              tiles
+              ...tiles
             else
               for (final (header, sources) in _groups)
                 _Group(
@@ -945,22 +1060,25 @@ class _StrengthCard extends StatelessWidget {
 
 /// A sentence-case header over one rounded plate of rows.
 class _Group extends StatelessWidget {
-  const _Group({required this.header, required this.children});
+  const _Group({required this.header, required this.children, this.top = 26});
 
-  final String header;
+  /// Null for a box that follows another under the same heading.
+  final String? header;
   final List<Widget> children;
+  final double top;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(Insets.gutter, 26, Insets.gutter, 0),
+      padding: EdgeInsets.fromLTRB(Insets.gutter, top, Insets.gutter, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 7),
-            child: Text(header, style: AppText.footnote),
-          ),
+          if (header case final h?)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 0, 4, 7),
+              child: Text(h, style: AppText.footnote),
+            ),
           DecoratedBox(
             decoration: _panel,
             child: ClipRRect(

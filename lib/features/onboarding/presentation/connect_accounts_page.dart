@@ -383,7 +383,8 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
   /// themselves, so a person whose music comes only from Spotify sees it
   /// under Spotify. An app on this phone that fills nothing yet (not
   /// connected, or nothing found) still gets a header, which is how it is
-  /// connected from here. Categories only questions fill come last.
+  /// connected from here. Categories only questions fill come last, and only
+  /// the ones the person answered.
   ///
   /// A header opens what can be done to its apps; a category row opens the
   /// category.
@@ -412,7 +413,9 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
     for (final c in categories) {
       final apps = appsOf(c);
       if (apps.isEmpty) {
-        asked.add(c);
+        // Only what they answered during setup (Aryan, 2026-10-01): Edit
+        // tiles edits, it does not offer questions nobody took up.
+        if (bank.answers.any((a) => a.category == c)) asked.add(c);
         continue;
       }
       final i = groups.indexWhere((g) => _sameApps(g.$1, apps));

@@ -366,6 +366,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   photos: photosItem,
                   tiles: shown,
                   mediaOf: _media,
+                  mediaBusy: (t) =>
+                      ref.watch(tileMediaProvider).isBusy(t.kind, t.key),
+                  onMedia: (t) => unawaited(_chooseMedia(t)),
                   onReorder: (moved, target) => _reorder(tiles, moved, target),
                   onRemove: (key) => _remove(tiles, key),
                   onFloorHit: () => showAppToast(
@@ -468,6 +471,44 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           ),
         );
 
+  /// The camera on a tile in arrange mode: the same sheet as on the category
+  /// page, so a photo or video can be put behind a tile, or taken off, without
+  /// going through Edit tiles (Aryan, 2026-10-01). It saves at once, as it
+  /// does there; only the order waits for Save.
+  Future<void> _chooseMedia(api.ProfileTile tile) async {
+    final has = _media(tile) != null;
+    final taken = await showAppActionSheet(
+      context,
+      title: 'Put something behind this',
+      message: tile.isAnswer
+          ? 'It sits under your answer.'
+          : 'It sits under the number.',
+      actions: [
+        const SheetAction('Photo Library', icon: Icons.photo_library_outlined),
+        const SheetAction('Take Photo or Video', icon: Icons.photo_camera),
+        const SheetAction('Choose File', icon: Icons.folder_outlined),
+        if (has) const SheetAction('Remove', destructive: true),
+      ],
+    );
+    if (taken == null || !mounted) return;
+
+    void onError(String message) {
+      if (mounted) showAppToast(context, message);
+    }
+
+    final controller = ref.read(tileMediaProvider.notifier);
+    if (taken == 3) {
+      await controller.clear(tile.kind, tile.key, onError: onError);
+      return;
+    }
+    await controller.attach(
+      tile.kind,
+      tile.key,
+      TileMediaSource.values[taken],
+      onError: onError,
+    );
+  }
+
   MediaAsset? _media(api.ProfileTile t) => _theirs
       ? t.media
       : ref.watch(tileMediaProvider).resolve(t.kind, t.key, t.media);
@@ -507,19 +548,28 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Pressable(
-            onTap: () => setState(() => _arranging = !_arranging),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
-              child: Text(
-                _arranging ? 'Done' : 'Arrange',
-                style: AppText.navAction.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.accent,
+          // A four-tile icon opens arrange mode (Aryan, 2026-10-01); Done,
+          // in words, closes it.
+          if (_arranging)
+            Pressable(
+              onTap: () => setState(() => _arranging = false),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+                child: Text(
+                  'Done',
+                  style: AppText.navAction.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.accent,
+                  ),
                 ),
               ),
+            )
+          else
+            NavIconButton(
+              icon: Icons.grid_view_rounded,
+              semanticLabel: 'Arrange your tiles',
+              onTap: () => setState(() => _arranging = true),
             ),
-          ),
           // Your saved list, which lives on your own profile rather than in
           // Settings. Hidden while arranging, where leaving would drop the
           // order being worked on.

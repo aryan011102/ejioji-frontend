@@ -359,10 +359,14 @@ class AppRow extends StatelessWidget {
     this.destructive = false,
     this.last = false,
     this.onTap,
+    this.tag,
     super.key,
   });
 
   final String label;
+
+  /// A short pill beside the label, such as "New".
+  final String? tag;
   final Widget? leading;
   final String? subtitle;
   final String? value;
@@ -387,12 +391,40 @@ class AppRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  label,
-                  style: AppText.body.copyWith(
-                    color:
-                        destructive ? AppColors.destructive : AppColors.label,
-                  ),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        label,
+                        style: AppText.body.copyWith(
+                          color: destructive
+                              ? AppColors.destructive
+                              : AppColors.label,
+                        ),
+                      ),
+                    ),
+                    if (tag case final t?) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.accent,
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: Text(
+                          t,
+                          style: AppText.micro.copyWith(
+                            color: AppColors.label,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 if (subtitle != null) ...[
                   const SizedBox(height: 1),

@@ -17,7 +17,8 @@ const kMinTiles = 6;
 ///
 /// Drag anywhere on a tile to move it; the ✕ takes it off. Both are edits, so
 /// neither writes — the profile goes dirty and the foot becomes Save. The
-/// camera puts a photo or video behind a tile, which saves at once.
+/// camera, top left, puts a photo or video behind a tile, which saves at
+/// once; the ✕ is top right.
 ///
 /// Dragging is long-press rather than immediate, because the wall scrolls: an
 /// immediate drag would fight every scroll gesture on the screen.
@@ -254,7 +255,7 @@ class _ArrangeableTile extends StatelessWidget {
                 ),
                 Positioned(
                   top: 9,
-                  right: 9,
+                  left: 9,
                   child: Pressable(
                     onTap: mediaBusy ? null : onMedia,
                     semanticLabel: media == null
@@ -285,7 +286,7 @@ class _ArrangeableTile extends StatelessWidget {
                 ),
                 Positioned(
                   top: 9,
-                  left: 9,
+                  right: 9,
                   child: Pressable(
                     onTap: onRemove,
                     semanticLabel: 'Remove from profile',

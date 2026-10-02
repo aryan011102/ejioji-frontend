@@ -187,7 +187,7 @@ class _ReadingPageState extends ConsumerState<ReadingPage> {
             const SizedBox(height: 7),
             Text(
               'This takes about a minute and only happens once. We read it, '
-              'work out what it says, and give the key straight back.',
+              "work out what it says, and don't store any of it.",
               textAlign: TextAlign.center,
               style: AppText.callout,
             ),

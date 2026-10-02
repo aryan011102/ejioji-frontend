@@ -139,11 +139,6 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
   /// The one inbox being refreshed or removed, when there are several.
   String? _busyInbox;
 
-  /// Which groups of "Your tiles" are open: an app, or null for the
-  /// categories only questions fill. All closed to start, so the list is a
-  /// handful of apps rather than every category.
-  final Set<SourceProvider?> _openTiles = {};
-
   @override
   void initState() {
     super.initState();
@@ -377,64 +372,109 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
     ];
   }
 
-  /// Edit tiles: every category, with how many of its tiles are on the
-  /// profile, each opening on its own. Null until the three reads land.
-  Widget? _tilesGroup() {
+  /// Edit tiles: the categories, grouped by the apps that fill them, always
+  /// open (Aryan, 2026-10-01). Null until the four reads land, and then the
+  /// page falls back to the plain list of sources.
+  ///
+  /// A group is a set of apps: Gmail holds food, going out, travel, shopping
+  /// and moving; YouTube holds watching; Music is filled by YouTube, Spotify
+  /// and Apple Music together, so it is one group with all three stacked in
+  /// its header rather than a Music row under each of them. Read off the tiles
+  /// themselves, so a person whose music comes only from Spotify sees it
+  /// under Spotify. An app on this phone that fills nothing yet (not
+  /// connected, or nothing found) still gets a header, which is how it is
+  /// connected from here. Categories only questions fill come last, and only
+  /// the ones the person answered.
+  ///
+  /// A header opens what can be done to its apps; a category row opens the
+  /// category.
+  Widget? _tilesGroup({
+    required Map<SourceProvider, Connection> linked,
+    required List<Connection> inboxes,
+    required ConsentState? consent,
+    required bool locked,
+  }) {
     final candidates = ref.watch(candidatesProvider).valueOrNull;
     final profile = ref.watch(myProfileProvider).valueOrNull;
     final bank = ref.watch(promptBankProvider).valueOrNull;
     if (candidates == null || profile == null || bank == null) return null;
     final categories = pickableCategories(candidates, bank.answers, bank);
-    if (categories.isEmpty) return null;
 
-    // Grouped by the app the tiles came from (Aryan, 2026-10-01): Gmail opens
-    // to food delivery, going out, travel, shopping; YouTube and Netflix to
-    // what they fill. Read off the tiles themselves, so a category two apps
-    // feed sits under both. Whatever no app fills (questions only) is last.
-    final groups = <(SourceProvider?, List<TileCategory>)>[
+    // Which apps fill each category, in the order the apps are listed.
+    List<SourceProvider> appsOf(TileCategory c) => [
+          for (final source in _tileSources)
+            if (candidates.any(
+              (i) => i.category == c && i.providers.contains(source),
+            ))
+              source,
+        ];
+    final groups = <(List<SourceProvider>, List<TileCategory>)>[];
+    final asked = <TileCategory>[];
+    for (final c in categories) {
+      final apps = appsOf(c);
+      if (apps.isEmpty) {
+        // Only what they answered during setup (Aryan, 2026-10-01): Edit
+        // tiles edits, it does not offer questions nobody took up.
+        if (bank.answers.any((a) => a.category == c)) asked.add(c);
+        continue;
+      }
+      final i = groups.indexWhere((g) => _sameApps(g.$1, apps));
+      if (i < 0) {
+        groups.add((apps, [c]));
+      } else {
+        groups[i].$2.add(c);
+      }
+    }
+    // One app's own group first, in app order, then the shared ones; an app
+    // that fills nothing on its own sits where its own group would be.
+    final shown = {for (final (apps, _) in groups) ...apps};
+    final ordered = <(List<SourceProvider>, List<TileCategory>)>[
       for (final source in _tileSources)
-        if (categoriesOf(source, candidates, categories) case final cs
-            when cs.isNotEmpty)
-          (source, cs),
+        if (groups.where((g) => _sameApps(g.$1, [source])).firstOrNull
+            case final g?)
+          g
+        else if (!shown.contains(source) && _onThisPhone(source))
+          ([source], const <TileCategory>[]),
+      for (final g in groups)
+        if (g.$1.length > 1) g,
+      if (asked.isNotEmpty) (const <SourceProvider>[], asked),
     ];
-    final fed = {for (final (_, cs) in groups) ...cs};
-    final asked = [
-      for (final c in categories)
-        if (!fed.contains(c)) c,
-    ];
-    if (asked.isNotEmpty) groups.add((null, asked));
 
     int onProfile(Iterable<TileCategory> cs) =>
         profile.tiles.where((t) => cs.contains(t.category)).length;
     String? count(int n) => n == 0 ? null : '$n on profile';
 
     final rows = <Widget>[];
-    for (final (g, (source, cs)) in groups.indexed) {
-      final open = _openTiles.contains(source);
-      final lastGroup = g == groups.length - 1;
+    for (final (g, (apps, cs)) in ordered.indexed) {
+      final lastGroup = g == ordered.length - 1;
+      final connected = apps.any(linked.containsKey);
       rows.add(
         AppRow(
-          leading: source == null
-              ? const Icon(Icons.edit_note, size: 22, color: AppColors.label2)
-              : _BrandMark(source),
-          label: switch (source) {
-            null => 'Your answers',
-            SourceProvider.gmail => 'Gmail',
-            SourceProvider s => s.label,
+          leading: switch (apps) {
+            [] => const Icon(Icons.edit_note, size: 22, color: AppColors.label2),
+            [final one] => _BrandMark(one),
+            _ => _StackedMarks(apps),
           },
+          label: switch (apps) {
+            [] => 'Your answers',
+            [final one] => _appName(one),
+            _ => apps.map(_appName).join(' · '),
+          },
+          subtitle: apps.isNotEmpty && !connected ? 'Not connected' : null,
           value: count(onProfile(cs)),
-          control: Icon(
-            open ? Icons.expand_less : Icons.expand_more,
-            size: 20,
-            color: AppColors.label4,
-          ),
-          last: lastGroup && !open,
-          onTap: () => setState(() {
-            if (!_openTiles.remove(source)) _openTiles.add(source);
-          }),
+          last: lastGroup && cs.isEmpty,
+          onTap: apps.isEmpty || locked
+              ? null
+              : () => unawaited(
+                    _openApps(
+                      apps,
+                      linked: linked,
+                      inboxes: inboxes,
+                      consent: consent,
+                    ),
+                  ),
         ),
       );
-      if (!open) continue;
       for (final (j, c) in cs.indexed) {
         rows.add(
           Padding(
@@ -457,6 +497,74 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
           'on your profile',
       children: rows,
     );
+  }
+
+  static bool _sameApps(List<SourceProvider> a, List<SourceProvider> b) =>
+      a.length == b.length && a.every(b.contains);
+
+  /// Whether this phone can connect [source] at all: Apple Music is a sign-in
+  /// only where MusicKit is.
+  static bool _onThisPhone(SourceProvider source) =>
+      source != SourceProvider.appleMusic || AppleMusicKit.isAvailable;
+
+  static String _appName(SourceProvider source) =>
+      source == SourceProvider.gmail ? 'Gmail' : source.label;
+
+  /// A header tapped. Gmail opens its inboxes and "Add another account"; any
+  /// other app connected opens its usual three options (what we read, refresh,
+  /// disconnect), and one not connected connects. A shared header (Music)
+  /// first asks which of its apps.
+  Future<void> _openApps(
+    List<SourceProvider> apps, {
+    required Map<SourceProvider, Connection> linked,
+    required List<Connection> inboxes,
+    required ConsentState? consent,
+  }) async {
+    var app = apps.first;
+    if (apps.length > 1) {
+      final i = await showAppActionSheet(
+        context,
+        title: apps.map(_appName).join(' · '),
+        actions: [
+          for (final a in apps)
+            SheetAction(
+              linked.containsKey(a) ? _appName(a) : 'Connect ${_appName(a)}',
+              icon: linked.containsKey(a) ? Icons.link : Icons.add,
+            ),
+        ],
+      );
+      if (i == null || !mounted) return;
+      app = apps[i];
+    }
+    if (consent == null) return;
+    if (app == SourceProvider.gmail && inboxes.isNotEmpty) {
+      final canAdd = inboxes.length < _maxInboxes;
+      final i = await showAppActionSheet(
+        context,
+        title: 'Gmail',
+        actions: [
+          for (final inbox in inboxes)
+            SheetAction(
+              inbox.address ?? 'Gmail',
+              icon: Icons.mail_outline,
+            ),
+          if (canAdd)
+            const SheetAction('Add another account', icon: Icons.add),
+        ],
+      );
+      if (i == null || !mounted) return;
+      if (i < inboxes.length) {
+        await _manageInbox(inboxes[i], only: inboxes.length == 1);
+      } else {
+        await _connect(SourceProvider.gmail, consent);
+      }
+      return;
+    }
+    if (linked.containsKey(app)) {
+      await _manage(app, _appName(app));
+    } else {
+      await _connect(app, consent);
+    }
   }
 
   /// The apps, in the order their groups appear under "Your tiles".
@@ -523,6 +631,14 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
         ref.watch(myProfileProvider).valueOrNull?.publish.needsLinkedIn ??
             !hasLinkedIn;
     final mustAddLinkedIn = !hasLinkedIn && linkedInRequired;
+    final tiles = widget.editing
+        ? _tilesGroup(
+            linked: linked,
+            inboxes: inboxes,
+            consent: consent.valueOrNull,
+            locked: locked,
+          )
+        : null;
 
     return AppScaffold(
       navBar: widget.editing
@@ -579,25 +695,28 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
           padding: EdgeInsets.only(top: widget.editing ? 0 : 12, bottom: 22),
           children: [
             const _Heading(),
-            if (widget.editing)
-              if (_tilesGroup() case final group?) group,
             _ReadOnceCard(onTap: () => context.push(Routes.consent)),
             _StrengthCard(linked: linked, of: _sourceCount),
-            for (final (header, sources) in _groups)
-              _Group(
-                header: header,
-                children: _lastMarked([
-                  for (final s in sources)
-                    ..._rows(
-                      s,
-                      linked: linked,
-                      inboxes: inboxes,
-                      connecting: connecting,
-                      consent: consent.valueOrNull,
-                      locked: locked,
-                    ),
-                ]),
-              ),
+            // Edit tiles: the tiles grouped by app, every app reached from its
+            // header, in place of the list of sources (Aryan, 2026-10-01).
+            if (tiles != null)
+              tiles
+            else
+              for (final (header, sources) in _groups)
+                _Group(
+                  header: header,
+                  children: _lastMarked([
+                    for (final s in sources)
+                      ..._rows(
+                        s,
+                        linked: linked,
+                        inboxes: inboxes,
+                        connecting: connecting,
+                        consent: consent.valueOrNull,
+                        locked: locked,
+                      ),
+                  ]),
+                ),
             _Group(
               header: 'Social · only your matches see these',
               children: [
@@ -1175,6 +1294,39 @@ class _SocialRow extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Several apps' marks overlapping in one leading slot, for a group more than
+/// one app fills (Music: YouTube, Spotify, Apple Music).
+class _StackedMarks extends StatelessWidget {
+  const _StackedMarks(this.apps);
+
+  final List<SourceProvider> apps;
+
+  static const _mark = 18.0;
+
+  @override
+  Widget build(BuildContext context) {
+    // Spread to fit the 29pt slot whatever the count.
+    final step =
+        apps.length < 2 ? 0.0 : (29 - _mark) / (apps.length - 1);
+    return SizedBox(
+      width: 29,
+      height: 29,
+      child: Stack(
+        children: [
+          for (final (i, a) in apps.indexed)
+            Positioned(
+              left: i * step,
+              top: i.isEven ? 0 : 29 - _mark,
+              width: _mark,
+              height: _mark,
+              child: FittedBox(child: _BrandMark(a)),
+            ),
+        ],
+      ),
     );
   }
 }

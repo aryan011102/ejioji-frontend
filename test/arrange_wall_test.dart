@@ -83,6 +83,8 @@ void main() {
         photos: _photos,
         tiles: _tiles,
         mediaOf: (_) => null,
+        mediaBusy: (_) => false,
+        onMedia: (_) {},
         onReorder: (_, __) {},
         onRemove: (_) {},
         onFloorHit: () {},

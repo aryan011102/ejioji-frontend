@@ -16,7 +16,8 @@ const kMinTiles = 6;
 /// Arrange mode.
 ///
 /// Drag anywhere on a tile to move it; the ✕ takes it off. Both are edits, so
-/// neither writes — the profile goes dirty and the foot becomes Save.
+/// neither writes — the profile goes dirty and the foot becomes Save. The
+/// camera puts a photo or video behind a tile, which saves at once.
 ///
 /// Dragging is long-press rather than immediate, because the wall scrolls: an
 /// immediate drag would fight every scroll gesture on the screen.
@@ -29,6 +30,8 @@ class ArrangeWall extends StatefulWidget {
     required this.photos,
     required this.tiles,
     required this.mediaOf,
+    required this.mediaBusy,
+    required this.onMedia,
     required this.onReorder,
     required this.onRemove,
     required this.onFloorHit,
@@ -45,6 +48,12 @@ class ArrangeWall extends StatefulWidget {
 
   /// What sits behind each tile, so arranging does not strip the photos off.
   final MediaAsset? Function(api.ProfileTile) mediaOf;
+
+  /// Whether an upload behind this tile is in flight.
+  final bool Function(api.ProfileTile) mediaBusy;
+
+  /// The camera on a tile.
+  final ValueChanged<api.ProfileTile> onMedia;
 
   final void Function(String movedKey, String targetKey) onReorder;
   final void Function(String key) onRemove;
@@ -86,6 +95,8 @@ class _ArrangeWallState extends State<ArrangeWall>
             child: _ArrangeableTile(
               tile: tile,
               media: widget.mediaOf(tile),
+              mediaBusy: widget.mediaBusy(tile),
+              onMedia: () => widget.onMedia(tile),
               wobble: _wobble,
               dragging: _dragging == tile.key,
               canRemove: canRemove,
@@ -142,6 +153,8 @@ class _ArrangeableTile extends StatelessWidget {
   const _ArrangeableTile({
     required this.tile,
     required this.media,
+    required this.mediaBusy,
+    required this.onMedia,
     required this.wobble,
     required this.dragging,
     required this.canRemove,
@@ -153,6 +166,8 @@ class _ArrangeableTile extends StatelessWidget {
 
   final api.ProfileTile tile;
   final MediaAsset? media;
+  final bool mediaBusy;
+  final VoidCallback onMedia;
   final Animation<double> wobble;
   final bool dragging;
   final bool canRemove;
@@ -234,6 +249,37 @@ class _ArrangeableTile extends StatelessWidget {
                         size: 22,
                         color: AppColors.label,
                       ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 9,
+                  right: 9,
+                  child: Pressable(
+                    onTap: mediaBusy ? null : onMedia,
+                    semanticLabel: media == null
+                        ? 'Put a photo or video behind this tile'
+                        : 'Change the photo or video behind this tile',
+                    child: Container(
+                      width: 26,
+                      height: 26,
+                      decoration: const BoxDecoration(
+                        color: Color(0xF0FFFFFF),
+                        shape: BoxShape.circle,
+                      ),
+                      child: mediaBusy
+                          ? const Padding(
+                              padding: EdgeInsets.all(6),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Color(0xFF1A1116),
+                              ),
+                            )
+                          : const Icon(
+                              Icons.photo_camera,
+                              size: 14,
+                              color: Color(0xFF1A1116),
+                            ),
                     ),
                   ),
                 ),

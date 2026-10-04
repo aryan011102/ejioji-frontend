@@ -474,10 +474,14 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
         );
 
     // Which apps fill each category, in the order the apps are listed.
+    // Watching and Netflix count as one box, so both rows sit under
+    // "YouTube · Netflix" (Pritika, 2026-10-04).
     List<SourceProvider> appsOf(TileCategory c) => [
           for (final source in _tileSources)
             if (candidates.any(
-              (i) => i.category == c && i.providers.contains(source),
+              (i) =>
+                  _boxOf(i.category) == _boxOf(c) &&
+                  i.providers.contains(source),
             ))
               source,
         ];
@@ -507,8 +511,13 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
           ? -1
           : groups.indexWhere(
               (g) =>
-                  g.$2.contains(home) ||
-                  (g.$2.isEmpty && g.$1.any((a) => _homeOf[a] == home)),
+                  g.$2.any((c) => _boxOf(c) == _boxOf(home)) ||
+                  (g.$2.isEmpty &&
+                      g.$1.any(
+                        (a) =>
+                            _boxOf(_homeOf[a] ?? TileCategory.unknown) ==
+                            _boxOf(home),
+                      )),
             );
       if (i < 0) {
         groups.add(([source], <TileCategory>[]));
@@ -613,6 +622,12 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
     SourceProvider.spotify: TileCategory.music,
     SourceProvider.appleMusic: TileCategory.music,
   };
+
+  /// The box a category's row sits in: Netflix shares Watching's, so YouTube
+  /// and Netflix are one "YouTube · Netflix" box, as the music apps are one.
+  /// The categories themselves stay apart, each with its own two tiles.
+  static TileCategory _boxOf(TileCategory c) =>
+      c == TileCategory.netflix ? TileCategory.watching : c;
 
   static bool _sameApps(List<SourceProvider> a, List<SourceProvider> b) =>
       a.length == b.length && a.every(b.contains);

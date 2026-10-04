@@ -131,6 +131,24 @@ void main() {
       expect(profile.displayName, 'Priya Nair');
       expect(profile.languages, [Language.hindi, Language.tamil]);
       expect(profile.education, Education.masters);
+      expect(profile.lastNameInitial, isFalse);
+    });
+
+    test('her own wall shows the initial others see, her form the full name',
+        () {
+      final profile = Profile.fromJson({
+        'first_name': 'Priya',
+        'last_name': 'Nair',
+        'last_name_initial': true,
+        'shown_last_name': 'N.',
+        'birth_date': '1998-04-12',
+        'age': 27,
+        'gender': 'woman',
+        'city': 'bengaluru',
+      });
+      expect(profile.lastName, 'Nair');
+      expect(profile.lastNameInitial, isTrue);
+      expect(profile.displayName, 'Priya N.');
     });
   });
 

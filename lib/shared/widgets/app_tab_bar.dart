@@ -23,12 +23,21 @@ class AppTabBar extends StatelessWidget {
     required this.current,
     required this.onSelect,
     this.chatsBadge = 0,
+    this.onHoldHome,
+    this.blind = false,
     super.key,
   });
 
   final AppTab current;
   final ValueChanged<AppTab> onSelect;
   final int chatsBadge;
+
+  /// Holding Home turns it over to Go blind, and holding it again turns it
+  /// back. There is no fourth tab: Blind is Home's other face.
+  final VoidCallback? onHoldHome;
+
+  /// Home is showing Go blind, so its icon is the sparkle.
+  final bool blind;
 
   /// The bar itself, without the safe area under it.
   static const barHeight = 62.0;
@@ -101,18 +110,30 @@ class AppTabBar extends StatelessWidget {
   Widget _items() {
     return Row(
       children: [
-        _item(AppTab.home, 'Home', Icons.home_rounded),
+        _item(
+          AppTab.home,
+          'Home',
+          blind ? Icons.auto_awesome : Icons.home_rounded,
+          onLongPress: onHoldHome,
+        ),
         _item(AppTab.chats, 'Chats', Icons.forum_rounded, badge: chatsBadge),
         _item(AppTab.you, 'You', Icons.account_circle_outlined),
       ],
     );
   }
 
-  Widget _item(AppTab tab, String label, IconData icon, {int badge = 0}) {
+  Widget _item(
+    AppTab tab,
+    String label,
+    IconData icon, {
+    int badge = 0,
+    VoidCallback? onLongPress,
+  }) {
     final on = tab == current;
     return Expanded(
       child: Pressable(
         onTap: () => onSelect(tab),
+        onLongPress: onLongPress,
         semanticLabel: label,
         child: SizedBox(
           height: double.infinity,
@@ -122,10 +143,23 @@ class AppTabBar extends StatelessWidget {
               Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  Icon(
-                    icon,
-                    size: 22,
-                    color: on ? AppColors.accent : AppColors.label3,
+                  // Home's icon turns over with the screen: house to
+                  // sparkle and back.
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 320),
+                    transitionBuilder: (child, animation) => ScaleTransition(
+                      scale: animation,
+                      child: RotationTransition(
+                        turns: Tween(begin: 0.5, end: 1.0).animate(animation),
+                        child: child,
+                      ),
+                    ),
+                    child: Icon(
+                      icon,
+                      key: ValueKey(icon),
+                      size: 22,
+                      color: on ? AppColors.accent : AppColors.label3,
+                    ),
                   ),
                   if (badge > 0)
                     Positioned(

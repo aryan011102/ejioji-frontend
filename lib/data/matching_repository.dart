@@ -1,6 +1,7 @@
 import '../core/network/api_client.dart';
 import '../core/network/endpoints.dart';
 import '../core/network/json.dart';
+import '../shared/models/blind.dart';
 import '../shared/models/enums.dart';
 import '../shared/models/person.dart';
 import '../shared/models/tile.dart';
@@ -54,6 +55,25 @@ class MatchingRepository {
       query: {if (after != null) 'after': after, 'limit': limit},
     );
     return FeedPage.fromJson(body);
+  }
+
+  /// A page of Go blind. No [seed] is a new deal (the shuffle button); the
+  /// seed it came back with, and [after], is more of the same deal. The
+  /// server shuffles, so the order is never decided here.
+  Future<BlindPage> blind({
+    int? seed,
+    int? after,
+    TileCategory? category,
+  }) async {
+    final body = await _api.getJson(
+      Api.blind,
+      query: {
+        if (seed != null) 'seed': seed,
+        if (after != null) 'after': after,
+        if (category != null) 'category': category.wire,
+      },
+    );
+    return BlindPage.fromJson(body);
   }
 
   /// Asks to chat. Comes back accepted when the other person had already

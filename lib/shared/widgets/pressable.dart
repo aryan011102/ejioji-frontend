@@ -12,6 +12,7 @@ class Pressable extends StatefulWidget {
   const Pressable({
     required this.child,
     this.onTap,
+    this.onLongPress,
     this.scale = 0.97,
     this.semanticLabel,
     super.key,
@@ -19,6 +20,10 @@ class Pressable extends StatefulWidget {
 
   final Widget child;
   final VoidCallback? onTap;
+
+  /// A second, hidden action. Only the Home tab has one: holding it turns
+  /// Home over to Go blind.
+  final VoidCallback? onLongPress;
   final double scale;
   final String? semanticLabel;
 
@@ -43,6 +48,7 @@ class _PressableState extends State<Pressable> {
         onTapUp: _enabled ? (_) => setState(() => _down = false) : null,
         onTapCancel: _enabled ? () => setState(() => _down = false) : null,
         onTap: widget.onTap,
+        onLongPress: widget.onLongPress,
         child: AnimatedScale(
           scale: _down ? widget.scale : 1,
           duration: Motion.press,

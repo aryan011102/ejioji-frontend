@@ -57,14 +57,16 @@ class _HomePageState extends ConsumerState<HomePage>
   }
 
   void _startBlind() => WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) ref.read(blindProvider.notifier).start();
+        if (mounted) ref.read(blindProvider.notifier).enter();
       });
 
   @override
   Widget build(BuildContext context) {
     ref.listen<bool>(blindModeProvider, (_, blind) {
-      if (blind && !_blindBuilt) {
-        setState(() => _blindBuilt = true);
+      if (blind) {
+        if (!_blindBuilt) setState(() => _blindBuilt = true);
+        // Every turn, not only the first: Blind decides whether its deal is
+        // still worth keeping (BlindController.enter).
         _startBlind();
       }
       blind ? _flip.forward() : _flip.reverse();

@@ -22,8 +22,8 @@ class BlindTile {
 
 /// A page of a deal. [tiles] are in the order the server dealt them.
 @immutable
-class BlindPage {
-  const BlindPage({required this.seed, required this.tiles, this.nextCursor});
+class BlindDeal {
+  const BlindDeal({required this.seed, required this.tiles, this.nextCursor});
 
   /// Sent back for more of this same deal.
   final int seed;
@@ -34,7 +34,7 @@ class BlindPage {
 
   /// A dealt tile that is not on its person's card is dropped rather than
   /// guessed at: the card is what a tap opens, and the two must agree.
-  static BlindPage fromJson(Json j) {
+  static BlindDeal fromJson(Json j) {
     final people = {
       for (final p in Candidate.listFrom(j.objects('people'))) p.userId: p,
     };
@@ -51,7 +51,7 @@ class BlindPage {
         }
       }
     }
-    return BlindPage(
+    return BlindDeal(
       seed: j.intOrNull('seed') ?? 0,
       tiles: tiles,
       nextCursor: j.intOrNull('next_cursor'),

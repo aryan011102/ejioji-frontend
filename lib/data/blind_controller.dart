@@ -106,12 +106,34 @@ class BlindController extends Notifier<BlindState> {
     return const BlindState();
   }
 
-  /// The first time Blind is turned to. Later turns keep the deal and the
-  /// place in it.
-  void start() {
-    if (state.started) return;
+  /// Set when the filters change: the deal in hand was made for different
+  /// people, so the next turn to Blind deals again.
+  bool _stale = false;
+
+  /// Blind has been turned to. The first time it deals. Later turns keep the
+  /// deal and the place in it, unless there is nothing worth keeping: the
+  /// filters changed since, or the last deal was empty or failed. Without
+  /// this an empty deal stays on screen however many people arrive.
+  void enter() {
+    final keep = state.started &&
+        !_stale &&
+        state.error == null &&
+        (state.tiles.isNotEmpty || state.loading);
+    if (keep) return;
+    _stale = false;
     state = state.copyWith(started: true);
-    unawaited(_deal());
+    unawaited(shuffle());
+  }
+
+  /// The filters were saved. Deals now if Blind is what is showing, and on
+  /// the next turn to it otherwise.
+  void filtersChanged() {
+    if (!state.started) return;
+    if (ref.read(blindModeProvider)) {
+      unawaited(shuffle());
+    } else {
+      _stale = true;
+    }
   }
 
   /// A fresh deal of the same tab: the shuffle button.

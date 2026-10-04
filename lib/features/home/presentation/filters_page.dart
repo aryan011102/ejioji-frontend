@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
+import '../../../data/blind_controller.dart';
 import '../../../data/feed_controller.dart';
 import '../../../data/providers.dart';
 import '../../../shared/models/enums.dart';
@@ -186,6 +187,8 @@ class _FiltersFormState extends ConsumerState<_FiltersForm> {
             ],
           );
       ref.invalidate(preferencesProvider);
+      // Blind deals from the same people, so it deals again too.
+      ref.read(blindProvider.notifier).filtersChanged();
       await ref.read(feedProvider.notifier).refresh();
       if (mounted) context.pop();
     } on ApiException catch (e) {

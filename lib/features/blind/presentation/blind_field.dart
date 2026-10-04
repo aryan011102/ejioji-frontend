@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -34,15 +35,23 @@ class BlindGeometry {
       );
 }
 
+/// One place on the plane: a block and a slot in it. The same tile can sit in
+/// two places once a deal repeats, so a lifted tile is a place, not a tile.
+typedef _Place = (int bx, int by, int slot);
+
 /// A plane you drag in any direction, with no top, no end and no first tile.
 ///
-/// A tap on a tile opens whose it is. A quick flick to the right on one asks
-/// to chat about it: quick, because a slow drag to the right is just moving,
-/// and the plane has to stay free to move every way.
+/// Tap and swipe (Aryan, 2026-10-04, replacing a fast flick that was too hard
+/// to hit): a tap lifts a tile and stops the plane; the lifted tile then
+/// slides right, at any speed, to show "Chat about this" under it, and letting
+/// go past the mark asks. A tap on the lifted tile opens whose it is. A tap or
+/// a drag anywhere else puts it back. The plane itself never has to tell a
+/// swipe from a move, because only a lifted tile swipes.
 class BlindField extends StatefulWidget {
   const BlindField({
     required this.layout,
     required this.topInset,
+    required this.bottomInset,
     required this.onOpen,
     required this.onChat,
     required this.onRunningLow,
@@ -56,6 +65,10 @@ class BlindField extends StatefulWidget {
   /// What floats over the top edge (the tabs), so the first row starts below
   /// it rather than under it.
   final double topInset;
+
+  /// What floats over the bottom (the tab bar), so the lifted tile's hint
+  /// sits above it.
+  final double bottomInset;
 
   final ValueChanged<BlindTile> onOpen;
   final Future<void> Function(BlindTile) onChat;
@@ -89,44 +102,41 @@ class _BlindFieldState extends State<BlindField> with TickerProviderStateMixin {
   Offset _velocity = Offset.zero;
   Duration _lastTick = Duration.zero;
 
-  late final AnimationController _snap = AnimationController(
+  /// The lifted tile, if any, and how far it has slid right.
+  _Place? _lifted;
+  double _slide = 0;
+  bool _sliding = false;
+  bool _pastMark = false;
+
+  /// Asking: the sheet is up, and the slid tile holds where it is.
+  bool _asking = false;
+
+  late final AnimationController _settle = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 220),
+    duration: const Duration(milliseconds: 260),
   );
-  Animation<Offset>? _snapTo;
-
-  // The drag in progress, for telling a flick from a move.
-  Offset _dragFrom = Offset.zero;
-  Offset _offsetAtDrag = Offset.zero;
-  Duration _dragStarted = Duration.zero;
-  final Stopwatch _clock = Stopwatch()..start();
-
-  /// The tile being asked about, lit while its sheet is up.
-  String? _chatting;
+  Animation<double>? _slideTo;
 
   late BlindGeometry _geo;
-
-  /// A flick is short, fast and mostly sideways. Anything else moves the
-  /// plane.
-  static const _flickWithin = Duration(milliseconds: 280);
-  static const _flickSpeed = 900.0;
 
   @override
   void initState() {
     super.initState();
     _glide = createTicker(_onGlide);
-    _snap.addListener(() {
-      final to = _snapTo;
-      if (to != null) setState(() => _offset = to.value);
+    _settle.addListener(() {
+      final to = _slideTo;
+      if (to != null) setState(() => _slide = to.value);
     });
   }
 
   @override
   void dispose() {
     _glide.dispose();
-    _snap.dispose();
+    _settle.dispose();
     super.dispose();
   }
+
+  // ---- Moving the plane. ----
 
   /// Momentum, with framerate-independent decay so it feels the same at 60
   /// and 120Hz. A field you have to keep re-grabbing is a chore, not a wander.
@@ -147,61 +157,134 @@ class _BlindFieldState extends State<BlindField> with TickerProviderStateMixin {
 
   void _onPanStart(DragStartDetails d) {
     _stopGlide();
-    _snap.stop();
     _velocity = Offset.zero;
-    _dragFrom = d.localPosition;
-    _offsetAtDrag = _offset;
-    _dragStarted = _clock.elapsed;
+    final lifted = _lifted;
+    if (lifted != null && !_asking && _placeAt(d.localPosition) == lifted) {
+      _settle.stop();
+      _sliding = true;
+      return;
+    }
+    // A drag anywhere else puts the lifted tile back and moves the plane.
+    if (lifted != null && !_asking) _drop();
   }
 
-  void _onPanUpdate(DragUpdateDetails d) => setState(() => _offset += d.delta);
+  void _onPanUpdate(DragUpdateDetails d) {
+    if (_sliding) {
+      final width = _liftedWidth;
+      final next = (_slide + d.delta.dx).clamp(0.0, width * 0.85);
+      final past = next >= _markFor(width);
+      // One tap of the engine as it crosses into "let go and it asks".
+      if (past != _pastMark) HapticFeedback.selectionClick();
+      setState(() {
+        _slide = next;
+        _pastMark = past;
+      });
+      return;
+    }
+    if (_asking) return;
+    setState(() => _offset += d.delta);
+  }
 
   void _onPanEnd(DragEndDetails d) {
     final v = d.velocity.pixelsPerSecond;
-    final quick = _clock.elapsed - _dragStarted < _flickWithin;
-    final moved = _offset - _offsetAtDrag;
-    if (quick &&
-        v.dx > _flickSpeed &&
-        v.dx > v.dy.abs() * 2 &&
-        moved.dx > 16) {
-      final tile = _tileAt(_dragFrom);
-      if (tile != null) {
-        unawaited(_flickToChat(tile));
-        return;
+    if (_sliding) {
+      _sliding = false;
+      final fling = v.dx > 700 && _slide > _liftedWidth * 0.15;
+      if (_pastMark || fling) {
+        unawaited(_ask());
+      } else {
+        _settleTo(0);
       }
+      _pastMark = false;
+      return;
     }
-    if (v.distance < 120) return;
+    if (_asking || v.distance < 120) return;
     _velocity = v;
     _lastTick = Duration.zero;
     _glide.start();
   }
 
-  /// Puts the plane back where the flick found it, lights the tile, and asks.
-  Future<void> _flickToChat(BlindTile tile) async {
-    HapticFeedback.mediumImpact();
-    _snapTo = Tween(begin: _offset, end: _offsetAtDrag).animate(
-      CurvedAnimation(parent: _snap, curve: Curves.easeOutCubic),
+  // ---- The lifted tile. ----
+
+  /// How far right the tile must slide before letting go asks: about a third
+  /// of it, but never more than a short thumb's travel on a wide tile.
+  static double _markFor(double width) => math.min(width * 0.38, 110);
+
+  double get _liftedWidth {
+    final lifted = _lifted;
+    if (lifted == null) return 1;
+    return _geo.box(BlindLayout.slots[lifted.$3].$3).width;
+  }
+
+  BlindTile? _tileOf(_Place p) {
+    final tiles = widget.layout.block(p.$1, p.$2);
+    return p.$3 < tiles.length ? tiles[p.$3] : null;
+  }
+
+  void _onTileTap(_Place place, BlindTile tile) {
+    if (_asking) return;
+    if (_lifted == place) {
+      widget.onOpen(tile);
+      return;
+    }
+    _stopGlide();
+    HapticFeedback.selectionClick();
+    _settle.stop();
+    setState(() {
+      _lifted = place;
+      _slide = 0;
+    });
+  }
+
+  void _drop() {
+    _settle.stop();
+    setState(() {
+      _lifted = null;
+      _slide = 0;
+      _sliding = false;
+      _pastMark = false;
+    });
+  }
+
+  void _settleTo(double target) {
+    _slideTo = Tween(begin: _slide, end: target).animate(
+      CurvedAnimation(parent: _settle, curve: Curves.easeOutCubic),
     );
-    setState(() => _chatting = tile.id);
-    unawaited(_snap.forward(from: 0));
+    unawaited(_settle.forward(from: 0));
+  }
+
+  Future<void> _ask() async {
+    final place = _lifted;
+    final tile = place == null ? null : _tileOf(place);
+    if (tile == null) {
+      _drop();
+      return;
+    }
+    HapticFeedback.mediumImpact();
+    setState(() => _asking = true);
+    // Rests open while the sheet is up, so it is plain which line is asked
+    // about.
+    _settleTo(_liftedWidth * 0.5);
     try {
       await widget.onChat(tile);
     } finally {
-      if (mounted) setState(() => _chatting = null);
+      if (mounted) {
+        setState(() => _asking = false);
+        _drop();
+      }
     }
   }
 
-  /// The tile under a point on screen, if any (a gap is no tile).
-  BlindTile? _tileAt(Offset local) {
-    final p = local - _offsetAtDrag;
+  /// The place under a point on screen, if any (a gap is no place).
+  _Place? _placeAt(Offset local) {
+    final p = local - _offset;
     final bx = (p.dx / _geo.blockWidth).floor();
     final by = (p.dy / _geo.blockHeight).floor();
     final q = p - Offset(bx * _geo.blockWidth, by * _geo.blockHeight);
-    final tiles = widget.layout.block(bx, by);
-    for (var k = 0; k < tiles.length; k++) {
+    for (var k = 0; k < BlindLayout.slots.length; k++) {
       final (col, row, size) = BlindLayout.slots[k];
       final rect = Offset(col * _geo.step, row * _geo.step) & _geo.box(size);
-      if (rect.contains(q)) return tiles[k];
+      if (rect.contains(q)) return (bx, by, k);
     }
     return null;
   }
@@ -217,6 +300,7 @@ class _BlindFieldState extends State<BlindField> with TickerProviderStateMixin {
         }
         final view = Offset.zero & constraints.biggest;
         final children = <Widget>[];
+        Widget? liftedChild;
 
         final firstX = ((-_offset.dx) / _geo.blockWidth).floor();
         final lastX = ((view.width - _offset.dx) / _geo.blockWidth).floor();
@@ -237,25 +321,36 @@ class _BlindFieldState extends State<BlindField> with TickerProviderStateMixin {
               // videos: one off screen would still be playing.
               if (!rect.overlaps(view)) continue;
               final t = tiles[k];
-              children.add(
-                Positioned.fromRect(
-                  rect: rect,
-                  child: _Tile(
-                    // Keyed by place and tile, so a video keeps playing while
-                    // the plane moves under it.
-                    key: ValueKey('$bx:$by:$k:${t.id}'),
-                    tile: t,
-                    size: size,
-                    showCategory: widget.showCategory,
-                    asked: widget.asked.contains(t.person.userId),
-                    chatting: _chatting == t.id,
-                    onTap: () => widget.onOpen(t),
-                  ),
+              final place = (bx, by, k);
+              final lifted = _lifted == place;
+              final child = Positioned.fromRect(
+                rect: rect,
+                child: _Tile(
+                  // Keyed by place and tile, so a video keeps playing while
+                  // the plane moves under it.
+                  key: ValueKey('$bx:$by:$k:${t.id}'),
+                  tile: t,
+                  size: size,
+                  showCategory: widget.showCategory,
+                  asked: widget.asked.contains(t.person.userId),
+                  lifted: lifted,
+                  receded: _lifted != null && !lifted,
+                  slide: lifted ? _slide : 0,
+                  pastMark: lifted && (_pastMark || _asking),
+                  onTap: () => _onTileTap(place, t),
                 ),
               );
+              // The lifted tile is drawn last, so its shadow falls on its
+              // neighbours rather than under them.
+              if (lifted) {
+                liftedChild = child;
+              } else {
+                children.add(child);
+              }
             }
           }
         }
+        if (liftedChild != null) children.add(liftedChild);
 
         if (widget.layout.runningLow) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -265,10 +360,30 @@ class _BlindFieldState extends State<BlindField> with TickerProviderStateMixin {
 
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
+          // A tap in a gap puts the lifted tile back.
+          onTap: _lifted != null && !_asking ? _drop : null,
           onPanStart: _onPanStart,
           onPanUpdate: _onPanUpdate,
           onPanEnd: _onPanEnd,
-          child: ClipRect(child: Stack(children: children)),
+          child: ClipRect(
+            child: Stack(
+              children: [
+                ...children,
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: widget.bottomInset,
+                  child: IgnorePointer(
+                    child: AnimatedOpacity(
+                      opacity: _lifted != null && !_asking ? 1 : 0,
+                      duration: Motion.fade,
+                      child: const Center(child: _LiftHint()),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
@@ -283,7 +398,10 @@ class _Tile extends StatelessWidget {
     required this.size,
     required this.showCategory,
     required this.asked,
-    required this.chatting,
+    required this.lifted,
+    required this.receded,
+    required this.slide,
+    required this.pastMark,
     required this.onTap,
     super.key,
   });
@@ -292,59 +410,122 @@ class _Tile extends StatelessWidget {
   final TileSize size;
   final bool showCategory;
   final bool asked;
-  final bool chatting;
+
+  /// Picked up: a little larger, lit, and the one thing that can slide.
+  final bool lifted;
+
+  /// Another tile is lifted: this one steps back so that one reads.
+  final bool receded;
+
+  /// How far right the lifted tile has slid.
+  final double slide;
+
+  /// Slid far enough that letting go asks (or asking already).
+  final bool pastMark;
+
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final t = tile.tile;
     final media = t.media;
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        AnimatedOpacity(
-          opacity: asked ? 0.42 : 1,
-          duration: Motion.press,
-          child: InsightTile(
-            size: size,
-            number: t.isAnswer ? null : t.headline,
-            caption: t.isAnswer ? null : t.body,
-            prompt: t.question,
-            answer: t.isAnswer ? t.headline : null,
-            tone: t.tone,
-            isTrack: t.looksLikeTrack,
-            music: t.music,
-            mediaUrl: media?.stillUrl,
-            videoUrl: media?.videoUrl,
-            isLivePhoto: media?.kind == MediaKind.livePhoto,
-            categoryGlyph: showCategory ? t.glyph : null,
-            onTap: onTap,
-          ),
-        ),
-        if (asked) const Positioned(top: 9, right: 9, child: _AskedMark()),
-        // Lit while the sheet asking about it is up, so it is clear which
-        // line the flick caught.
-        IgnorePointer(
-          child: AnimatedOpacity(
-            opacity: chatting ? 1 : 0,
-            duration: const Duration(milliseconds: 160),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
+    final face = InsightTile(
+      size: size,
+      number: t.isAnswer ? null : t.headline,
+      caption: t.isAnswer ? null : t.body,
+      prompt: t.question,
+      answer: t.isAnswer ? t.headline : null,
+      tone: t.tone,
+      isTrack: t.looksLikeTrack,
+      music: t.music,
+      mediaUrl: media?.stillUrl,
+      videoUrl: media?.videoUrl,
+      isLivePhoto: media?.kind == MediaKind.livePhoto,
+      categoryGlyph: showCategory ? t.glyph : null,
+      onTap: onTap,
+    );
+
+    return AnimatedScale(
+      scale: lifted ? 1.04 : 1,
+      duration: Motion.page,
+      curve: Curves.easeOutBack,
+      child: AnimatedOpacity(
+        opacity: receded ? 0.45 : (asked ? 0.42 : 1),
+        duration: Motion.fade,
+        child: Stack(
+          fit: StackFit.expand,
+          clipBehavior: Clip.none,
+          children: [
+            // Under the tile, shown as it slides right: the way to ask.
+            if (lifted && slide > 0)
+              ClipRRect(
                 borderRadius: BorderRadius.circular(Radii.tile),
-                border: Border.all(color: AppColors.accent, width: 2.5),
-                color: const Color(0x339B4487),
+                child: ColoredBox(
+                  color: pastMark ? AppColors.accent : AppColors.fill,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: SizedBox(
+                      width: slide,
+                      child: Opacity(
+                        opacity: (slide / 60).clamp(0.0, 1.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.chat_bubble_outline_rounded,
+                              color: AppColors.onAccent,
+                              size: 24,
+                            ),
+                            if (slide >= 96) ...[
+                              const SizedBox(height: 6),
+                              Text(
+                                'Chat about this',
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                style: AppText.footnote.copyWith(
+                                  color: AppColors.onAccent,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
-              child: const Center(
-                child: Icon(
-                  Icons.chat_bubble_outline_rounded,
-                  color: AppColors.onAccent,
-                  size: 30,
+            Transform.translate(
+              offset: Offset(slide, 0),
+              child: DecoratedBox(
+                position: DecorationPosition.foreground,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(Radii.tile),
+                  border: lifted
+                      ? Border.all(color: AppColors.accent, width: 2)
+                      : null,
+                ),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(Radii.tile),
+                    boxShadow: lifted
+                        ? const [
+                            BoxShadow(
+                              color: AppColors.glow,
+                              blurRadius: 28,
+                              offset: Offset(0, 10),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: face,
                 ),
               ),
             ),
-          ),
+            if (asked) const Positioned(top: 9, right: 9, child: _AskedMark()),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -367,6 +548,54 @@ class _AskedMark extends StatelessWidget {
         style: AppText.micro.copyWith(
           color: AppColors.onAccent,
           fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+/// What a lifted tile can do, said once it is lifted rather than taught up
+/// front.
+class _LiftHint extends StatelessWidget {
+  const _LiftHint();
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          height: 40,
+          constraints: const BoxConstraints(maxWidth: 320),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: AppColors.glass,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.glassEdge),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.swipe_right_alt_rounded,
+                size: 18,
+                color: AppColors.accent,
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  'Swipe right to chat · tap to open',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.footnote.copyWith(
+                    color: AppColors.label,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

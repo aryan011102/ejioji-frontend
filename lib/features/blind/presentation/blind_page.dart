@@ -207,6 +207,8 @@ class _BlindPageState extends ConsumerState<BlindPage>
         key: ValueKey(state.deal),
         layout: _layoutFor(state),
         topInset: top + 8,
+        bottomInset:
+            MediaQuery.paddingOf(context).bottom + AppTabBar.clearance + 78,
         asked: state.asked,
         showCategory: category == null,
         onOpen: _open,
@@ -418,7 +420,7 @@ class _Hint extends StatelessWidget {
                 ),
                 const SizedBox(width: 9),
                 Text(
-                  'Drag any way. Flick a tile right to chat.',
+                  'Drag any way. Tap a tile to pick it up.',
                   style: AppText.callout.copyWith(
                     color: AppColors.label,
                     fontWeight: FontWeight.w500,

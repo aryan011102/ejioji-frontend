@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' show ImageFilter;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -36,22 +36,26 @@ class BlindGeometry {
 }
 
 /// One place on the plane: a block and a slot in it. The same tile can sit in
-/// two places once a deal repeats, so a lifted tile is a place, not a tile.
+/// two places once a deal repeats, so the tile being held is a place.
 typedef _Place = (int bx, int by, int slot);
 
 /// A plane you drag in any direction, with no top, no end and no first tile.
 ///
-/// Tap and swipe (Aryan, 2026-10-04, replacing a fast flick that was too hard
-/// to hit): a tap lifts a tile and stops the plane; the lifted tile then
-/// slides right, at any speed, to show "Chat about this" under it, and letting
-/// go past the mark asks. A tap on the lifted tile opens whose it is. A tap or
-/// a drag anywhere else puts it back. The plane itself never has to tell a
-/// swipe from a move, because only a lifted tile swipes.
+/// Three things a finger can do (Aryan, 2026-10-04, after a fast flick and
+/// then a tap-to-lift were both too much work):
+///
+/// - **Tap** a tile: their profile opens.
+/// - **Touch a tile, rest a moment, slide left**: the tile slides to show
+///   "Chat about this", as a profile tile does, and letting go past the mark
+///   asks. One movement, no second step.
+/// - **Touch and move at once**: the plane moves.
+///
+/// The moment of rest ([holdFor]) is what tells holding a tile from dragging
+/// the plane; without it a swipe left and a drag left are the same gesture.
 class BlindField extends StatefulWidget {
   const BlindField({
     required this.layout,
     required this.topInset,
-    required this.bottomInset,
     required this.onOpen,
     required this.onChat,
     required this.onRunningLow,
@@ -60,15 +64,16 @@ class BlindField extends StatefulWidget {
     super.key,
   });
 
+  /// How long a finger rests on a tile before it holds the tile rather than
+  /// the plane. Short: long enough to tell a deliberate touch from the start
+  /// of a drag, short enough not to feel like waiting.
+  static const holdFor = Duration(milliseconds: 180);
+
   final BlindLayout layout;
 
   /// What floats over the top edge (the tabs), so the first row starts below
   /// it rather than under it.
   final double topInset;
-
-  /// What floats over the bottom (the tab bar), so the lifted tile's hint
-  /// sits above it.
-  final double bottomInset;
 
   final ValueChanged<BlindTile> onOpen;
   final Future<void> Function(BlindTile) onChat;
@@ -102,18 +107,17 @@ class _BlindFieldState extends State<BlindField> with TickerProviderStateMixin {
   Offset _velocity = Offset.zero;
   Duration _lastTick = Duration.zero;
 
-  /// The lifted tile, if any, and how far it has slid right.
-  _Place? _lifted;
+  /// The tile under a resting finger, and how far it has slid left.
+  _Place? _held;
   double _slide = 0;
-  bool _sliding = false;
   bool _pastMark = false;
 
-  /// Asking: the sheet is up, and the slid tile holds where it is.
+  /// The sheet is up: the slid tile holds where it is.
   bool _asking = false;
 
   late final AnimationController _settle = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 260),
+    duration: const Duration(milliseconds: 240),
   );
   Animation<double>? _slideTo;
 
@@ -126,6 +130,12 @@ class _BlindFieldState extends State<BlindField> with TickerProviderStateMixin {
     _settle.addListener(() {
       final to = _slideTo;
       if (to != null) setState(() => _slide = to.value);
+    });
+    _settle.addStatusListener((status) {
+      // Back home with nothing being asked: nothing is held any more.
+      if (status == AnimationStatus.completed && _slide == 0 && !_asking) {
+        setState(() => _held = null);
+      }
     });
   }
 
@@ -155,95 +165,65 @@ class _BlindFieldState extends State<BlindField> with TickerProviderStateMixin {
     _lastTick = Duration.zero;
   }
 
-  void _onPanStart(DragStartDetails d) {
-    _stopGlide();
-    _velocity = Offset.zero;
-    final lifted = _lifted;
-    if (lifted != null && !_asking && _placeAt(d.localPosition) == lifted) {
-      _settle.stop();
-      _sliding = true;
-      return;
-    }
-    // A drag anywhere else puts the lifted tile back and moves the plane.
-    if (lifted != null && !_asking) _drop();
-  }
+  void _onPanDown(DragDownDetails _) => _stopGlide();
 
   void _onPanUpdate(DragUpdateDetails d) {
-    if (_sliding) {
-      final width = _liftedWidth;
-      final next = (_slide + d.delta.dx).clamp(0.0, width * 0.85);
-      final past = next >= _markFor(width);
-      // One tap of the engine as it crosses into "let go and it asks".
-      if (past != _pastMark) HapticFeedback.selectionClick();
-      setState(() {
-        _slide = next;
-        _pastMark = past;
-      });
-      return;
-    }
     if (_asking) return;
     setState(() => _offset += d.delta);
   }
 
   void _onPanEnd(DragEndDetails d) {
     final v = d.velocity.pixelsPerSecond;
-    if (_sliding) {
-      _sliding = false;
-      final fling = v.dx > 700 && _slide > _liftedWidth * 0.15;
-      if (_pastMark || fling) {
-        unawaited(_ask());
-      } else {
-        _settleTo(0);
-      }
-      _pastMark = false;
-      return;
-    }
     if (_asking || v.distance < 120) return;
     _velocity = v;
     _lastTick = Duration.zero;
     _glide.start();
   }
 
-  // ---- The lifted tile. ----
+  // ---- Holding a tile. ----
 
-  /// How far right the tile must slide before letting go asks: about a third
+  /// How far left the tile must slide before letting go asks: about a third
   /// of it, but never more than a short thumb's travel on a wide tile.
   static double _markFor(double width) => math.min(width * 0.38, 110);
 
-  double get _liftedWidth {
-    final lifted = _lifted;
-    if (lifted == null) return 1;
-    return _geo.box(BlindLayout.slots[lifted.$3].$3).width;
-  }
+  double _widthOf(_Place p) => _geo.box(BlindLayout.slots[p.$3].$3).width;
 
-  BlindTile? _tileOf(_Place p) {
-    final tiles = widget.layout.block(p.$1, p.$2);
-    return p.$3 < tiles.length ? tiles[p.$3] : null;
-  }
-
-  void _onTileTap(_Place place, BlindTile tile) {
+  void _onHoldStart(_Place place) {
     if (_asking) return;
-    if (_lifted == place) {
-      widget.onOpen(tile);
-      return;
-    }
     _stopGlide();
+    _settle.stop();
     HapticFeedback.selectionClick();
-    _settle.stop();
     setState(() {
-      _lifted = place;
+      _held = place;
       _slide = 0;
-    });
-  }
-
-  void _drop() {
-    _settle.stop();
-    setState(() {
-      _lifted = null;
-      _slide = 0;
-      _sliding = false;
       _pastMark = false;
     });
+  }
+
+  void _onHoldMove(_Place place, LongPressMoveUpdateDetails d) {
+    if (_held != place || _asking) return;
+    final width = _widthOf(place);
+    // Only leftwards counts; a finger wandering right just closes it again.
+    final next = (-d.offsetFromOrigin.dx).clamp(0.0, width * 0.85);
+    final past = next >= _markFor(width);
+    // One tap of the engine as it crosses into "let go and it asks".
+    if (past != _pastMark) HapticFeedback.selectionClick();
+    setState(() {
+      _slide = next;
+      _pastMark = past;
+    });
+  }
+
+  void _onHoldEnd(_Place place, BlindTile tile, LongPressEndDetails d) {
+    if (_held != place || _asking) return;
+    final fling =
+        d.velocity.pixelsPerSecond.dx < -700 && _slide > _widthOf(place) * 0.15;
+    if (_pastMark || fling) {
+      unawaited(_ask(place, tile));
+    } else {
+      _settleTo(0);
+    }
+    _pastMark = false;
   }
 
   void _settleTo(double target) {
@@ -253,40 +233,20 @@ class _BlindFieldState extends State<BlindField> with TickerProviderStateMixin {
     unawaited(_settle.forward(from: 0));
   }
 
-  Future<void> _ask() async {
-    final place = _lifted;
-    final tile = place == null ? null : _tileOf(place);
-    if (tile == null) {
-      _drop();
-      return;
-    }
+  Future<void> _ask(_Place place, BlindTile tile) async {
     HapticFeedback.mediumImpact();
     setState(() => _asking = true);
     // Rests open while the sheet is up, so it is plain which line is asked
     // about.
-    _settleTo(_liftedWidth * 0.5);
+    _settleTo(math.min(_widthOf(place) * 0.5, 140));
     try {
       await widget.onChat(tile);
     } finally {
       if (mounted) {
         setState(() => _asking = false);
-        _drop();
+        _settleTo(0);
       }
     }
-  }
-
-  /// The place under a point on screen, if any (a gap is no place).
-  _Place? _placeAt(Offset local) {
-    final p = local - _offset;
-    final bx = (p.dx / _geo.blockWidth).floor();
-    final by = (p.dy / _geo.blockHeight).floor();
-    final q = p - Offset(bx * _geo.blockWidth, by * _geo.blockHeight);
-    for (var k = 0; k < BlindLayout.slots.length; k++) {
-      final (col, row, size) = BlindLayout.slots[k];
-      final rect = Offset(col * _geo.step, row * _geo.step) & _geo.box(size);
-      if (rect.contains(q)) return (bx, by, k);
-    }
-    return null;
   }
 
   @override
@@ -300,7 +260,7 @@ class _BlindFieldState extends State<BlindField> with TickerProviderStateMixin {
         }
         final view = Offset.zero & constraints.biggest;
         final children = <Widget>[];
-        Widget? liftedChild;
+        Widget? heldChild;
 
         final firstX = ((-_offset.dx) / _geo.blockWidth).floor();
         final lastX = ((view.width - _offset.dx) / _geo.blockWidth).floor();
@@ -322,35 +282,54 @@ class _BlindFieldState extends State<BlindField> with TickerProviderStateMixin {
               if (!rect.overlaps(view)) continue;
               final t = tiles[k];
               final place = (bx, by, k);
-              final lifted = _lifted == place;
+              final held = _held == place;
               final child = Positioned.fromRect(
+                // Keyed by place and tile on the Stack's own child, so a
+                // video keeps playing while the plane moves under it, and so
+                // the held tile, moved to the top to draw over its
+                // neighbours, keeps the recognizer that is holding it.
+                key: ValueKey('$bx:$by:$k:${t.id}'),
                 rect: rect,
-                child: _Tile(
-                  // Keyed by place and tile, so a video keeps playing while
-                  // the plane moves under it.
-                  key: ValueKey('$bx:$by:$k:${t.id}'),
-                  tile: t,
-                  size: size,
-                  showCategory: widget.showCategory,
-                  asked: widget.asked.contains(t.person.userId),
-                  lifted: lifted,
-                  receded: _lifted != null && !lifted,
-                  slide: lifted ? _slide : 0,
-                  pastMark: lifted && (_pastMark || _asking),
-                  onTap: () => _onTileTap(place, t),
+                child: RawGestureDetector(
+                  gestures: {
+                    LongPressGestureRecognizer:
+                        GestureRecognizerFactoryWithHandlers<
+                            LongPressGestureRecognizer>(
+                      () => LongPressGestureRecognizer(
+                        duration: BlindField.holdFor,
+                      ),
+                      (r) {
+                        r.onLongPressStart = (_) => _onHoldStart(place);
+                        r.onLongPressMoveUpdate = (d) => _onHoldMove(place, d);
+                        r.onLongPressEnd = (d) => _onHoldEnd(place, t, d);
+                      },
+                    ),
+                  },
+                  child: _Tile(
+                    tile: t,
+                    size: size,
+                    showCategory: widget.showCategory,
+                    asked: widget.asked.contains(t.person.userId),
+                    held: held,
+                    slide: held ? _slide : 0,
+                    pastMark: held && (_pastMark || _asking),
+                    onTap: () {
+                      if (!_asking) widget.onOpen(t);
+                    },
+                  ),
                 ),
               );
-              // The lifted tile is drawn last, so its shadow falls on its
-              // neighbours rather than under them.
-              if (lifted) {
-                liftedChild = child;
+              // The held tile is drawn last, so it slides over its neighbours
+              // rather than under them.
+              if (held) {
+                heldChild = child;
               } else {
                 children.add(child);
               }
             }
           }
         }
-        if (liftedChild != null) children.add(liftedChild);
+        if (heldChild != null) children.add(heldChild);
 
         if (widget.layout.runningLow) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -360,30 +339,10 @@ class _BlindFieldState extends State<BlindField> with TickerProviderStateMixin {
 
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
-          // A tap in a gap puts the lifted tile back.
-          onTap: _lifted != null && !_asking ? _drop : null,
-          onPanStart: _onPanStart,
+          onPanDown: _onPanDown,
           onPanUpdate: _onPanUpdate,
           onPanEnd: _onPanEnd,
-          child: ClipRect(
-            child: Stack(
-              children: [
-                ...children,
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: widget.bottomInset,
-                  child: IgnorePointer(
-                    child: AnimatedOpacity(
-                      opacity: _lifted != null && !_asking ? 1 : 0,
-                      duration: Motion.fade,
-                      child: const Center(child: _LiftHint()),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          child: ClipRect(child: Stack(children: children)),
         );
       },
     );
@@ -398,12 +357,10 @@ class _Tile extends StatelessWidget {
     required this.size,
     required this.showCategory,
     required this.asked,
-    required this.lifted,
-    required this.receded,
+    required this.held,
     required this.slide,
     required this.pastMark,
     required this.onTap,
-    super.key,
   });
 
   final BlindTile tile;
@@ -411,13 +368,10 @@ class _Tile extends StatelessWidget {
   final bool showCategory;
   final bool asked;
 
-  /// Picked up: a little larger, lit, and the one thing that can slide.
-  final bool lifted;
+  /// A finger is resting on it: it rises a little to say so.
+  final bool held;
 
-  /// Another tile is lifted: this one steps back so that one reads.
-  final bool receded;
-
-  /// How far right the lifted tile has slid.
+  /// How far left it has slid.
   final double slide;
 
   /// Slid far enough that letting go asks (or asking already).
@@ -429,41 +383,24 @@ class _Tile extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = tile.tile;
     final media = t.media;
-    final face = InsightTile(
-      size: size,
-      number: t.isAnswer ? null : t.headline,
-      caption: t.isAnswer ? null : t.body,
-      prompt: t.question,
-      answer: t.isAnswer ? t.headline : null,
-      tone: t.tone,
-      isTrack: t.looksLikeTrack,
-      music: t.music,
-      mediaUrl: media?.stillUrl,
-      videoUrl: media?.videoUrl,
-      isLivePhoto: media?.kind == MediaKind.livePhoto,
-      categoryGlyph: showCategory ? t.glyph : null,
-      onTap: onTap,
-    );
-
     return AnimatedScale(
-      scale: lifted ? 1.04 : 1,
-      duration: Motion.page,
-      curve: Curves.easeOutBack,
+      scale: held ? 1.03 : 1,
+      duration: Motion.press,
       child: AnimatedOpacity(
-        opacity: receded ? 0.45 : (asked ? 0.42 : 1),
+        opacity: asked ? 0.42 : 1,
         duration: Motion.fade,
         child: Stack(
           fit: StackFit.expand,
-          clipBehavior: Clip.none,
           children: [
-            // Under the tile, shown as it slides right: the way to ask.
-            if (lifted && slide > 0)
+            // Under the tile, shown as it slides left: the way to ask. The
+            // same look as a profile tile's "Chat about this".
+            if (slide > 0)
               ClipRRect(
                 borderRadius: BorderRadius.circular(Radii.tile),
                 child: ColoredBox(
                   color: pastMark ? AppColors.accent : AppColors.fill,
                   child: Align(
-                    alignment: Alignment.centerLeft,
+                    alignment: Alignment.centerRight,
                     child: SizedBox(
                       width: slide,
                       child: Opacity(
@@ -496,29 +433,34 @@ class _Tile extends StatelessWidget {
                 ),
               ),
             Transform.translate(
-              offset: Offset(slide, 0),
+              offset: Offset(-slide, 0),
               child: DecoratedBox(
-                position: DecorationPosition.foreground,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(Radii.tile),
-                  border: lifted
-                      ? Border.all(color: AppColors.accent, width: 2)
+                  boxShadow: held
+                      ? const [
+                          BoxShadow(
+                            color: AppColors.glow,
+                            blurRadius: 22,
+                            offset: Offset(0, 8),
+                          ),
+                        ]
                       : null,
                 ),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(Radii.tile),
-                    boxShadow: lifted
-                        ? const [
-                            BoxShadow(
-                              color: AppColors.glow,
-                              blurRadius: 28,
-                              offset: Offset(0, 10),
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: face,
+                child: InsightTile(
+                  size: size,
+                  number: t.isAnswer ? null : t.headline,
+                  caption: t.isAnswer ? null : t.body,
+                  prompt: t.question,
+                  answer: t.isAnswer ? t.headline : null,
+                  tone: t.tone,
+                  isTrack: t.looksLikeTrack,
+                  music: t.music,
+                  mediaUrl: media?.stillUrl,
+                  videoUrl: media?.videoUrl,
+                  isLivePhoto: media?.kind == MediaKind.livePhoto,
+                  categoryGlyph: showCategory ? t.glyph : null,
+                  onTap: onTap,
                 ),
               ),
             ),
@@ -548,54 +490,6 @@ class _AskedMark extends StatelessWidget {
         style: AppText.micro.copyWith(
           color: AppColors.onAccent,
           fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
-
-/// What a lifted tile can do, said once it is lifted rather than taught up
-/// front.
-class _LiftHint extends StatelessWidget {
-  const _LiftHint();
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          height: 40,
-          constraints: const BoxConstraints(maxWidth: 320),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: AppColors.glass,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.glassEdge),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.swipe_right_alt_rounded,
-                size: 18,
-                color: AppColors.accent,
-              ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  'Swipe right to chat · tap to open',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppText.footnote.copyWith(
-                    color: AppColors.label,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );

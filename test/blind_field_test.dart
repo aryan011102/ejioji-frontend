@@ -5,8 +5,9 @@ import 'package:ejioji/shared/widgets/tiles.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Tap and swipe on Go blind's plane (Aryan, 2026-10-04): a tap lifts a tile,
-/// a lifted tile slides right to ask, a tap on it opens the profile.
+/// Tap and hold-swipe on Go blind's plane (Aryan, 2026-10-04): a tap opens
+/// the profile; resting a finger on a tile and sliding left asks; touching
+/// and moving at once moves the plane.
 void main() {
   Map<String, Object?> insight(String key, String value) => {
         'kind': 'insight',
@@ -55,7 +56,6 @@ void main() {
           body: BlindField(
             layout: BlindLayout(tiles),
             topInset: 60,
-            bottomInset: 120,
             onOpen: opened.add,
             onChat: (t) async => asked.add(t),
             onRunningLow: () {},
@@ -83,79 +83,59 @@ void main() {
     return rects.first.center;
   }
 
-  const hint = 'Swipe right to chat · tap to open';
-
-  testWidgets('a tap lifts a tile, and a second tap opens whose it is', (
-    tester,
-  ) async {
-    await pump(tester);
-    final tile = onScreen(tester);
-    expect(find.text(hint), findsOneWidget);
-    expect(
-      tester.widget<AnimatedOpacity>(
-        find.ancestor(of: find.text(hint), matching: find.byType(AnimatedOpacity)),
-      ).opacity,
-      0,
-    );
-
-    await tester.tapAt(tile);
-    await tester.pumpAndSettle();
-    expect(opened, isEmpty, reason: 'the first tap only lifts');
-    expect(
-      tester.widget<AnimatedOpacity>(
-        find.ancestor(of: find.text(hint), matching: find.byType(AnimatedOpacity)),
-      ).opacity,
-      1,
-    );
-
-    await tester.tapAt(tile);
-    await tester.pumpAndSettle();
-    expect(opened, hasLength(1));
-  });
-
-  testWidgets('a lifted tile swiped right, slowly, asks about it', (
-    tester,
-  ) async {
-    await pump(tester);
-    at = onScreen(tester);
-    await tester.tapAt(at);
-    await tester.pumpAndSettle();
-
-    // Slow on purpose: the old flick needed speed, and that was the problem.
-    final gesture = await tester.startGesture(at);
-    for (var i = 0; i < 20; i++) {
-      await gesture.moveBy(const Offset(8, 0));
-      await tester.pump(const Duration(milliseconds: 40));
+  /// Rests on [from] long enough to hold the tile, then slides left by
+  /// [by], slowly.
+  Future<void> holdAndSlide(WidgetTester tester, Offset from, double by) async {
+    final gesture = await tester.startGesture(from);
+    await tester.pump(BlindField.holdFor + const Duration(milliseconds: 40));
+    const steps = 20;
+    for (var i = 0; i < steps; i++) {
+      await gesture.moveBy(Offset(-by / steps, 0));
+      await tester.pump(const Duration(milliseconds: 30));
     }
     await gesture.up();
     await tester.pumpAndSettle();
+  }
+
+  testWidgets('a tap opens whose it is, at once', (tester) async {
+    await pump(tester);
+    await tester.tapAt(onScreen(tester));
+    await tester.pumpAndSettle();
+    expect(opened, hasLength(1));
+    expect(asked, isEmpty);
+  });
+
+  testWidgets('rest, then slide left: asks about that tile', (tester) async {
+    await pump(tester);
+    await holdAndSlide(tester, onScreen(tester), 160);
     expect(asked, hasLength(1));
     expect(opened, isEmpty);
   });
 
-  testWidgets('a short slide springs back without asking', (tester) async {
+  testWidgets('rest, then a short slide: springs back, asks nothing', (
+    tester,
+  ) async {
     await pump(tester);
-    at = onScreen(tester);
-    await tester.tapAt(at);
-    await tester.pumpAndSettle();
-    final gesture = await tester.startGesture(at);
-    for (var i = 0; i < 4; i++) {
-      await gesture.moveBy(const Offset(6, 0));
-      await tester.pump(const Duration(milliseconds: 60));
-    }
-    await gesture.up();
-    await tester.pumpAndSettle();
+    await holdAndSlide(tester, onScreen(tester), 40);
+    expect(asked, isEmpty);
+    expect(opened, isEmpty);
+  });
+
+  testWidgets('rest, then slide right: asks nothing', (tester) async {
+    await pump(tester);
+    await holdAndSlide(tester, onScreen(tester), -160);
     expect(asked, isEmpty);
   });
 
-  testWidgets('a swipe on a tile not lifted moves the plane, never asks', (
+  testWidgets('touch and move at once moves the plane, never asks', (
     tester,
   ) async {
     await pump(tester);
     at = onScreen(tester);
-    await tester.dragFrom(at, const Offset(200, 0));
+    await tester.dragFrom(at, const Offset(-200, 0));
     await tester.pumpAndSettle();
     expect(asked, isEmpty);
+    expect(opened, isEmpty);
     expect(onScreen(tester), isNot(at));
   });
 }

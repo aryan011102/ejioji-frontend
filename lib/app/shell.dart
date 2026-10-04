@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/theme/tokens.dart';
+import '../data/blind_controller.dart';
 import '../data/live_events.dart';
 import '../data/providers.dart';
 import '../features/onboarding/presentation/ai_consent_sheet.dart';
@@ -76,6 +78,19 @@ class _AppShellState extends ConsumerState<AppShell> {
     }
   }
 
+  /// Holding Home turns it over: to Go blind, and back. From another tab it
+  /// lands on Blind, since that is what holding Home asks for.
+  void _holdHome() {
+    HapticFeedback.mediumImpact();
+    final mode = ref.read(blindModeProvider.notifier);
+    if (_current != AppTab.home) {
+      mode.state = true;
+      context.go(Routes.home);
+      return;
+    }
+    mode.state = !mode.state;
+  }
+
   @override
   void dispose() {
     unawaited(_events?.cancel());
@@ -103,6 +118,8 @@ class _AppShellState extends ConsumerState<AppShell> {
       bottomNavigationBar: AppTabBar(
         current: _current,
         chatsBadge: unread + waiting,
+        blind: ref.watch(blindModeProvider),
+        onHoldHome: _holdHome,
         onSelect: (tab) => switch (tab) {
           AppTab.home => context.go(Routes.home),
           AppTab.chats => context.go(Routes.chats),

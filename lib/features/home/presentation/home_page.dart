@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,15 +9,96 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/session/session.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
+import '../../../data/blind_controller.dart';
 import '../../../data/feed_controller.dart';
 import '../../../data/providers.dart';
 import '../../../shared/models/enums.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/pressable.dart';
 import '../../../shared/widgets/states.dart';
+import '../../blind/presentation/blind_page.dart';
 import '../../profile/presentation/person_actions.dart';
 import '../../profile/presentation/profile_page.dart';
 import 'empty_feed_page.dart';
+
+/// Home, and Home turned over.
+///
+/// Holding the Home icon flips the screen to Go blind and back
+/// (blindModeProvider). Both faces stay alive once built, so flipping back
+/// finds the card, the scroll and the place on the plane where they were left.
+class HomePage extends ConsumerStatefulWidget {
+  const HomePage({super.key});
+
+  @override
+  ConsumerState<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends ConsumerState<HomePage>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _flip = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 640),
+    value: ref.read(blindModeProvider) ? 1 : 0,
+  );
+
+  /// Built the first time it is turned to, and kept after.
+  late bool _blindBuilt = ref.read(blindModeProvider);
+
+  @override
+  void initState() {
+    super.initState();
+    if (_blindBuilt) _startBlind();
+  }
+
+  @override
+  void dispose() {
+    _flip.dispose();
+    super.dispose();
+  }
+
+  void _startBlind() => WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) ref.read(blindProvider.notifier).start();
+      });
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen<bool>(blindModeProvider, (_, blind) {
+      if (blind && !_blindBuilt) {
+        setState(() => _blindBuilt = true);
+        _startBlind();
+      }
+      blind ? _flip.forward() : _flip.reverse();
+    });
+
+    return ColoredBox(
+      color: AppColors.group,
+      child: AnimatedBuilder(
+        animation: _flip,
+        builder: (context, _) {
+          final t = Curves.easeInOutCubic.transform(_flip.value);
+          final turned = t >= 0.5;
+          // Half a turn about the vertical axis: Home goes edge-on, and Blind
+          // comes round from the other side.
+          final angle = turned ? (t - 1) * math.pi : t * math.pi;
+          return Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.identity()
+              ..setEntry(3, 2, 0.0011)
+              ..rotateY(angle),
+            child: Stack(
+              children: [
+                // Offstage keeps a face's state while the other one shows.
+                Offstage(offstage: turned, child: const _Deck()),
+                if (_blindBuilt)
+                  Offstage(offstage: !turned, child: const BlindPage()),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
 
 /// Home is the viewer's view.
 ///
@@ -25,8 +108,8 @@ import 'empty_feed_page.dart';
 ///
 /// Home owns the deck. The profile takes the current person as a parameter,
 /// so the card being looked at and the card being acted on cannot come apart.
-class HomePage extends ConsumerWidget {
-  const HomePage({super.key});
+class _Deck extends ConsumerWidget {
+  const _Deck();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -58,7 +141,7 @@ class HomePage extends ConsumerWidget {
 
     final error = feed.error;
     if (error != null && feed.cards.isEmpty) {
-      final step = _missingStep(error);
+      final step = feedMissingStep(error);
       if (step != null) {
         return AppScaffold(
           child: EmptyState(
@@ -129,7 +212,7 @@ class HomePage extends ConsumerWidget {
 /// no profile, no "show me" choice. Each is a step still to take, so each gets
 /// the button that takes it rather than "That did not load".
 ({IconData icon, String title, String body, String label, String route})?
-    _missingStep(Object error) {
+    feedMissingStep(Object error) {
   if (error is! ApiException) return null;
   return switch (error.code) {
     'consent_required' => (

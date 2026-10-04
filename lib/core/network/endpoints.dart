@@ -78,6 +78,8 @@ abstract final class Api {
   // the match.
   static const preferences = '$prefix/matching/preferences';
   static const feed = '$prefix/matching/feed';
+  // Go blind: the tiles of the people the feed would show, dealt shuffled.
+  static const blind = '$prefix/matching/blind';
   static const requests = '$prefix/matching/requests';
   static const incoming = '$prefix/matching/requests/incoming';
   static const outgoing = '$prefix/matching/requests/outgoing';

@@ -43,7 +43,6 @@ class ProfileRepository {
     String? company,
     Habit? smoking,
     Habit? drinking,
-    bool? lastNameInitial,
   }) async {
     final body = await _api.put(
       Api.profile,
@@ -59,8 +58,6 @@ class ProfileRepository {
         'company': company,
         'smoking': smoking?.wire,
         'drinking': drinking?.wire,
-        // Left out, the server keeps whatever was chosen before.
-        if (lastNameInitial != null) 'last_name_initial': lastNameInitial,
       },
     );
     return Profile.fromJson(body);
@@ -153,6 +150,13 @@ class ProfileRepository {
   /// Out of every feed, still browsing and asking. Answers with the state.
   Future<PublishState> enterStealth() async =>
       PublishState.fromJson(await _api.post(Api.stealth));
+
+  /// The Settings switch: others see "Priya N." instead of the whole last
+  /// name, and her LinkedIn only once matched. Women only to switch on (the
+  /// server answers 422 `initial_for_women_only` otherwise).
+  Future<Profile> setLastNameInitial(bool on) async => Profile.fromJson(
+        await _api.put(Api.lastNameInitial, body: {'on': on}),
+      );
 
   /// Back in feeds, each at its next rebuild (a few hours at most).
   Future<void> leaveStealth() => _api.deleteEmpty(Api.stealth);

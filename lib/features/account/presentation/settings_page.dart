@@ -10,6 +10,7 @@ import '../../../core/session/session.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
 import '../../../data/providers.dart';
+import '../../../shared/models/enums.dart';
 import '../../../shared/widgets/controls.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/sheets.dart';
@@ -42,6 +43,27 @@ class SettingsPage extends ConsumerStatefulWidget {
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   /// Waiting on the server for the stealth switch.
   bool _stealthBusy = false;
+
+  /// Waiting on the server for the last-name switch.
+  bool _initialBusy = false;
+
+  /// Others see the initial of the last name instead of the whole of it, and
+  /// her LinkedIn only once matched. Offered to women only; the server checks
+  /// that too. The full name is still what onboarding takes and DigiLocker
+  /// checks: this changes only what others see.
+  Future<void> _setInitial(bool on) async {
+    setState(() => _initialBusy = true);
+    try {
+      final saved =
+          await ref.read(profileRepositoryProvider).setLastNameInitial(on);
+      ref.invalidate(myProfileProvider);
+      if (mounted) showAppToast(context, 'People now see ${saved.displayName}.');
+    } on ApiException catch (e) {
+      if (mounted) showAppToast(context, e.message);
+    } finally {
+      if (mounted) setState(() => _initialBusy = false);
+    }
+  }
 
   /// Waiting on the server to open the founder's conversation.
   bool _openingFounder = false;
@@ -174,6 +196,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget build(BuildContext context) {
     final premium = ref.watch(premiumProvider).valueOrNull;
     final stealthOn = ref.watch(sessionProvider).publish?.stealth ?? false;
+    final details = ref.watch(myProfileProvider).valueOrNull?.profile;
 
     return AppScaffold(
       navBar: AppNavBar(
@@ -232,6 +255,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     color: AppColors.label2,
                   ),
                   onTap: () => context.push(Routes.premium),
+                ),
+              if (details?.gender == Gender.woman)
+                AppRow(
+                  label: 'Show last name as initial',
+                  subtitle: '✨ This feature is exclusively for women',
+                  leading: const Icon(
+                    Icons.badge_outlined,
+                    size: 18,
+                    color: AppColors.label2,
+                  ),
+                  control: AppSwitch(
+                    value: details!.lastNameInitial,
+                    onChanged: _initialBusy ? null : _setInitial,
+                  ),
                 ),
               AppRow(
                 label: 'Blocked users',

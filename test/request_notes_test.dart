@@ -3,6 +3,7 @@ import 'package:ejioji/shared/models/chat.dart';
 import 'package:ejioji/shared/models/person.dart';
 import 'package:ejioji/shared/models/tile.dart';
 import 'package:ejioji/shared/widgets/ask_about_sheet.dart';
+import 'package:ejioji/shared/widgets/pressable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -32,7 +33,7 @@ final _tile = ProfileTile.fromJson({
 });
 
 /// A button that opens the sheet, and whatever [send] was handed.
-Widget _host(Future<String> Function(String?) send, List<bool?> results) =>
+Widget _host(Future<String> Function(String) send, List<bool?> results) =>
     MaterialApp(
       home: Scaffold(
         body: Builder(
@@ -87,9 +88,9 @@ void main() {
 
   group('the ask sheet', () {
     testWidgets('sends what was written, trimmed, and closes', (tester) async {
-      final sent = <String?>[];
+      final sent = <String>[];
       final results = <bool?>[];
-      Future<String> send(String? note) async {
+      Future<String> send(String note) async {
         sent.add(note);
         return 'Asked about this.';
       }
@@ -99,6 +100,9 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField), '  Good taste  ');
+      // Typing has to reach a frame before the button is tappable: it is
+      // dimmed while nothing is written.
+      await tester.pump();
       await tester.tap(find.text('Send request'));
       await tester.pumpAndSettle();
 
@@ -107,9 +111,54 @@ void main() {
       expect(find.text('Asked about this.'), findsOneWidget);
     });
 
-    testWidgets('nothing written sends no note', (tester) async {
-      final sent = <String?>[];
-      Future<String> send(String? note) async {
+    testWidgets('nothing written sends nothing at all', (tester) async {
+      final sent = <String>[];
+      final results = <bool?>[];
+      Future<String> send(String note) async {
+        sent.add(note);
+        return 'Asked about this.';
+      }
+
+      await tester.pumpWidget(_host(send, results));
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      // Send, with an empty field and then with spaces, and neither asks.
+      await tester.tap(find.text('Send request'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '   ');
+      await tester.pump();
+      await tester.tap(find.text('Send request'));
+      await tester.pumpAndSettle();
+
+      expect(sent, isEmpty);
+      expect(results, isEmpty);
+      expect(find.text('Ask Riya about this'), findsOneWidget);
+    });
+
+    testWidgets('Send is dimmed until a line is written', (tester) async {
+      await tester.pumpWidget(_host((_) async => 'Asked about this.', []));
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      final button = find.widgetWithText(Pressable, 'Send request');
+      bool live() => tester.widget<Pressable>(button).onTap != null;
+
+      expect(live(), isFalse, reason: 'nothing written');
+
+      await tester.enterText(find.byType(TextField), 'Good taste');
+      await tester.pump();
+      expect(live(), isTrue, reason: 'a line written');
+
+      await tester.enterText(find.byType(TextField), '  ');
+      await tester.pump();
+      expect(live(), isFalse, reason: 'spaces are nothing written');
+    });
+
+    testWidgets('the keyboard send key does not send an empty line',
+        (tester) async {
+      final sent = <String>[];
+      Future<String> send(String note) async {
         sent.add(note);
         return 'Asked about this.';
       }
@@ -117,15 +166,27 @@ void main() {
       await tester.pumpWidget(_host(send, []));
       await tester.tap(find.text('open'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Send request'));
+      await tester.testTextInput.receiveAction(TextInputAction.send);
       await tester.pumpAndSettle();
-      expect(sent, [null]);
+      expect(sent, isEmpty);
+    });
+
+    testWidgets('nothing stands under the field until something is refused',
+        (tester) async {
+      await tester.pumpWidget(_host((_) async => '', []));
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('sees this with your request'),
+        findsNothing,
+      );
+      expect(find.textContaining('Numbers and handles'), findsNothing);
     });
 
     testWidgets('a refused line keeps the sheet open on it and says why',
         (tester) async {
       final results = <bool?>[];
-      Future<String> send(String? note) async {
+      Future<String> send(String note) async {
         throw const ValidationFailure(
           'Keep contact details for after they say yes.',
           code: 'text_rejected',
@@ -137,6 +198,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField), 'call 9876543210');
+      await tester.pump();
       await tester.tap(find.text('Send request'));
       await tester.pumpAndSettle();
 

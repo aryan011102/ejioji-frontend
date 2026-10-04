@@ -60,7 +60,7 @@ class MatchingRepository {
   /// A page of Go blind. No [seed] is a new deal (the shuffle button); the
   /// seed it came back with, and [after], is more of the same deal. The
   /// server shuffles, so the order is never decided here.
-  Future<BlindPage> blind({
+  Future<BlindDeal> blind({
     int? seed,
     int? after,
     TileCategory? category,
@@ -73,7 +73,7 @@ class MatchingRepository {
         if (category != null) 'category': category.wire,
       },
     );
-    return BlindPage.fromJson(body);
+    return BlindDeal.fromJson(body);
   }
 
   /// Asks to chat. Comes back accepted when the other person had already

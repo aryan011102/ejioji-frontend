@@ -47,7 +47,7 @@ void main() {
 
   group('a page of the deal', () {
     test('keeps the server order and pairs each tile with its person', () {
-      final page = BlindPage.fromJson({
+      final page = BlindDeal.fromJson({
         'seed': 42,
         'next_cursor': 12,
         'people': [
@@ -69,7 +69,7 @@ void main() {
     test('drops a dealt tile its card does not hold, rather than guessing', () {
       // The card is what a tap opens; a tile that is not on it would open a
       // profile without the line that was tapped.
-      final page = BlindPage.fromJson({
+      final page = BlindDeal.fromJson({
         'seed': 1,
         'people': [
           card('a', [insight('a1', '142')]),
@@ -86,7 +86,7 @@ void main() {
   });
 
   group('the plane', () {
-    List<BlindTile> deal(int n) => BlindPage.fromJson({
+    List<BlindTile> deal(int n) => BlindDeal.fromJson({
           'seed': 1,
           'people': [
             card('p', [

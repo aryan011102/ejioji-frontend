@@ -36,7 +36,7 @@ class AppTabBar extends StatelessWidget {
   /// back. There is no fourth tab: Blind is Home's other face.
   final VoidCallback? onHoldHome;
 
-  /// Home is showing Go blind, so its icon is the sparkle.
+  /// Home is showing Go blind, so it reads Blind under the sparkle.
   final bool blind;
 
   /// The bar itself, without the safe area under it.
@@ -112,7 +112,7 @@ class AppTabBar extends StatelessWidget {
       children: [
         _item(
           AppTab.home,
-          'Home',
+          blind ? 'Blind' : 'Home',
           blind ? Icons.auto_awesome : Icons.home_rounded,
           onLongPress: onHoldHome,
         ),
@@ -187,11 +187,17 @@ class AppTabBar extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 3),
-              Text(
-                label,
-                style: AppText.tabLabel.copyWith(
-                  color: on ? AppColors.accent : AppColors.label3,
-                  fontWeight: on ? FontWeight.w600 : FontWeight.w500,
+              // Home's label turns over with its icon, so the two do not
+              // change at different moments.
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 320),
+                child: Text(
+                  label,
+                  key: ValueKey(label),
+                  style: AppText.tabLabel.copyWith(
+                    color: on ? AppColors.accent : AppColors.label3,
+                    fontWeight: on ? FontWeight.w600 : FontWeight.w500,
+                  ),
                 ),
               ),
             ],

@@ -21,6 +21,8 @@ class Profile {
     required this.gender,
     required this.city,
     this.lastName,
+    this.lastNameInitial = false,
+    this.shownLastName,
     this.languages = const [],
     this.education,
     this.pronouns,
@@ -31,6 +33,14 @@ class Profile {
 
   final String firstName;
   final String? lastName;
+
+  /// Her wish to show others only the initial of her last name ("Priya N."),
+  /// offered to women only and off by default. [shownLastName] is what others
+  /// actually see, worked out by the server: the initial only while the
+  /// profile says woman.
+  final bool lastNameInitial;
+  final String? shownLastName;
+
   final DateTime birthDate;
 
   /// Computed by the server, so it cannot drift from the birth date.
@@ -55,13 +65,17 @@ class Profile {
   final Habit? smoking;
   final Habit? drinking;
 
-  /// The name as it is shown. A person with no last name is just their first.
-  String get displayName =>
-      lastName == null || lastName!.isEmpty ? firstName : '$firstName $lastName';
+  /// The name as others see it. A person with no last name is just their first.
+  String get displayName {
+    final shown = shownLastName ?? lastName;
+    return shown == null || shown.isEmpty ? firstName : '$firstName $shown';
+  }
 
   static Profile fromJson(Json j) => Profile(
         firstName: j.str('first_name'),
         lastName: j.strOrNull('last_name'),
+        lastNameInitial: j.flag('last_name_initial'),
+        shownLastName: j.strOrNull('shown_last_name'),
         birthDate: j.date('birth_date'),
         age: j.intOr('age', 0),
         gender: Gender.parse(j.strOrNull('gender')),

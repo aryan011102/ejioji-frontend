@@ -9,6 +9,7 @@ import '../../../core/theme/typography.dart';
 import '../../../data/photo_controller.dart';
 import '../../../data/providers.dart';
 import '../../../shared/models/enums.dart';
+import '../../../shared/widgets/controls.dart';
 import '../../../shared/widgets/entry.dart';
 import '../../../shared/widgets/identity.dart';
 import '../../../shared/widgets/layout.dart';
@@ -36,6 +37,7 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
 
   String? _name;
   String? _lastName;
+  bool _lastInitial = false;
   DateTime? _birthDate;
   Gender? _gender;
   City? _city;
@@ -97,6 +99,10 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
             company: (_company ?? '').trim().isEmpty ? null : _company!.trim(),
             smoking: _smoking,
             drinking: _drinking,
+            // Women only: the server refuses it for anyone else, and keeps
+            // the choice when it is not sent, so a change of gender does not
+            // lose it.
+            lastNameInitial: _gender == Gender.woman ? _lastInitial : null,
           );
       final profile = await ref.read(profileRepositoryProvider).load();
       if (!mounted) return;
@@ -345,6 +351,7 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
       _seeded = true;
       _name = details.firstName;
       _lastName = details.lastName;
+      _lastInitial = details.lastNameInitial;
       _birthDate = details.birthDate;
       _gender = details.gender;
       _city = details.city;
@@ -453,6 +460,26 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
                 ),
               ],
             ),
+            if (_gender == Gender.woman && (_lastName ?? '').trim().isNotEmpty)
+              SectionGroup(
+                footer: '✨ This feature is exclusively for women. With it '
+                    'on, people see "${_name ?? ''} '
+                    '${_lastName!.trim()[0].toUpperCase()}." and see your '
+                    'LinkedIn only once you match.',
+                children: [
+                  AppRow(
+                    label: 'Show last name as initial',
+                    last: true,
+                    control: AppSwitch(
+                      value: _lastInitial,
+                      onChanged: (on) => setState(() {
+                        _lastInitial = on;
+                        _dirty = true;
+                      }),
+                    ),
+                  ),
+                ],
+              ),
             SectionGroup(
               header: 'Background',
               footer: 'Both are optional, and both narrow who you see and who '

@@ -43,6 +43,7 @@ class ProfileRepository {
     String? company,
     Habit? smoking,
     Habit? drinking,
+    bool? lastNameInitial,
   }) async {
     final body = await _api.put(
       Api.profile,
@@ -58,6 +59,8 @@ class ProfileRepository {
         'company': company,
         'smoking': smoking?.wire,
         'drinking': drinking?.wire,
+        // Left out, the server keeps whatever was chosen before.
+        if (lastNameInitial != null) 'last_name_initial': lastNameInitial,
       },
     );
     return Profile.fromJson(body);

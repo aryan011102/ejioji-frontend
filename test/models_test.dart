@@ -131,24 +131,27 @@ void main() {
       expect(profile.displayName, 'Priya Nair');
       expect(profile.languages, [Language.hindi, Language.tamil]);
       expect(profile.education, Education.masters);
-      expect(profile.lastNameInitial, isFalse);
+      expect(profile.nameInitials, isFalse);
     });
 
-    test('her own wall shows the initial others see, her form the full name',
+    test('her own wall shows the initials others see, her form the full name',
         () {
       final profile = Profile.fromJson({
         'first_name': 'Priya',
         'last_name': 'Nair',
-        'last_name_initial': true,
-        'shown_last_name': 'N.',
+        'name_initials': true,
+        'shown_name': 'PN',
         'birth_date': '1998-04-12',
         'age': 27,
         'gender': 'woman',
         'city': 'bengaluru',
       });
+      // Both names as she typed them, for the form she edits them in.
+      expect(profile.firstName, 'Priya');
       expect(profile.lastName, 'Nair');
-      expect(profile.lastNameInitial, isTrue);
-      expect(profile.displayName, 'Priya N.');
+      expect(profile.nameInitials, isTrue);
+      // The initials hide the first name too, since 2026-10-05.
+      expect(profile.displayName, 'PN');
     });
   });
 

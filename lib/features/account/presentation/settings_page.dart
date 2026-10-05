@@ -44,24 +44,24 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   /// Waiting on the server for the stealth switch.
   bool _stealthBusy = false;
 
-  /// Waiting on the server for the last-name switch.
-  bool _initialBusy = false;
+  /// Waiting on the server for the initials switch.
+  bool _initialsBusy = false;
 
-  /// Others see the initial of the last name instead of the whole of it, and
-  /// her LinkedIn only once matched. Offered to women only; the server checks
-  /// that too. The full name is still what onboarding takes and DigiLocker
-  /// checks: this changes only what others see.
-  Future<void> _setInitial(bool on) async {
-    setState(() => _initialBusy = true);
+  /// Others see the initials of both names ("PA") instead of the names, and her
+  /// LinkedIn only once matched. Offered to women only; the server checks that
+  /// too. The full name is still what onboarding takes and DigiLocker checks:
+  /// this changes only what others see.
+  Future<void> _setInitials(bool on) async {
+    setState(() => _initialsBusy = true);
     try {
       final saved =
-          await ref.read(profileRepositoryProvider).setLastNameInitial(on);
+          await ref.read(profileRepositoryProvider).setNameInitials(on);
       ref.invalidate(myProfileProvider);
       if (mounted) showAppToast(context, 'People now see ${saved.displayName}.');
     } on ApiException catch (e) {
       if (mounted) showAppToast(context, e.message);
     } finally {
-      if (mounted) setState(() => _initialBusy = false);
+      if (mounted) setState(() => _initialsBusy = false);
     }
   }
 
@@ -258,7 +258,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ),
               if (details?.gender == Gender.woman)
                 AppRow(
-                  label: 'Show last name as initial',
+                  label: 'Show name as initials',
                   subtitle: '✨ This feature is exclusively for women',
                   leading: const Icon(
                     Icons.badge_outlined,
@@ -266,8 +266,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     color: AppColors.label2,
                   ),
                   control: AppSwitch(
-                    value: details!.lastNameInitial,
-                    onChanged: _initialBusy ? null : _setInitial,
+                    value: details!.nameInitials,
+                    onChanged: _initialsBusy ? null : _setInitials,
                   ),
                 ),
               AppRow(

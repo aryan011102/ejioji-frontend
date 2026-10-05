@@ -151,11 +151,11 @@ class ProfileRepository {
   Future<PublishState> enterStealth() async =>
       PublishState.fromJson(await _api.post(Api.stealth));
 
-  /// The Settings switch: others see "Priya N." instead of the whole last
-  /// name, and her LinkedIn only once matched. Women only to switch on (the
-  /// server answers 422 `initial_for_women_only` otherwise).
-  Future<Profile> setLastNameInitial(bool on) async => Profile.fromJson(
-        await _api.put(Api.lastNameInitial, body: {'on': on}),
+  /// The Settings switch: others see "PA" instead of "Pritika Agarwal", and her
+  /// LinkedIn only once matched. Women only to switch on (the server answers
+  /// 422 `initials_for_women_only` otherwise).
+  Future<Profile> setNameInitials(bool on) async => Profile.fromJson(
+        await _api.put(Api.nameInitials, body: {'on': on}),
       );
 
   /// Back in feeds, each at its next rebuild (a few hours at most).

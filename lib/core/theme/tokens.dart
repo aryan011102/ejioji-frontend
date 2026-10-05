@@ -50,6 +50,16 @@ abstract final class AppColors {
   // Chrome.
   static const glass = Color(0xC21C1C1E); // .76
   static const glassEdge = Color(0x24FFFFFF); // .14
+
+  // Liquid glass: the floating tab bar only. Clearer than [glass] because the
+  // backdrop is saturated as well as blurred, so the wall still reads through
+  // it; the edge is lit from the top left rather than drawn as a flat line.
+  static const liquidGlass = Color(0x5C1C1C1E); // .36
+  static const liquidSheen = Color(0x17FFFFFF); // .09, top half only
+  static const liquidRimLit = Color(0x80FFFFFF); // .50
+  static const liquidRimShade = Color(0x0FFFFFFF); // .06
+  static const liquidLens = Color(0x1FFFFFFF); // .12, under the selected tab
+  static const liquidShadow = Color(0x38000000);
   static const scrim = Color(0x80000000);
   static const tileEdge = Color(0x24FFFFFF);
   static const bubbleThem = Color(0xFF1C1C1E);

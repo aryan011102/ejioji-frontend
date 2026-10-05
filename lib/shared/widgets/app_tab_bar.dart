@@ -83,37 +83,38 @@ class AppTabBar extends StatelessWidget {
   /// tap selects Home, which the bar then animates to like any other change,
   /// and a hold turns Home over. Chats and You are Apple's untouched.
   Widget _native(BuildContext context) {
+    // The app's own icons, not SF Symbols: the package draws them into
+    // Apple's bar at its standard 25pt, tinted like any tab bar icon. Home's
+    // icon and label change together when it turns over, which is what makes
+    // the package redraw the icon.
     final bar = CNTabBar(
       tint: AppColors.accent,
       currentIndex: current.index,
       onTap: (i) => onSelect(AppTab.values[i]),
+      // Full width, like the bar it replaces. Shrink-wrapped, it drew a
+      // capsule only as wide as its three tabs.
+      shrinkCentered: false,
       items: [
         CNTabBarItem(
           label: blind ? 'Blind' : 'Home',
-          icon: CNSymbol(blind ? 'sparkles' : 'house'),
-          activeIcon: CNSymbol(blind ? 'sparkles' : 'house.fill'),
+          customIcon: blind ? Icons.auto_awesome : Icons.home_rounded,
         ),
         CNTabBarItem(
           label: 'Chats',
-          icon: const CNSymbol('bubble.left.and.bubble.right'),
-          activeIcon: const CNSymbol('bubble.left.and.bubble.right.fill'),
+          customIcon: Icons.forum_rounded,
           badge: chatsBadge > 0 ? '$chatsBadge' : null,
         ),
         const CNTabBarItem(
           label: 'You',
-          icon: CNSymbol('person.crop.circle'),
-          activeIcon: CNSymbol('person.crop.circle.fill'),
+          customIcon: Icons.account_circle_outlined,
         ),
       ],
     );
 
     return SafeArea(
       top: false,
-      // Centred and shrink-wrapped, so the overlay's third is a third of the
-      // bar Apple draws and not of the screen.
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        heightFactor: 1,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: Insets.gutter),
         child: Stack(
           children: [
             bar,

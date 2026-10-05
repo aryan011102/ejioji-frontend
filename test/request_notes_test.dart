@@ -252,11 +252,11 @@ void main() {
 
       // They can still type: the sheet is not a wall.
       expect(find.text('Send request'), findsNothing);
-      expect(find.text('Verify profile to send request'), findsOneWidget);
+      expect(find.text('Verify profile to send'), findsOneWidget);
       await tester.enterText(find.byType(TextField), 'Good taste');
       await tester.pump();
 
-      await tester.tap(find.text('Verify profile to send request'));
+      await tester.tap(find.text('Verify profile to send'));
       await tester.pumpAndSettle();
       expect(sent, isEmpty);
       expect(verifying, 1);
@@ -266,14 +266,18 @@ void main() {
         (tester) async {
       var verifying = 0;
       await tester.pumpWidget(
-        _host((_) async => '', <bool?>[],
-            verified: false, onVerify: () => verifying++),
+        _host(
+          (_) async => '',
+          <bool?>[],
+          verified: false,
+          onVerify: () => verifying++,
+        ),
       );
       await tester.tap(find.text('open'));
       await tester.pumpAndSettle();
 
       // Not dimmed: it is not sending anything, so nothing has to be written.
-      await tester.tap(find.text('Verify profile to send request'));
+      await tester.tap(find.text('Verify profile to send'));
       await tester.pumpAndSettle();
       expect(verifying, 1);
     });
@@ -309,7 +313,10 @@ void main() {
       );
       await tester.tap(find.text('open'));
       await tester.pumpAndSettle();
-      expect(find.text('Verify profile to send reply'), findsOneWidget);
+      expect(find.text('Verify profile to reply'), findsOneWidget);
+      // A bare verb either way, and never the other one's.
+      expect(find.text('Verify profile to send reply'), findsNothing);
+      expect(find.text('Verify profile to send'), findsNothing);
     });
 
     testWidgets('verified, a reply still reads as a reply', (tester) async {

@@ -84,13 +84,14 @@ class AppTabBar extends StatelessWidget {
   /// and a hold turns Home over. Chats and You are Apple's untouched.
   Widget _native(BuildContext context) {
     // The app's own icons, not SF Symbols: the package draws them into
-    // Apple's bar at its standard 25pt, tinted like any tab bar icon. Home's
-    // icon and label change together when it turns over, which is what makes
-    // the package redraw the icon.
+    // Apple's bar, tinted like any tab bar icon, at the 22pt the Flutter bar
+    // uses rather than Apple's 25. Home's icon and label change together when
+    // it turns over, which is what makes the package redraw the icon.
     final bar = CNTabBar(
       tint: AppColors.accent,
       currentIndex: current.index,
       onTap: (i) => onSelect(AppTab.values[i]),
+      iconSize: 22,
       // Full width, like the bar it replaces. Shrink-wrapped, it drew a
       // capsule only as wide as its three tabs.
       shrinkCentered: false,
@@ -113,8 +114,15 @@ class AppTabBar extends StatelessWidget {
 
     return SafeArea(
       top: false,
+      // The same gutter and lift off the home indicator as the Flutter bar,
+      // so [clearance] holds for both.
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: Insets.gutter),
+        padding: const EdgeInsets.fromLTRB(
+          Insets.gutter,
+          0,
+          Insets.gutter,
+          _floatingInset,
+        ),
         child: Stack(
           children: [
             bar,

@@ -100,6 +100,12 @@ class _AskAboutState extends State<_AskAbout> {
   /// asked you, which is what asking back actually does.
   String get _what => widget.replying ? 'reply' : 'request';
 
+  /// The way out to verification, worded for what they are doing: a bare verb
+  /// either way, since what is being sent or replied to is the line they have
+  /// just typed and the sheet already says whose tile it is about.
+  String get _verifyLabel =>
+      widget.replying ? 'Verify profile to reply' : 'Verify profile to send';
+
   /// Unverified: the button does not send, it takes them to verification. What
   /// they typed is not kept, which is the cost of sending them away from here.
   void _verify() {
@@ -224,7 +230,7 @@ class _AskAboutState extends State<_AskAbout> {
             onTap: dim ? null : (widget.verified ? _send : _verify),
             semanticLabel: widget.verified
                 ? 'Send $_what to ${widget.name}'
-                : 'Verify your profile to send a $_what',
+                : _verifyLabel,
             child: Container(
               height: 50,
               alignment: Alignment.center,
@@ -234,7 +240,7 @@ class _AskAboutState extends State<_AskAbout> {
               ),
               child: Text(
                 !widget.verified
-                    ? 'Verify profile to send $_what'
+                    ? _verifyLabel
                     : (_sending ? 'Sending…' : 'Send $_what'),
                 style: AppText.button.copyWith(
                   color: dim ? AppColors.label3 : AppColors.onAccent,

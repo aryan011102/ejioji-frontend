@@ -33,7 +33,13 @@ final _tile = ProfileTile.fromJson({
 });
 
 /// A button that opens the sheet, and whatever [send] was handed.
-Widget _host(Future<String> Function(String) send, List<bool?> results) =>
+Widget _host(
+  Future<String> Function(String) send,
+  List<bool?> results, {
+  bool verified = true,
+  bool replying = false,
+  VoidCallback? onVerify,
+}) =>
     MaterialApp(
       home: Scaffold(
         body: Builder(
@@ -44,6 +50,9 @@ Widget _host(Future<String> Function(String) send, List<bool?> results) =>
                 name: 'Riya',
                 tile: _tile,
                 send: send,
+                verified: verified,
+                replying: replying,
+                onVerify: onVerify,
               ),
             ),
             child: const Text('open'),
@@ -218,6 +227,121 @@ void main() {
       await tester.enterText(find.byType(TextField), 'x' * 200);
       final field = tester.widget<TextField>(find.byType(TextField));
       expect(field.controller!.text.length, requestNoteMaxChars);
+    });
+  });
+
+  group('the sheet when the profile is not verified', () {
+    /// The line opens the conversation, so sending one needs a tick
+    /// (2026-10-05). The sheet still takes what they write; the button goes to
+    /// verification instead of sending.
+    testWidgets('the button offers verification and sends nothing',
+        (tester) async {
+      final sent = <String>[];
+      var verifying = 0;
+      final results = <bool?>[];
+      Future<String> send(String note) async {
+        sent.add(note);
+        return 'Asked about this.';
+      }
+
+      await tester.pumpWidget(
+        _host(send, results, verified: false, onVerify: () => verifying++),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      // They can still type: the sheet is not a wall.
+      expect(find.text('Send request'), findsNothing);
+      expect(find.text('Verify profile to send request'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), 'Good taste');
+      await tester.pump();
+
+      await tester.tap(find.text('Verify profile to send request'));
+      await tester.pumpAndSettle();
+      expect(sent, isEmpty);
+      expect(verifying, 1);
+    });
+
+    testWidgets('it offers verification with the field still empty',
+        (tester) async {
+      var verifying = 0;
+      await tester.pumpWidget(
+        _host((_) async => '', <bool?>[],
+            verified: false, onVerify: () => verifying++),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      // Not dimmed: it is not sending anything, so nothing has to be written.
+      await tester.tap(find.text('Verify profile to send request'));
+      await tester.pumpAndSettle();
+      expect(verifying, 1);
+    });
+
+    testWidgets("the keyboard's send key does not get past it either",
+        (tester) async {
+      final sent = <String>[];
+      var verifying = 0;
+      Future<String> send(String note) async {
+        sent.add(note);
+        return 'Asked about this.';
+      }
+
+      await tester.pumpWidget(
+        _host(send, <bool?>[], verified: false, onVerify: () => verifying++),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Good taste');
+      await tester.pump();
+
+      // The field's own send action, not the button.
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+      expect(sent, isEmpty);
+      expect(verifying, 1);
+    });
+
+    testWidgets('answering someone who asked you says reply, not request',
+        (tester) async {
+      await tester.pumpWidget(
+        _host((_) async => '', <bool?>[], verified: false, replying: true),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      expect(find.text('Verify profile to send reply'), findsOneWidget);
+    });
+
+    testWidgets('verified, a reply still reads as a reply', (tester) async {
+      await tester.pumpWidget(
+        _host((_) async => 'Asked about this.', <bool?>[], replying: true),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      expect(find.text('Send reply'), findsOneWidget);
+    });
+
+    testWidgets("the server's refusal offers verification too", (tester) async {
+      // An older build, or a tick that lapsed since this screen loaded.
+      var verifying = 0;
+      // Exactly what the client builds from a 403 verification_required.
+      Future<String> send(String note) async => throw const ForbiddenFailure(
+            code: 'verification_required',
+            message: 'Verify your profile to send a line with your request.',
+          );
+
+      await tester.pumpWidget(
+        _host(send, <bool?>[], onVerify: () => verifying++),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Good taste');
+      await tester.pump();
+      await tester.tap(find.text('Send request'));
+      await tester.pumpAndSettle();
+
+      expect(verifying, 1);
+      expect(find.byType(TextField), findsNothing);
     });
   });
 }

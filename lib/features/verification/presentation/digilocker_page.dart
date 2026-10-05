@@ -171,6 +171,7 @@ class _DigilockerHandoffPageState extends ConsumerState<DigilockerHandoffPage> {
           // Only a mismatch is fixed on the profile; the others are not.
           fixable: result.outcome == 'birth_date_differs' ||
               result.outcome == 'name_differs' ||
+              result.outcome == 'last_name_differs' ||
               result.outcome == 'no_profile',
         ),
       );

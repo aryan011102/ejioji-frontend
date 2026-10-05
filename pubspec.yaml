@@ -107,6 +107,14 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
 
+  # iOS plugins come through CocoaPods, not Swift Package Manager. Under SPM,
+  # cupertino_native_better pulls SVGKit (iOS 12), which pulls a CocoaLumberjack
+  # that needs iOS 15, and Xcode refuses the archive over that mismatch inside
+  # the dependency itself — nothing in this app's own target can fix it.
+  # CocoaPods only checks each pod against the app's iOS 15.
+  config:
+    enable-swift-package-manager: false
+
   # Google Sans is licensed and is NOT redistributable — it is not checked in.
   # On Android the app asks for it by name and falls back to Roboto when it is
   # absent, which is the correct behaviour on a stock device. If your build has

@@ -1,3 +1,4 @@
+import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -53,6 +54,10 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     navigatorKey: rootKey,
+    // Apple's tab bar is a native view drawn above Flutter, so it has to be
+    // told when a sheet comes up or it sits on top of the sheet. One observer
+    // per navigator: sheets opened from a tab land on the shell's.
+    observers: [CNTabBarRouteObserver()],
     initialLocation: Routes.splash,
     // Rebuilds the redirect whenever the session moves.
     refreshListenable: _SessionSignal(ref),
@@ -157,6 +162,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       // The three tabs share a shell so the bar does not rebuild between them.
       ShellRoute(
         navigatorKey: shellKey,
+        observers: [CNTabBarRouteObserver()],
         builder: (context, state, child) =>
             AppShell(location: state.matchedLocation, child: child),
         routes: [

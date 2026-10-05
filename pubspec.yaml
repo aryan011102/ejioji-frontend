@@ -78,6 +78,7 @@ dependencies:
   # token is used: our server trades it for our own session, and Firebase's
   # is signed out straight away.
   firebase_auth: ^6.7.0
+  cupertino_native_better: ^1.6.0
 
 dev_dependencies:
   flutter_test:

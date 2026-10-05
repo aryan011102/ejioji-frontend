@@ -1,6 +1,7 @@
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/theme/platform.dart';
 import '../../core/theme/tokens.dart';
@@ -58,64 +59,9 @@ class AppTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppPlatform.floatingTabBar ? _floating(context) : _docked(context);
-  }
-
-  /// Liquid glass, drawn rather than borrowed from UIKit so the bar stays
-  /// this app's bar on every iOS version: the wall behind is blurred and
-  /// saturated, the edge is lit from the top left, and the selected tab sits
-  /// on a lens that slides, and stretches as it goes, from tab to tab.
-  ///
-  /// Increase Contrast swaps the clear glass for the frosted one, which is
-  /// what that setting asks of every translucent surface.
-  Widget _floating(BuildContext context) {
-    final clear = !MediaQuery.highContrastOf(context);
-    final radius = BorderRadius.circular(barHeight / 2);
-
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        Insets.gutter,
-        0,
-        Insets.gutter,
-        MediaQuery.paddingOf(context).bottom + _floatingInset,
-      ),
-      child: DecoratedBox(
-        // Outside the clip, or the clip cuts it away.
-        decoration: BoxDecoration(
-          borderRadius: radius,
-          boxShadow: const [
-            BoxShadow(
-              color: AppColors.liquidShadow,
-              blurRadius: 34,
-              offset: Offset(0, 12),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: radius,
-          child: BackdropFilter(
-            filter: clear
-                ? ImageFilter.compose(outer: _blur, inner: _saturate)
-                : _blur,
-            child: CustomPaint(
-              painter: _GlassPainter(
-                fill: clear ? AppColors.liquidGlass : AppColors.glass,
-                sheen: AppColors.liquidSheen,
-              ),
-              child: SizedBox(
-                height: barHeight,
-                child: Stack(
-                  children: [
-                    Positioned.fill(child: _lens(context)),
-                    _items(),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+    return AppPlatform.floatingTabBar
+        ? _LiquidBar(bar: this)
+        : _docked(context);
   }
 
   static final _blur = ImageFilter.blur(sigmaX: 24, sigmaY: 24);
@@ -138,40 +84,6 @@ class AppTabBar extends StatelessWidget {
   static const _lensCurve = Cubic(0.34, 1.36, 0.64, 1);
   static const _lensTravel = Duration(milliseconds: 420);
 
-  Widget _lens(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, box) {
-        final slot = box.maxWidth / AppTab.values.length;
-        return TweenAnimationBuilder<double>(
-          tween: Tween(end: current.index.toDouble()),
-          duration: MediaQuery.disableAnimationsOf(context)
-              ? Duration.zero
-              : _lensTravel,
-          curve: _lensCurve,
-          builder: (context, at, _) {
-            // 0 at rest on a tab, .5 halfway between two: the lens is widest
-            // mid-travel, the way a drop stretches when it is pulled.
-            final pull = (at - at.round()).abs();
-            final width = slot - _lensInset * 2 + slot * 0.5 * pull;
-            return Stack(
-              children: [
-                Positioned(
-                  left: slot * (at + 0.5) - width / 2,
-                  top: _lensInset,
-                  bottom: _lensInset,
-                  width: width,
-                  child: const CustomPaint(
-                    painter: _GlassPainter(fill: AppColors.liquidLens),
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
   Widget _docked(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
@@ -181,21 +93,30 @@ class AppTabBar extends StatelessWidget {
         ),
       ),
       padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
-      child: SizedBox(height: barHeight, child: _items()),
+      child: SizedBox(height: barHeight, child: _items(lit: current.index)),
     );
   }
 
-  Widget _items() {
+  /// [lit] is the tab drawn as selected: [current], except while a finger
+  /// drags the lens, when it is whichever tab the lens is over.
+  Widget _items({required int lit}) {
     return Row(
       children: [
         _item(
           AppTab.home,
           blind ? 'Blind' : 'Home',
           blind ? Icons.auto_awesome : Icons.home_rounded,
+          lit: lit,
           onLongPress: onHoldHome,
         ),
-        _item(AppTab.chats, 'Chats', Icons.forum_rounded, badge: chatsBadge),
-        _item(AppTab.you, 'You', Icons.account_circle_outlined),
+        _item(
+          AppTab.chats,
+          'Chats',
+          Icons.forum_rounded,
+          lit: lit,
+          badge: chatsBadge,
+        ),
+        _item(AppTab.you, 'You', Icons.account_circle_outlined, lit: lit),
       ],
     );
   }
@@ -204,10 +125,11 @@ class AppTabBar extends StatelessWidget {
     AppTab tab,
     String label,
     IconData icon, {
+    required int lit,
     int badge = 0,
     VoidCallback? onLongPress,
   }) {
-    final on = tab == current;
+    final on = tab.index == lit;
     return Expanded(
       child: Pressable(
         onTap: () => onSelect(tab),
@@ -281,6 +203,201 @@ class AppTabBar extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The floating bar: liquid glass, drawn rather than borrowed from UIKit so
+/// the bar stays this app's bar on every iOS version. The wall behind is
+/// blurred and saturated, the edge is lit from the top left, and the selected
+/// tab sits on a lens that slides, and stretches as it goes, from tab to tab.
+///
+/// The lens can also be dragged. A finger sliding along the bar picks the
+/// lens up: it swells a little, follows the finger, lights whichever tab it
+/// is over with a tick of haptics as it crosses into one, and on release
+/// settles on the nearest tab and opens it.
+///
+/// Increase Contrast swaps the clear glass for the frosted one, which is
+/// what that setting asks of every translucent surface.
+class _LiquidBar extends StatefulWidget {
+  const _LiquidBar({required this.bar});
+
+  final AppTabBar bar;
+
+  @override
+  State<_LiquidBar> createState() => _LiquidBarState();
+}
+
+class _LiquidBarState extends State<_LiquidBar>
+    with SingleTickerProviderStateMixin {
+  /// Where the lens is, in tabs: 0 on Home, 1 on Chats, fractions between.
+  late final AnimationController _lens = AnimationController.unbounded(
+    vsync: this,
+    value: widget.bar.current.index.toDouble(),
+  );
+
+  /// A finger is on the bar, carrying the lens.
+  bool _held = false;
+
+  /// The width of one tab, from the last layout.
+  double _slot = 1;
+
+  static final _count = AppTab.values.length;
+
+  @override
+  void didUpdateWidget(_LiquidBar old) {
+    super.didUpdateWidget(old);
+    if (old.bar.current != widget.bar.current && !_held) {
+      _settle(widget.bar.current.index);
+    }
+  }
+
+  @override
+  void dispose() {
+    _lens.dispose();
+    super.dispose();
+  }
+
+  void _settle(int index) {
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _lens.value = index.toDouble();
+      return;
+    }
+    _lens.animateTo(
+      index.toDouble(),
+      duration: AppTabBar._lensTravel,
+      curve: AppTabBar._lensCurve,
+    );
+  }
+
+  void _pickUp(DragStartDetails d) {
+    _lens.stop();
+    setState(() => _held = true);
+    _follow(d.localPosition.dx);
+  }
+
+  void _follow(double dx) {
+    // A little give past the end tabs, so the edge feels soft, not walled.
+    final at = (dx / _slot - 0.5).clamp(-0.2, _count - 0.8);
+    final was = _lens.value.round();
+    _lens.value = at;
+    if (at.round() != was) {
+      HapticFeedback.selectionClick();
+      setState(() {});
+    }
+  }
+
+  void _drop() {
+    // A cancel can arrive for a drag that never started.
+    if (!_held) return;
+    final index = _lens.value.round().clamp(0, _count - 1);
+    setState(() => _held = false);
+    _settle(index);
+    if (index != widget.bar.current.index) {
+      widget.bar.onSelect(AppTab.values[index]);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final clear = !MediaQuery.highContrastOf(context);
+    final radius = BorderRadius.circular(AppTabBar.barHeight / 2);
+    final lit = _held
+        ? _lens.value.round().clamp(0, _count - 1)
+        : widget.bar.current.index;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        Insets.gutter,
+        0,
+        Insets.gutter,
+        MediaQuery.paddingOf(context).bottom + AppTabBar._floatingInset,
+      ),
+      child: DecoratedBox(
+        // Outside the clip, or the clip cuts it away.
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          boxShadow: const [
+            BoxShadow(
+              color: AppColors.liquidShadow,
+              blurRadius: 34,
+              offset: Offset(0, 12),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: radius,
+          child: BackdropFilter(
+            filter: clear
+                ? ImageFilter.compose(
+                    outer: AppTabBar._blur,
+                    inner: AppTabBar._saturate,
+                  )
+                : AppTabBar._blur,
+            child: CustomPaint(
+              painter: _GlassPainter(
+                fill: clear ? AppColors.liquidGlass : AppColors.glass,
+                sheen: AppColors.liquidSheen,
+              ),
+              // A sideways drag beats a tap once the finger has moved, and
+              // loses to it otherwise, so tapping a tab and holding Home
+              // behave exactly as before.
+              child: GestureDetector(
+                onHorizontalDragStart: _pickUp,
+                onHorizontalDragUpdate: (d) => _follow(d.localPosition.dx),
+                onHorizontalDragEnd: (_) => _drop(),
+                onHorizontalDragCancel: _drop,
+                child: SizedBox(
+                  height: AppTabBar.barHeight,
+                  child: LayoutBuilder(
+                    builder: (context, box) {
+                      _slot = box.maxWidth / _count;
+                      return Stack(
+                        children: [
+                          Positioned.fill(child: _lensLayer()),
+                          widget.bar._items(lit: lit),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _lensLayer() {
+    return TweenAnimationBuilder<double>(
+      // Picked up, the lens swells toward the bar's edge.
+      tween: Tween(end: _held ? 1 : 0),
+      duration: Motion.press,
+      builder: (context, lift, _) => AnimatedBuilder(
+        animation: _lens,
+        builder: (context, _) {
+          final at = _lens.value;
+          // 0 at rest on a tab, .5 halfway between two: the lens is widest
+          // mid-travel, the way a drop stretches when it is pulled.
+          final pull = (at - at.round()).abs();
+          final inset = AppTabBar._lensInset - 3 * lift;
+          final width = _slot - inset * 2 + _slot * 0.5 * pull;
+          return Stack(
+            children: [
+              Positioned(
+                left: _slot * (at + 0.5) - width / 2,
+                top: inset,
+                bottom: inset,
+                width: width,
+                child: const CustomPaint(
+                  painter: _GlassPainter(fill: AppColors.liquidLens),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

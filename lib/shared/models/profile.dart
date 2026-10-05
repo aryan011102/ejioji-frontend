@@ -21,8 +21,8 @@ class Profile {
     required this.gender,
     required this.city,
     this.lastName,
-    this.lastNameInitial = false,
-    this.shownLastName,
+    this.nameInitials = false,
+    this.shownName,
     this.languages = const [],
     this.education,
     this.pronouns,
@@ -34,12 +34,12 @@ class Profile {
   final String firstName;
   final String? lastName;
 
-  /// Her wish to show others only the initial of her last name ("Priya N."),
-  /// offered to women only and off by default. [shownLastName] is what others
-  /// actually see, worked out by the server: the initial only while the
-  /// profile says woman.
-  final bool lastNameInitial;
-  final String? shownLastName;
+  /// Her wish to show others the initials of both her names ("PA") instead of
+  /// the names themselves, offered to women only and off by default.
+  /// [shownName] is what others actually see, worked out by the server: the
+  /// initials only while the profile says woman and there is a last name.
+  final bool nameInitials;
+  final String? shownName;
 
   final DateTime birthDate;
 
@@ -65,17 +65,18 @@ class Profile {
   final Habit? smoking;
   final Habit? drinking;
 
-  /// The name as others see it. A person with no last name is just their first.
-  String get displayName {
-    final shown = shownLastName ?? lastName;
-    return shown == null || shown.isEmpty ? firstName : '$firstName $shown';
-  }
+  /// The name as others see it, which is what her own wall previews. Her forms
+  /// read [firstName] and [lastName] instead, so she edits what she actually
+  /// typed. A person with no last name is just their first.
+  String get displayName =>
+      shownName ??
+      (lastName == null || lastName!.isEmpty ? firstName : '$firstName $lastName');
 
   static Profile fromJson(Json j) => Profile(
         firstName: j.str('first_name'),
         lastName: j.strOrNull('last_name'),
-        lastNameInitial: j.flag('last_name_initial'),
-        shownLastName: j.strOrNull('shown_last_name'),
+        nameInitials: j.flag('name_initials'),
+        shownName: j.strOrNull('shown_name'),
         birthDate: j.date('birth_date'),
         age: j.intOr('age', 0),
         gender: Gender.parse(j.strOrNull('gender')),

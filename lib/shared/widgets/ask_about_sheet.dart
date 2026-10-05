@@ -22,6 +22,14 @@ const requestNoteMaxChars = 150;
 /// tile can never arrive on its own with nothing said about it. The server
 /// still takes a request with no line, so this is the app's rule, not its.
 ///
+/// **Sending the line needs a verified profile** (2026-10-05). The recipient
+/// reads it as the conversation's first line, so it is held to the same rule as
+/// a chat message. Unverified, the sheet still opens and still takes what they
+/// write; the button says so and goes to verification instead of sending. The
+/// server refuses it too (403 `verification_required`), so this is the app
+/// saying what the rule is, not the rule itself. A knock with no words is not
+/// gated, which is why the plain "Chat with" button is untouched.
+///
 /// [send] makes the request with what was written, returns what to tell the
 /// person, and throws [ApiException] if it is refused. The sheet says it,
 /// because the screen behind may be gone by then: on Home, asking moves the
@@ -33,19 +41,45 @@ Future<bool?> showAskAboutSheet(
   required String name,
   required ProfileTile tile,
   required Future<String> Function(String note) send,
+  bool verified = true,
+  bool replying = false,
+  VoidCallback? onVerify,
 }) {
   return showAppSheet<bool>(
     context,
-    builder: (_) => _AskAbout(name: name, tile: tile, send: send),
+    builder: (_) => _AskAbout(
+      name: name,
+      tile: tile,
+      send: send,
+      verified: verified,
+      replying: replying,
+      onVerify: onVerify,
+    ),
   );
 }
 
 class _AskAbout extends StatefulWidget {
-  const _AskAbout({required this.name, required this.tile, required this.send});
+  const _AskAbout({
+    required this.name,
+    required this.tile,
+    required this.send,
+    required this.verified,
+    required this.replying,
+    this.onVerify,
+  });
 
   final String name;
   final ProfileTile tile;
   final Future<String> Function(String note) send;
+
+  /// Their tick stands. False means the button goes to verification.
+  final bool verified;
+
+  /// This sheet answers someone who asked them, which accepts the request and
+  /// opens the chat. A reply, not a request, and the button says so.
+  final bool replying;
+
+  final VoidCallback? onVerify;
 
   @override
   State<_AskAbout> createState() => _AskAboutState();
@@ -62,12 +96,28 @@ class _AskAboutState extends State<_AskAbout> {
     super.dispose();
   }
 
+  /// "request" when asking someone new, "reply" when answering someone who
+  /// asked you, which is what asking back actually does.
+  String get _what => widget.replying ? 'reply' : 'request';
+
+  /// Unverified: the button does not send, it takes them to verification. What
+  /// they typed is not kept, which is the cost of sending them away from here.
+  void _verify() {
+    Navigator.of(context).pop();
+    widget.onVerify?.call();
+  }
+
   Future<void> _send() async {
     if (_sending) return;
     final text = _controller.text.trim();
     // Nothing written is not a request. The button is already dimmed, so this
     // only catches the keyboard's send key.
     if (text.isEmpty) return;
+    // Nor does the keyboard's send key get past the verification gate.
+    if (!widget.verified) {
+      _verify();
+      return;
+    }
     setState(() {
       _sending = true;
       _refusal = null;
@@ -84,6 +134,10 @@ class _AskAboutState extends State<_AskAbout> {
       // sheet closes and says so.
       if (e.code == 'text_rejected') {
         setState(() => _refusal = e.message);
+      } else if (e.code == 'verification_required') {
+        // The server is the real gate: a tick can lapse between this screen
+        // loading and Send, and an older build does not know the rule at all.
+        _verify();
       } else {
         Navigator.of(context).pop();
         showAppToast(context, e.message);
@@ -100,6 +154,9 @@ class _AskAboutState extends State<_AskAbout> {
     // Spaces alone are nothing written, and the field rebuilds on every
     // keystroke, so the button follows what is actually there.
     final empty = _controller.text.trim().isEmpty;
+    // Unverified, the button is never dimmed: it is not sending anything, it is
+    // a way out to verification, and that works with the field still empty.
+    final dim = widget.verified && (_sending || empty);
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
@@ -164,21 +221,23 @@ class _AskAboutState extends State<_AskAbout> {
           else
             const SizedBox(height: 12),
           Pressable(
-            onTap: _sending || empty ? null : _send,
-            semanticLabel: 'Send request to ${widget.name}',
+            onTap: dim ? null : (widget.verified ? _send : _verify),
+            semanticLabel: widget.verified
+                ? 'Send $_what to ${widget.name}'
+                : 'Verify your profile to send a $_what',
             child: Container(
               height: 50,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: _sending || empty ? AppColors.fill2 : AppColors.fill,
+                color: dim ? AppColors.fill2 : AppColors.fill,
                 borderRadius: BorderRadius.circular(Radii.row),
               ),
               child: Text(
-                _sending ? 'Sending…' : 'Send request',
+                !widget.verified
+                    ? 'Verify profile to send $_what'
+                    : (_sending ? 'Sending…' : 'Send $_what'),
                 style: AppText.button.copyWith(
-                  color: _sending || empty
-                      ? AppColors.label3
-                      : AppColors.onAccent,
+                  color: dim ? AppColors.label3 : AppColors.onAccent,
                 ),
               ),
             ),

@@ -87,6 +87,13 @@ class _ChatsPageState extends ConsumerState<ChatsPage> {
             ? 'You matched. The chat opens on both tiles.'
             : 'Asked about this.';
       },
+      // Answering someone who asked you: a reply, and the button says so.
+      replying: true,
+      // Unknown (the profile has not loaded) counts as verified: the server is
+      // the real gate and refuses with verification_required, which the sheet
+      // then handles. Guessing the other way would stop a verified person.
+      verified: ref.read(myProfileProvider).valueOrNull?.verified ?? true,
+      onVerify: () => context.push(Routes.verify),
     );
     if (!mounted || sent != true) return;
     _refreshEverything();

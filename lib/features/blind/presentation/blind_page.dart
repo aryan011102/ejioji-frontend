@@ -11,6 +11,7 @@ import '../../../app/routes.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
 import '../../../data/blind_controller.dart';
+import '../../../data/providers.dart';
 import '../../../shared/models/blind.dart';
 import '../../../shared/models/enums.dart';
 import '../../../shared/widgets/app_tab_bar.dart';
@@ -110,6 +111,11 @@ class _BlindPageState extends ConsumerState<BlindPage>
             ? '$name asked you too. The chat opens on this tile.'
             : 'Asked about this. $name will see it with your request.';
       },
+    // Unknown (the profile has not loaded) counts as verified: the server is
+    // the real gate and refuses with verification_required, which the sheet
+    // then handles. Guessing the other way would stop a verified person.
+      verified: ref.read(myProfileProvider).valueOrNull?.verified ?? true,
+      onVerify: () => context.push(Routes.verify),
     );
   }
 

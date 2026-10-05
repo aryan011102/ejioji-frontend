@@ -93,15 +93,15 @@ class _DigilockerStepsPageState extends ConsumerState<DigilockerStepsPage> {
           const SizedBox(height: 8),
           Text(
             "You'll finish this on DigiLocker's own site and come straight "
-            'back.',
+            'back. You do not need the DigiLocker app.',
             style: AppText.callout,
           ),
           const SizedBox(height: 26),
           const StepRow(
             number: '1',
             title: 'Sign in to DigiLocker',
-            body: 'With the mobile number linked to your Aadhaar. The OTP '
-                'comes from DigiLocker, not from us.',
+            body: 'In your browser, with the mobile number linked to your '
+                'Aadhaar. The OTP comes from DigiLocker, not from us.',
           ),
           const StepRow(
             number: '2',

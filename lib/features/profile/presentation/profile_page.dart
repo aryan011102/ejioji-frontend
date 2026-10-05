@@ -877,6 +877,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             : 'Asked about this. ${person.firstName} will see it with your '
                 'request.';
       },
+      // Unknown (the profile has not loaded) counts as verified: the server is
+      // the real gate and refuses with verification_required, which the sheet
+      // then handles. Guessing the other way would stop a verified person.
+      verified: ref.read(myProfileProvider).valueOrNull?.verified ?? true,
+      onVerify: () => context.push(Routes.verify),
     );
   }
 

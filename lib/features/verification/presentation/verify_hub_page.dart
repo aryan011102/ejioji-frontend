@@ -68,9 +68,14 @@ class VerifyHubPage extends ConsumerWidget {
               children: [
                 AppRow(
                   label: 'DigiLocker',
-                  subtitle: v.verified || v.available
+                  // Said here because this is where someone decides whether to
+                  // tap, and "do I have to download something" is what stops
+                  // them. It opens in the browser: there is no app to install.
+                  subtitle: v.verified
                       ? null
-                      : 'Not available right now',
+                      : v.available
+                          ? 'No app needed. It opens in your browser.'
+                          : 'Not available right now',
                   leading: const Icon(
                     Icons.description_outlined,
                     size: 18,

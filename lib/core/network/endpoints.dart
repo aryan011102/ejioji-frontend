@@ -54,7 +54,7 @@ abstract final class Api {
       '$prefix/profile/tiles/$kind/${Uri.encodeComponent(key)}/media';
   static const publish = '$prefix/profile/publish';
   static const stealth = '$prefix/profile/stealth';
-  static const lastNameInitial = '$prefix/profile/last-name-initial';
+  static const nameInitials = '$prefix/profile/name-initials';
   // Verification: a DigiLocker check of the profile's first name and birth date.
   static const verification = '$prefix/profile/verification';
   static const digilockerAuthorize =

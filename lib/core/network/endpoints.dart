@@ -119,6 +119,7 @@ abstract final class Api {
   // Sharing a match's profile with friends and family. Both say ready first;
   // a link's address is sent once, when it is made.
   static String sharing(String matchId) => '$prefix/sharing/$matchId';
+  static String inCommon(String matchId) => '$prefix/in-common/$matchId';
   static String sharingReady(String matchId) => '$prefix/sharing/$matchId/ready';
   static String sharingLinks(String matchId) => '$prefix/sharing/$matchId/links';
   static String sharingLink(String linkId) => '$prefix/sharing/links/$linkId';

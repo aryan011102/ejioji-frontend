@@ -48,6 +48,7 @@ class ConsentPage extends ConsumerStatefulWidget {
         for (final p in _ConsentPageState._order)
           if (p != ConsentPurpose.appleMusicImport || AppleMusicKit.isAvailable) p,
         ConsentPurpose.identityVerification,
+        ConsentPurpose.inCommon,
       ];
 
   @override
@@ -116,6 +117,10 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
         ConsentPurpose.identityVerification =>
           'Checks your first name and date of birth against DigiLocker, once, '
               'for the verified tick. Your Aadhaar number is never shared.',
+        ConsentPurpose.inCommon =>
+          'Shows you and each match the few things you share, read from all '
+              'your insights, including ones off your profile. Only once you '
+              'have both said yes.',
         ConsentPurpose.unknown => '',
       };
 

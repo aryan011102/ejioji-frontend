@@ -68,6 +68,7 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
     ConsentPurpose.netflixUpload,
     ConsentPurpose.spotifyImport,
     ConsentPurpose.appleMusicImport,
+    ConsentPurpose.instagramUpload,
     ConsentPurpose.aiProcessing,
     ConsentPurpose.matching,
   ];
@@ -106,6 +107,11 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
         ConsentPurpose.appleMusicImport =>
           'The songs and albums saved in your Apple Music library, read once. '
               'Not your playlists, and Apple has no listening history to give.',
+        ConsentPurpose.instagramUpload =>
+          'Five files from the Instagram download you upload: who you follow, '
+              'what you liked and saved, and what you watched. Your phone opens '
+              'the zip; your messages never leave it. Each public account is '
+              'sorted into a topic by an AI; friends count for nothing.',
         ConsentPurpose.aiProcessing =>
           'Sends summaries of what you connect (totals and the names behind '
               'them) to Claude, an AI made by Anthropic, to suggest insights '

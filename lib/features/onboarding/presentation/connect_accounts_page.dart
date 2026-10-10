@@ -18,33 +18,27 @@ import '../../../shared/models/archetype.dart';
 import '../../../shared/models/connection.dart';
 import '../../../shared/models/consent.dart';
 import '../../../shared/models/enums.dart';
-import '../../../shared/models/social.dart';
 import '../../../shared/widgets/buttons.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/pressable.dart';
 import '../../../shared/widgets/sheets.dart';
-import '../../../shared/widgets/social_mark.dart';
 import '../../../shared/widgets/states.dart';
 import '../../insights/presentation/category_page.dart';
-import '../../profile/presentation/social_link_sheet.dart';
 import 'ai_consent_sheet.dart';
 
 /// What the profile is actually made of, and the one screen that deals with it.
 ///
-/// Five sources, and only five, Apple Music only on an iPhone. The original
-/// design offered nine, including several that have no way in at all:
-/// Instagram's basic display API is gone, LinkedIn work history needs partner
-/// access nobody gets, and Apple Health's terms forbid what we would do with
-/// it. Offering a connect button for those is a promise the product cannot
-/// keep. The layout is the design's; the list is what exists.
+/// Six sources, Apple Music only on an iPhone. The original design offered
+/// nine, including some that have no way in at all: LinkedIn work history
+/// needs partner access nobody gets, and Apple Health's terms forbid what we
+/// would do with it. Offering a connect button for those is a promise the
+/// product cannot keep. The layout is the design's; the list is what exists.
 ///
-/// Instagram, X and LinkedIn are here too, as the design draws them, but they
-/// are not sources: nothing is read from them. They are a handle the person
-/// types or pastes, handed only to people they match with, so they sit in their
-/// own group below the sources and never count towards profile strength.
-///
-/// LinkedIn was required from 2026-09-29 and is optional again from 2026-10-10,
-/// on exactly the same terms as Instagram and X (Aryan's call).
+/// Instagram is a source since 2026-10-10, as Netflix is: no API, so the
+/// person uploads their own download (instagram_upload_page.dart). Its tiles
+/// are Social. The Instagram, X and LinkedIn handles shown to matches are not
+/// sources and moved to Edit info the same day (Aryan's call), so a handle and
+/// a source are never side by side here.
 ///
 /// Every source is read exactly once, when it is connected. There is no
 /// background sync: the access token lives in the server's memory for the
@@ -123,6 +117,11 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
           provider: SourceProvider.netflix,
           name: 'Netflix',
           note: 'The watch history you download',
+        ),
+        (
+          provider: SourceProvider.instagram,
+          name: 'Instagram',
+          note: 'Who you follow and what you like · the download you ask for',
         ),
       ],
     ),
@@ -243,6 +242,11 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
       case SourceProvider.spotify:
         await context.push(
           Routes.upload(Routes.spotifyUpload, editing: widget.editing),
+        );
+        return;
+      case SourceProvider.instagram:
+        await context.push(
+          Routes.upload(Routes.instagramUpload, editing: widget.editing),
         );
         return;
       default:
@@ -621,6 +625,7 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
     SourceProvider.netflix: TileCategory.netflix,
     SourceProvider.spotify: TileCategory.music,
     SourceProvider.appleMusic: TileCategory.music,
+    SourceProvider.instagram: TileCategory.social,
   };
 
   /// The box a category's row sits in: Netflix shares Watching's, so YouTube
@@ -704,6 +709,7 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
     SourceProvider.netflix,
     SourceProvider.spotify,
     SourceProvider.appleMusic,
+    SourceProvider.instagram,
   ];
 
   void _next() => context.push(
@@ -736,11 +742,6 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
         _busy != null ||
         _busyInbox != null ||
         !consent.hasValue;
-    final socials = {
-      for (final l in ref.watch(mySocialsProvider).valueOrNull ??
-          const <SocialLink>[])
-        l.network: l,
-    };
     // Who their data thinks they are: required (Aryan's call, 2026-10-10), so
     // setup does not go on without one. Unknown while the profile loads, which
     // does not hold anyone up: the server does not insist, this screen does.
@@ -832,22 +833,6 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
                       ),
                   ]),
                 ),
-            _Group(
-              header: 'Social · only your matches see these',
-              children: [
-                for (final n in SocialNetwork.shown)
-                  _SocialRow(
-                    network: n,
-                    link: socials[n],
-                    last: n == SocialNetwork.shown.last,
-                    onTap: () => showSocialLinkSheet(
-                      context,
-                      network: n,
-                      existing: socials[n],
-                    ),
-                  ),
-              ],
-            ),
             if (!widget.editing)
               Padding(
                 padding: const EdgeInsets.fromLTRB(
@@ -1321,90 +1306,6 @@ class _AddAccountRow extends StatelessWidget {
   }
 }
 
-/// A social link's row: the network, then its handle and whether matches see
-/// it, or what it is for when there is none yet.
-class _SocialRow extends StatelessWidget {
-  const _SocialRow({
-    required this.network,
-    required this.link,
-    required this.last,
-    required this.onTap,
-  });
-
-  final SocialNetwork network;
-  final SocialLink? link;
-  final bool last;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final l = link;
-    final line = switch (l) {
-      null => network == SocialNetwork.linkedin
-          ? 'Your profile link · for matches only'
-          : 'Your handle · for matches only',
-      _ when l.shown => '${l.display} · shown to matches',
-      _ => '${l.display} · hidden from matches',
-    };
-    const tone = AppColors.label3;
-    return Column(
-      children: [
-        PressableRow(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-            child: Row(
-              children: [
-                SocialMark(network),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        network.label,
-                        style: AppText.body.copyWith(
-                          fontSize: 17,
-                          height: 25.5 / 17,
-                        ),
-                      ),
-                      const SizedBox(height: 1),
-                      Text(
-                        line,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppText.caption.copyWith(
-                          fontSize: 12.5,
-                          height: 16 / 12.5,
-                          color: tone,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Icon(
-                  Icons.chevron_right,
-                  size: 18,
-                  color: AppColors.label3,
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (!last)
-          const Padding(
-            padding: EdgeInsets.only(left: 58),
-            child: Divider(
-              height: 1,
-              thickness: 1,
-              color: AppColors.separator,
-            ),
-          ),
-      ],
-    );
-  }
-}
-
 /// "Who your data thinks you are": the archetype chosen, or that one is
 /// required. Opens the four to choose from.
 class _ArchetypeRow extends StatelessWidget {
@@ -1547,6 +1448,14 @@ class _BrandMark extends StatelessWidget {
           const Icon(
             Icons.music_note_rounded,
             size: 19,
+            color: AppColors.label,
+          ),
+        ),
+      SourceProvider.instagram => (
+          BrandColors.instagramVia,
+          const Icon(
+            Icons.camera_alt_outlined,
+            size: 18,
             color: AppColors.label,
           ),
         ),

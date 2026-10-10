@@ -110,6 +110,19 @@ class SourcesRepository {
     return IngestionRun.fromJson(body);
   }
 
+  /// Instagram, from the person's own download: the five files the upload
+  /// page takes out of the zip, as one JSON object of their text, keyed by
+  /// name. The server refuses any other key, so nothing else from the zip
+  /// (messages, searches) can ride along.
+  Future<IngestionRun> uploadInstagram(String json) async {
+    final body = await _api.postRaw(
+      Api.instagramUpload,
+      body: json,
+      contentType: 'application/json',
+    );
+    return IngestionRun.fromJson(body);
+  }
+
   /// The person has gone to Spotify to ask for their data. The server pushes
   /// them a reminder to upload it a few days later, unless they have by then.
   Future<void> spotifyRequested() => _api.postEmpty(Api.spotifyRequested);

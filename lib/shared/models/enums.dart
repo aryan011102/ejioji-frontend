@@ -108,6 +108,7 @@ enum ConsentPurpose {
   gmailReceipts('gmail_receipts', 'Order emails in Gmail'),
   netflixUpload('netflix_upload', 'Netflix history'),
   appleMusicImport('apple_music_import', 'Apple Music library'),
+  instagramUpload('instagram_upload', 'Instagram download'),
   aiProcessing('ai_processing', 'AI suggestions'),
   matching('matching', 'Matching'),
   identityVerification('identity_verification', 'DigiLocker verification'),
@@ -131,6 +132,7 @@ enum SourceProvider {
   gmail('gmail', 'Gmail receipts'),
   netflix('netflix', 'Netflix'),
   appleMusic('apple_music', 'Apple Music'),
+  instagram('instagram', 'Instagram'),
   unknown('', '');
 
   const SourceProvider(this.wire, this.label);
@@ -145,6 +147,7 @@ enum SourceProvider {
         SourceProvider.gmail => ConsentPurpose.gmailReceipts,
         SourceProvider.netflix => ConsentPurpose.netflixUpload,
         SourceProvider.appleMusic => ConsentPurpose.appleMusicImport,
+        SourceProvider.instagram => ConsentPurpose.instagramUpload,
         SourceProvider.unknown => ConsentPurpose.unknown,
       };
 

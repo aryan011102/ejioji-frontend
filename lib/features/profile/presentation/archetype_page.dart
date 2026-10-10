@@ -177,6 +177,7 @@ class _ArchetypePageState extends ConsumerState<ArchetypePage> {
                     child: ArchetypeFace(
                       archetype: Archetype(title: o.title, body: o.body),
                       selected: o.id == picked,
+                      selectable: true,
                     ),
                   ),
                 ),

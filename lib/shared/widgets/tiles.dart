@@ -1231,6 +1231,7 @@ class ArchetypeFace extends StatelessWidget {
   const ArchetypeFace({
     required this.archetype,
     this.selected = false,
+    this.selectable = false,
     this.theirs = false,
     super.key,
   });
@@ -1246,9 +1247,15 @@ class ArchetypeFace extends StatelessWidget {
   /// Chosen in the picker: the same ring a picked tile has.
   final bool selected;
 
+  /// One of the choices on the archetype page (Aryan, 2026-10-11): the title
+  /// alone, like any other tile, with the same circle at the top right that
+  /// every tile being picked has. The label is the page's own title there, so
+  /// four copies of it say nothing.
+  final bool selectable;
+
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
+    final face = DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(Radii.tile),
         gradient: TileTones.indigo,
@@ -1266,16 +1273,18 @@ class ArchetypeFace extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            Text(
-              (theirs ? theirLabel : label).toUpperCase(),
-              style: AppText.micro.copyWith(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.7,
-                color: const Color(0xA8FFFFFF),
+            if (!selectable) ...[
+              Text(
+                (theirs ? theirLabel : label).toUpperCase(),
+                style: AppText.micro.copyWith(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.7,
+                  color: const Color(0xA8FFFFFF),
+                ),
               ),
-            ),
-            const SizedBox(height: 5),
+              const SizedBox(height: 5),
+            ],
             Text(
               archetype.title,
               style: AppText.bodyStrong.copyWith(
@@ -1287,6 +1296,14 @@ class ArchetypeFace extends StatelessWidget {
           ],
         ),
       ),
+    );
+    if (!selectable) return face;
+    return Stack(
+      fit: StackFit.passthrough,
+      children: [
+        face,
+        Positioned(top: 10, right: 10, child: _Radio(on: selected)),
+      ],
     );
   }
 }

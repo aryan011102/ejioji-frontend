@@ -157,12 +157,22 @@ void main() {
 
       expect(find.text('Who your data thinks you are'), findsOneWidget);
       expect(find.text('The Night Owl'), findsOneWidget);
+      // Each choice is the title alone, like any tile: the page title already
+      // says what they are, so no choice repeats it.
+      expect(find.text('WHO YOUR DATA THINKS YOU ARE'), findsNothing);
+      // And each has the circle a tile being picked has, none ticked yet.
+      final ticks = find.descendant(
+        of: find.byType(ArchetypeFace),
+        matching: find.byIcon(Icons.check_rounded),
+      );
+      expect(ticks, findsNothing);
       await tester.tap(find.text('Use this'));
       await tester.pumpAndSettle();
       expect(repo.chosen, isNull);
 
       await tester.tap(find.text('The Night Owl'));
-      await tester.pump();
+      await tester.pumpAndSettle();
+      expect(ticks, findsOneWidget);
       await tester.tap(find.text('Use this'));
       await tester.pumpAndSettle();
       expect(repo.chosen, 'o1');

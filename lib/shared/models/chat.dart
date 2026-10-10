@@ -210,10 +210,16 @@ class Conversation {
     this.lastMessage,
     this.founderLine = false,
     this.streak,
+    this.locked = false,
   });
 
   /// Days in a row they have both been writing, while it runs.
   final Streak? streak;
+
+  /// Past the open chats a person can have (eight, the server's
+  /// `chat_open_max`): listed so they know it is there, with no last message,
+  /// and it does not open until one of the open ones is unmatched.
+  final bool locked;
 
   final String matchId;
   final DateTime matchedAt;
@@ -242,6 +248,7 @@ class Conversation {
       theirReadSeq: j.intOr('their_read_seq', 0),
       founderLine: j.flag('founder_line'),
       streak: Streak.maybe(j, 'streak'),
+      locked: j.flag('locked'),
     );
   }
 

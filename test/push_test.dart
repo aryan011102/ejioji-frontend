@@ -47,6 +47,14 @@ void main() {
       expect(open?.id, isNull);
     });
 
+    test('an unmatch opens Chats, since the conversation is gone', () {
+      final open = PushOpen.from(
+        const RemoteMessage(data: {'type': 'unmatched'}),
+      );
+      expect(open?.kind, PushKind.unmatched);
+      expect(open?.id, isNull);
+    });
+
     test('a kind this build has never heard of is ignored', () {
       // The server can start pushing something new before this app ships.
       // Ignoring it leaves the notification itself readable and opens the app

@@ -65,13 +65,21 @@ void main() {
   });
 
   group('the photo tile', () {
-    Future<void> pump(WidgetTester tester, Archetype? archetype) =>
+    Future<void> pump(
+      WidgetTester tester,
+      Archetype? archetype, {
+      bool theirs = false,
+    }) =>
         tester.pumpWidget(
           MaterialApp(
             home: Center(
               child: SizedBox.square(
                 dimension: 180,
-                child: PhotosTile(photoUrls: const [], archetype: archetype),
+                child: PhotosTile(
+                  photoUrls: const [],
+                  archetype: archetype,
+                  theirs: theirs,
+                ),
               ),
             ),
           ),
@@ -90,10 +98,26 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('WHO YOUR DATA THINKS YOU ARE'), findsOneWidget);
       expect(find.text('The Quiet Romantic'), findsOneWidget);
+      // The title only: the line under it is too long to read on a tile.
+      expect(find.text('Nostalgic.'), findsNothing);
 
       await tester.tap(find.byType(PhotosTile));
       await tester.pumpAndSettle();
       expect(find.text('The Quiet Romantic'), findsNothing);
+    });
+
+    testWidgets('on somebody else\'s profile it speaks about them', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        const Archetype(title: 'The Quiet Romantic', body: 'Nostalgic.'),
+        theirs: true,
+      );
+      await tester.tap(find.byType(PhotosTile));
+      await tester.pumpAndSettle();
+      expect(find.text('WHO THEIR DATA THINKS THEY ARE'), findsOneWidget);
+      expect(find.text('WHO YOUR DATA THINKS YOU ARE'), findsNothing);
     });
 
     testWidgets('with no archetype chosen, it stays photos', (tester) async {

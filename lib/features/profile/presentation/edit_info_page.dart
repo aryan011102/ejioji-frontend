@@ -76,6 +76,10 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
         _city == null) {
       return;
     }
+    // Required from 2026-10-10. Profiles made before then may have none, so
+    // Save stays tappable and says what is missing rather than going dim.
+    final lastName = (_lastName ?? '').trim();
+    if (lastName.isEmpty) return _toast('Add your last name to save.');
     setState(() => _saving = true);
     try {
       // The fields go together: the server takes them as one profile, so there
@@ -84,7 +88,7 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
       // of this call is how you quietly erase it.
       await ref.read(profileRepositoryProvider).save(
             firstName: _name!,
-            lastName: (_lastName ?? '').trim().isEmpty ? null : _lastName,
+            lastName: lastName,
             birthDate: _birthDate!,
             gender: _gender!,
             city: _city!,
@@ -147,7 +151,7 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
     final typed = await showTextEntrySheet(
       context,
       title: 'Last name',
-      hint: 'Optional',
+      hint: 'Your surname',
       initial: _lastName ?? '',
       maxLength: 40,
     );
@@ -437,7 +441,6 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
                 FieldRow(
                   label: 'Last name',
                   value: (_lastName ?? '').isEmpty ? null : _lastName,
-                  placeholder: 'Optional',
                   onTap: _editLastName,
                 ),
                 FieldRow(

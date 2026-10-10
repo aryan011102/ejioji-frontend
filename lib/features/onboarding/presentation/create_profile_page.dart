@@ -24,11 +24,13 @@ import '../../../shared/widgets/sheets.dart';
 /// derived tiles then have to argue with it. We ask less precisely because we
 /// promise more.
 ///
-/// A last name is asked for from 2026-09-20 and is optional. It was left out
-/// until then because a surname next to purchase history is how caste gets
-/// inferred, and this product holds the purchase history; the backend decision
-/// log for that date carries the reversal. It is shown to nobody in the feed:
-/// a card carries a first name and a city.
+/// A last name is asked for from 2026-09-20, and is required from 2026-10-10
+/// (Aryan's call; the server still takes a profile without one, so this is
+/// the app's rule). It was left out until 2026-09-20 because a surname next to
+/// purchase history is how caste gets inferred, and this product holds the
+/// purchase history; the backend decision log for that date carries the
+/// reversal. It is shown to nobody in the feed: a card carries a first name
+/// and a city.
 ///
 /// Languages and education are optional too, and both are filters as well as
 /// facts, so leaving them blank is what keeps them out of matching entirely.
@@ -72,6 +74,7 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
 
   bool get _ready =>
       _name.text.trim().isNotEmpty &&
+      _lastName.text.trim().isNotEmpty &&
       _birthDate != null &&
       _gender != null &&
       _city != null &&
@@ -164,9 +167,7 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
     try {
       await ref.read(profileRepositoryProvider).save(
             firstName: _name.text.trim(),
-            lastName: _lastName.text.trim().isEmpty
-                ? null
-                : _lastName.text.trim(),
+            lastName: _lastName.text.trim(),
             birthDate: _birthDate!,
             gender: _gender!,
             city: _city!,
@@ -279,8 +280,8 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
           const SizedBox(height: 22),
           SectionGroup(
             header: 'About you',
-            footer: 'Your age is shown, your date of birth is not. A last name '
-                'is optional and is never used to match you with anyone.',
+            footer: 'Your age is shown, your date of birth is not. Your last '
+                'name is never used to match you with anyone.',
             children: [
               FieldRow(
                 label: 'First name',
@@ -290,7 +291,6 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
               FieldRow(
                 label: 'Last name',
                 value: _lastName.text.isEmpty ? null : _lastName.text,
-                placeholder: 'Optional',
                 onTap: _editLastName,
               ),
               FieldRow(
@@ -392,7 +392,7 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
     final typed = await showTextEntrySheet(
       context,
       title: 'Last name',
-      hint: 'Optional',
+      hint: 'Your surname',
       initial: _lastName.text,
       maxLength: 40,
     );

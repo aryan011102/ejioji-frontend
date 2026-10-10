@@ -30,6 +30,7 @@ import '../features/onboarding/presentation/create_profile_page.dart';
 import '../features/onboarding/presentation/netflix_upload_page.dart';
 import '../features/onboarding/presentation/reading_page.dart';
 import '../features/onboarding/presentation/spotify_upload_page.dart';
+import '../features/profile/presentation/archetype_page.dart';
 import '../features/profile/presentation/edit_info_page.dart';
 import '../features/profile/presentation/profile_page.dart';
 import '../features/safety/presentation/report_page.dart';

@@ -13,6 +13,7 @@ import '../../../core/theme/typography.dart';
 import '../../../data/feed_controller.dart';
 import '../../../data/providers.dart';
 import '../../../data/tile_media_controller.dart';
+import '../../../shared/models/archetype.dart';
 import '../../../shared/models/enums.dart';
 import '../../../shared/models/media.dart';
 import '../../../shared/models/person.dart';
@@ -251,6 +252,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           photos: person.photos,
           tiles: person.tiles,
           person: person,
+          archetype: person.archetype,
         ),
       );
     }
@@ -295,6 +297,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           photos: profile.photos,
           tiles: profile.tiles,
           publish: profile.publish,
+          archetype: profile.archetype,
         );
       },
     );
@@ -309,9 +312,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     required List<api.ProfileTile> tiles,
     Candidate? person,
     PublishState? publish,
+    Archetype? archetype,
   }) {
     final shown = _ordered(tiles);
-    final photosItem = _photosItem(photos);
+    final photosItem = _photosItem(photos, archetype);
 
     return AppScaffold(
       navBar: _topBar(context, person),
@@ -465,16 +469,21 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   ///
   /// Arrange mode shows it too, pinned, so every other tile packs where it
   /// does on the wall.
-  BentoItem? _photosItem(List<MediaAsset> photos) => photos.isEmpty
-      ? null
-      : BentoItem(
-          size: TileSize.small,
-          child: PhotosTile(
-            photoUrls: [
-              for (final p in [...photos.skip(1), photos.first]) p.stillUrl,
-            ],
-          ),
-        );
+  ///
+  /// It turns over to who their data thinks they are, once they have chosen.
+  BentoItem? _photosItem(List<MediaAsset> photos, Archetype? archetype) =>
+      photos.isEmpty
+          ? null
+          : BentoItem(
+              size: TileSize.small,
+              child: PhotosTile(
+                photoUrls: [
+                  for (final p in [...photos.skip(1), photos.first])
+                    p.stillUrl,
+                ],
+                archetype: archetype,
+              ),
+            );
 
   /// The camera on a tile in arrange mode: the same sheet as on the category
   /// page, so a photo or video can be put behind a tile, or taken off, without

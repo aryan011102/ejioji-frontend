@@ -85,10 +85,15 @@ class AppNavBar extends StatelessWidget implements PreferredSizeWidget {
     this.onTrailing,
     this.trailingEnabled = true,
     this.trailing,
+    this.titleLeading,
     super.key,
   });
 
   final String? title;
+
+  /// Something drawn just before the title, like the other person's photo with
+  /// its story ring at the top of a chat.
+  final Widget? titleLeading;
 
   /// One short line under the title: a conversation's streak.
   final String? subtitle;
@@ -175,7 +180,7 @@ class AppNavBar extends StatelessWidget implements PreferredSizeWidget {
                   ),
           ),
           Expanded(
-            child: _withSubtitle(onTitle == null
+            child: _withLeading(_withSubtitle(onTitle == null
                 ? Text(
                     title ?? '',
                     textAlign: TextAlign.center,
@@ -203,6 +208,7 @@ class AppNavBar extends StatelessWidget implements PreferredSizeWidget {
                       ],
                     ),
                   ),
+              ),
             ),
           ),
           if (trailing != null)
@@ -242,6 +248,19 @@ class AppNavBar extends StatelessWidget implements PreferredSizeWidget {
             ),
         ],
       ),
+    );
+  }
+
+  Widget _withLeading(Widget title) {
+    final leading = titleLeading;
+    if (leading == null) return title;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        leading,
+        const SizedBox(width: 8),
+        Flexible(child: title),
+      ],
     );
   }
 

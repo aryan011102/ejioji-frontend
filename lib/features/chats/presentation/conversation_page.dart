@@ -13,6 +13,7 @@ import '../../../core/session/session.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/util/ids.dart';
+import '../../../data/in_common_repository.dart';
 import '../../../data/live_events.dart';
 import '../../../data/providers.dart';
 import '../../../shared/format.dart';
@@ -27,6 +28,8 @@ import '../../../shared/widgets/quoted_tile.dart';
 import '../../../shared/widgets/sheets.dart';
 import '../../../shared/widgets/states.dart';
 import 'chat_limit.dart';
+import 'in_common/in_common_flow.dart';
+import 'in_common/story_ring.dart';
 import 'streak_popup.dart';
 import 'unmatch_reason_sheet.dart';
 import 'verify_to_chat.dart';
@@ -98,6 +101,12 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
 
   /// Days in a row they have both been writing, while it runs.
   Streak? _streak;
+
+  /// What the two of them have in common, behind the ring on their photo.
+  /// Null until loaded, and if it cannot be: then there is simply no ring.
+  InCommon? _inCommon;
+  bool _inCommonSeen = false;
+  bool _ringLoading = false;
   bool _theyTyping = false;
   Timer? _typingClear;
   DateTime _lastTypingSent = DateTime.fromMillisecondsSinceEpoch(0);
@@ -112,6 +121,53 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
     OpenConversations.opened(_matchId);
     _events = ref.read(liveEventsProvider).events.listen(_onEvent);
     unawaited(_load());
+    unawaited(_loadInCommon());
+  }
+
+  Future<void> _loadInCommon() async {
+    try {
+      final deck = await ref.read(inCommonRepositoryProvider).load(_matchId);
+      final seen = await wasSeen(_matchId);
+      if (!mounted) return;
+      setState(() {
+        _inCommon = deck;
+        _inCommonSeen = seen;
+      });
+    } on Object {
+      // A founder conversation, an ended match or a failed read: no ring.
+    }
+  }
+
+  Future<void> _tapRing() async {
+    final current = _inCommon;
+    if (current == null || _ringLoading) return;
+    final latest = await tapRing(
+      context,
+      ref,
+      matchId: _matchId,
+      current: current,
+      onLoading: (loading) {
+        if (mounted) setState(() => _ringLoading = loading);
+      },
+    );
+    final seen = await wasSeen(_matchId);
+    if (!mounted) return;
+    setState(() {
+      _inCommon = latest ?? current;
+      _inCommonSeen = seen;
+    });
+  }
+
+  Widget? _ring() {
+    final deck = _inCommon;
+    if (_ended || _founderLine || deck == null || !deck.hasRing) return null;
+    return StoryRing(
+      name: deck.them.firstName,
+      imageUrl: deck.them.photo?.stillUrl ?? _person?.photo?.stillUrl,
+      seen: _inCommonSeen && deck.canOpen,
+      loading: _ringLoading,
+      onTap: () => unawaited(_tapRing()),
+    );
   }
 
   @override
@@ -603,6 +659,7 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
       child: AppScaffold(
         navBar: AppNavBar(
           title: name,
+          titleLeading: _ring(),
           subtitle: _ended || _streak == null ? null : streakLabel(_streak!),
           // No door once the match is over: there is nothing on the other side.
           // None on a founder conversation either: it is text only.

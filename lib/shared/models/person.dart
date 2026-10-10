@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../core/network/json.dart';
+import 'archetype.dart';
 import 'enums.dart';
 import 'media.dart';
 import 'social.dart';
@@ -37,7 +38,12 @@ class Candidate {
     required this.tiles,
     this.socials = const [],
     this.verified = false,
+    this.archetype,
   });
+
+  /// Who their data thinks they are, as they chose it: the back of their photo
+  /// tile. Null until they choose, or from an older server.
+  final Archetype? archetype;
 
   final String userId;
   final String firstName;
@@ -88,6 +94,7 @@ class Candidate {
         tiles: tiles,
         socials: socials,
         verified: verified,
+        archetype: archetype,
       );
 
   MediaAsset? get leadPhoto => photos.isEmpty ? null : photos.first;
@@ -110,6 +117,7 @@ class Candidate {
         photos: MediaAsset.listFrom(j.objects('photos')),
         tiles: ProfileTile.listFrom(j.objects('tiles')),
         verified: j.flag('verified'),
+        archetype: Archetype.maybe(j.objectOrNull('archetype')),
       );
 
   static List<Candidate> listFrom(List<Json> items) =>

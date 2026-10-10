@@ -55,6 +55,10 @@ abstract final class Api {
   static const publish = '$prefix/profile/publish';
   static const stealth = '$prefix/profile/stealth';
   static const nameInitials = '$prefix/profile/name-initials';
+  // "Who your data thinks you are": the four on offer, four more, the choice.
+  static const archetypes = '$prefix/profile/archetypes';
+  static const archetypesRefresh = '$prefix/profile/archetypes/refresh';
+  static const archetype = '$prefix/profile/archetype';
   // Verification: a DigiLocker check of the profile's first name and birth date.
   static const verification = '$prefix/profile/verification';
   static const digilockerAuthorize =

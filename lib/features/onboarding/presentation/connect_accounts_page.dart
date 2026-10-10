@@ -14,6 +14,7 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
 import '../../../data/connect_controller.dart';
 import '../../../data/providers.dart';
+import '../../../shared/models/archetype.dart';
 import '../../../shared/models/connection.dart';
 import '../../../shared/models/consent.dart';
 import '../../../shared/models/enums.dart';
@@ -709,6 +710,9 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
         widget.editing ? Routes.editCategoryAt(0) : Routes.pickCategoryAt(0),
       );
 
+  /// The four to choose from. The page saves the choice itself.
+  void _chooseArchetype() => unawaited(context.push<void>(Routes.archetype));
+
   @override
   Widget build(BuildContext context) {
     final consent = ref.watch(consentProvider);
@@ -737,6 +741,12 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
           const <SocialLink>[])
         l.network: l,
     };
+    // Who their data thinks they are: required (Aryan's call, 2026-10-10), so
+    // setup does not go on without one. Unknown while the profile loads, which
+    // does not hold anyone up: the server does not insist, this screen does.
+    final mine = ref.watch(myProfileProvider).valueOrNull;
+    final archetype = mine?.archetype;
+    final needsArchetype = mine != null && archetype == null;
     final tiles = widget.editing
         ? _tilesGroup(
             linked: linked,
@@ -757,13 +767,27 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
           : Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                PrimaryButton(
-                  label: 'Next',
-                  onPressed: linked.isNotEmpty ? _next : null,
-                ),
+                if (needsArchetype) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      'Choose who your data thinks you are to continue.',
+                      textAlign: TextAlign.center,
+                      style: AppText.caption,
+                    ),
+                  ),
+                  PrimaryButton(
+                    label: 'Choose your archetype',
+                    onPressed: _chooseArchetype,
+                  ),
+                ] else
+                  PrimaryButton(
+                    label: 'Next',
+                    onPressed: linked.isNotEmpty ? _next : null,
+                  ),
                 // Nothing connected still has a way on: every category comes
                 // back thin, so the walk is all questions.
-                if (linked.isEmpty)
+                if (linked.isEmpty && !needsArchetype)
                   TextActionButton(
                     label: "I'll do this later",
                     dim: true,
@@ -780,6 +804,14 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
             const _Heading(),
             _ReadOnceCard(onTap: () => context.push(Routes.consent)),
             _StrengthCard(linked: linked, of: _sourceCount),
+            // Below the strength, above Gmail (Aryan, 2026-10-10).
+            _Group(
+              header: null,
+              top: 16,
+              children: [
+                _ArchetypeRow(chosen: archetype, onTap: _chooseArchetype),
+              ],
+            ),
             // Edit tiles: the tiles grouped by app, every app reached from its
             // header, in place of the list of sources (Aryan, 2026-10-01).
             if (tiles != null)
@@ -1369,6 +1401,70 @@ class _SocialRow extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// "Who your data thinks you are": the archetype chosen, or that one is
+/// required. Opens the four to choose from.
+class _ArchetypeRow extends StatelessWidget {
+  const _ArchetypeRow({required this.chosen, required this.onTap});
+
+  final Archetype? chosen;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final a = chosen;
+    return PressableRow(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+        child: Row(
+          children: [
+            const IconPlate(
+              Icons.auto_awesome,
+              size: 32,
+              radius: 9,
+              background: AppColors.fill2,
+              foreground: AppColors.label,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Who your data thinks you are',
+                    style: AppText.body.copyWith(
+                      fontSize: 17,
+                      height: 25.5 / 17,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    a == null
+                        ? 'Required · choose the one that sounds like you'
+                        : a.title,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.caption.copyWith(
+                      fontSize: 12.5,
+                      height: 16 / 12.5,
+                      color: a == null ? AppColors.accent : AppColors.label3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Icon(
+              Icons.chevron_right,
+              size: 18,
+              color: AppColors.label3,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

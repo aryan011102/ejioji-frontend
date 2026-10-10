@@ -1,6 +1,7 @@
 import '../core/network/api_client.dart';
 import '../core/network/endpoints.dart';
 import '../core/network/json.dart';
+import '../shared/models/archetype.dart';
 import '../shared/models/enums.dart';
 import '../shared/models/media.dart';
 import '../shared/models/profile.dart';
@@ -157,6 +158,21 @@ class ProfileRepository {
   Future<Profile> setNameInitials(bool on) async => Profile.fromJson(
         await _api.put(Api.nameInitials, body: {'on': on}),
       );
+
+  /// The four archetypes on offer and the one chosen. The first time, the
+  /// server writes them, which can take a few seconds.
+  Future<ArchetypeOffer> archetypes() async =>
+      ArchetypeOffer.fromJson(await _api.getJson(Api.archetypes));
+
+  /// Four new ones. 429 `rate_limited` past the day's refreshes.
+  Future<ArchetypeOffer> refreshArchetypes() async =>
+      ArchetypeOffer.fromJson(await _api.post(Api.archetypesRefresh));
+
+  /// One of the four on offer, by id, as theirs. 404 if a refresh replaced it.
+  Future<Archetype> chooseArchetype(String optionId) async {
+    final j = await _api.put(Api.archetype, body: {'option_id': optionId});
+    return Archetype(title: j.str('title'), body: j.str('body'));
+  }
 
   /// Back in feeds, each at its next rebuild (a few hours at most).
   Future<void> leaveStealth() => _api.deleteEmpty(Api.stealth);

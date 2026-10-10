@@ -30,6 +30,7 @@ Future<InCommon?> tapRing(
   required String matchId,
   required InCommon current,
   void Function(bool loading)? onLoading,
+  VoidCallback? onReplied,
 }) async {
   var deck = current;
   if (deck.state == InCommonState.ask) {
@@ -57,7 +58,23 @@ Future<InCommon?> tapRing(
   }
   if (!context.mounted || !deck.canOpen) return deck;
   await markSeen(matchId);
-  if (context.mounted) await showStories(context, deck);
+  if (context.mounted) {
+    await showStories(
+      context,
+      deck,
+      onReply: (story, text) async {
+        try {
+          await ref
+              .read(chatRepositoryProvider)
+              .send(matchId, text: text, storyTitle: story.title);
+          onReplied?.call();
+          return null;
+        } on ApiException catch (e) {
+          return e.message;
+        }
+      },
+    );
+  }
   return deck;
 }
 

@@ -88,6 +88,23 @@ void main() {
           'them': side(1100, '1,100', 'Meera'),
         },
       ),
+      {
+        ...story('common', '2 of your top shows match.', category: 'netflix'),
+        'chart': {
+          'type': 'ranks',
+          'me': side(9, 'Friends', 'you'),
+          'them': side(8, 'Dark', 'Meera'),
+          'me_ranks': [
+            {'label': 'Friends', 'display': '9', 'shared': true},
+            {'label': 'Dark', 'display': '5', 'shared': true},
+            {'label': 'Lost', 'display': '3', 'shared': false},
+          ],
+          'them_ranks': [
+            {'label': 'Dark', 'display': '8', 'shared': true},
+            {'label': 'Friends', 'display': '6', 'shared': true},
+          ],
+        },
+      },
       story('thought', 'You bought a projector. Meera keeps going back to Friends.'),
       story(
         'differ',
@@ -105,7 +122,10 @@ void main() {
     final deck = InCommon.fromJson(body);
     expect(deck.state, InCommonState.ready);
     expect(deck.canOpen, isTrue);
-    expect(deck.stories, hasLength(8));
+    expect(deck.stories, hasLength(9));
+    final ranks = deck.stories.firstWhere((s) => s.chart?.type == ChartType.ranks).chart!;
+    expect(ranks.meRanks.map((r) => r.shared), [true, true, false]);
+    expect(ranks.themRanks.first.label, 'Dark');
     expect(deck.stories.first.kind, StoryKind.intro);
     expect(deck.stories[1].chart!.type, ChartType.hours);
     expect(deck.stories[1].chart!.them.label, 'Meera');
@@ -168,5 +188,33 @@ void main() {
     await tester.tap(find.text('Not now'));
     await tester.tap(find.text('Read the full notice'));
     expect(taps, ['allow', 'not now', 'notice']);
+  });
+
+  testWidgets('every story but the intro can be replied to', (tester) async {
+    final replies = <String>[];
+    final deck = InCommon.fromJson(body);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StoryViewer(
+          deck: deck,
+          onReply: (story, text) async {
+            replies.add('${story.title}|$text');
+            return null;
+          },
+        ),
+      ),
+    );
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('Chat about this'), findsNothing);
+    await tester.tapAt(const Offset(300, 400));
+    await tester.pump(const Duration(seconds: 1));
+    await tester.tap(find.text('Chat about this'));
+    await tester.pumpAndSettle();
+    expect(find.text('Send to Meera'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'same, 2pm is sacred');
+    await tester.pump();
+    await tester.tap(find.text('Send'));
+    await tester.pumpAndSettle();
+    expect(replies, ['2 PM. For both of you.|same, 2pm is sacred']);
   });
 }

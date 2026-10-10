@@ -24,6 +24,7 @@ import '../../../shared/models/tile.dart';
 import '../../../shared/widgets/capture_shield.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/pressable.dart';
+import '../../../shared/widgets/quoted_story.dart';
 import '../../../shared/widgets/quoted_tile.dart';
 import '../../../shared/widgets/sheets.dart';
 import '../../../shared/widgets/states.dart';
@@ -149,6 +150,7 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
       onLoading: (loading) {
         if (mounted) setState(() => _ringLoading = loading);
       },
+      onReplied: () => unawaited(_load()),
     );
     final seen = await wasSeen(_matchId);
     if (!mounted) return;
@@ -999,6 +1001,11 @@ class _Bubble extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 4),
                     child: QuotedTile(tile: message.tile!),
+                  ),
+                if (message.story != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: QuotedStory(story: message.story!),
                   ),
                 if (message.text != null && message.text!.isNotEmpty) ...[
                   if (media != null) const SizedBox(height: 4),

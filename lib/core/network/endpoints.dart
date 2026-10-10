@@ -34,6 +34,7 @@ abstract final class Api {
   static String authorize(String source) => '$prefix/connections/$source/authorize';
   static String complete(String source) => '$prefix/connections/$source/complete';
   static const netflixUpload = '$prefix/connections/netflix/upload';
+  static const instagramUpload = '$prefix/connections/instagram/upload';
   static const spotifyUpload = '$prefix/connections/spotify/upload';
   static const spotifyRequested = '$prefix/connections/spotify/requested';
   static String run(String runId) => '$prefix/ingestion/runs/$runId';

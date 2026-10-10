@@ -28,7 +28,7 @@ class _RowSpinner extends StatelessWidget {
 }
 
 /// Four groups: your account, appearance, help, and the one that ends things.
-/// Socials are managed on the connect page, not here (Aryan, 2026-10-01).
+/// Socials are managed in Edit info, not here (Aryan, 2026-10-10).
 ///
 /// The rules that need stating are stated where they are acted on — inside
 /// the sheet that deletes, or on the page that blocks — rather than as

@@ -19,6 +19,7 @@ abstract final class Routes {
   static const consent = '/onboarding/permissions';
   static const connect = '/onboarding/connect';
   static const netflixUpload = '/onboarding/connect/netflix';
+  static const instagramUpload = '/onboarding/connect/instagram';
   static const spotifyUpload = '/onboarding/connect/spotify';
 
   /// An upload page, carrying `?edit=1` from Edit tiles so the reading screen

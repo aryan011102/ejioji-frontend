@@ -27,6 +27,7 @@ import '../features/insights/presentation/category_page.dart';
 import '../features/onboarding/presentation/connect_accounts_page.dart';
 import '../features/onboarding/presentation/consent_page.dart';
 import '../features/onboarding/presentation/create_profile_page.dart';
+import '../features/onboarding/presentation/instagram_upload_page.dart';
 import '../features/onboarding/presentation/netflix_upload_page.dart';
 import '../features/onboarding/presentation/reading_page.dart';
 import '../features/onboarding/presentation/spotify_upload_page.dart';
@@ -127,6 +128,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.netflixUpload,
         builder: (_, state) => NetflixUploadPage(
+          editing: state.uri.queryParameters['edit'] == '1',
+        ),
+      ),
+      GoRoute(
+        path: Routes.instagramUpload,
+        builder: (_, state) => InstagramUploadPage(
           editing: state.uri.queryParameters['edit'] == '1',
         ),
       ),

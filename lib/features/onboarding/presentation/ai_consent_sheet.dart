@@ -178,25 +178,9 @@ class AiConsentCard extends StatelessWidget {
         Text('Let an AI suggest your insights?', style: AppText.title3),
         const SizedBox(height: 8),
         Text(
-          'We send summaries of what you connect to Claude, an AI made by '
-          'Anthropic: totals, and the names behind them, like the channels, '
-          'artists or restaurants you come back to. It suggests which insights '
-          'to show, writes their captions, and writes the archetypes you '
-          'choose "who your data thinks you are" from.',
+          'Claude, an AI made by Anthropic, reads summaries of what you '
+          'connect, never your emails or messages. Saying no is fine.',
           style: AppText.callout,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'It never gets your emails, messages, photos, name or number, and it '
-          'never makes up a number: we count everything ourselves. Anthropic '
-          'may not train on it.',
-          style: AppText.caption,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Saying no is fine. You still get the standard insights, and you can '
-          'change this in Settings, under Privacy choices.',
-          style: AppText.caption,
         ),
         Align(
           alignment: Alignment.centerLeft,

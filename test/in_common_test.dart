@@ -80,12 +80,31 @@ void main() {
       ),
       story(
         'common',
-        '1,000 and 1,100. Neck and neck.',
-        category: 'music',
+        "You've both lost a whole day to Netflix.",
+        category: 'netflix',
         chart: {
           'type': 'numbers',
-          'me': side(1000, '1,000', 'you'),
-          'them': side(1100, '1,100', 'Meera'),
+          'me': side(22, '22', 'viewings in one day, you'),
+          'them': side(14, '14', 'viewings in one day, Meera'),
+        },
+      ),
+      story(
+        'common',
+        'Different kitchens. Same loyalty.',
+        category: 'food_delivery',
+        chart: {
+          'type': 'names',
+          'me': side(8, 'Bikkgane Biryani', 'you · 8 orders'),
+          'them': side(9, 'Taco Bell', 'Meera · 9 orders'),
+        },
+      ),
+      story(
+        'common',
+        'You both keep the old ones close.',
+        chart: {
+          'type': 'records',
+          'me': side(1971, '1971', 'you · The oldest song saved.'),
+          'them': side(1975, '1975', 'Meera · The oldest video liked.', 'watching'),
         },
       ),
       {
@@ -122,7 +141,7 @@ void main() {
     final deck = InCommon.fromJson(body);
     expect(deck.state, InCommonState.ready);
     expect(deck.canOpen, isTrue);
-    expect(deck.stories, hasLength(9));
+    expect(deck.stories, hasLength(11));
     final ranks = deck.stories.firstWhere((s) => s.chart?.type == ChartType.ranks).chart!;
     expect(ranks.meRanks.map((r) => r.shared), [true, true, false]);
     expect(ranks.themRanks.first.label, 'Dark');
@@ -131,6 +150,8 @@ void main() {
     expect(deck.stories[1].chart!.them.label, 'Meera');
     expect(deck.stories[1].onProfileThem, isFalse);
     expect(deck.stories.last.chart!.type, ChartType.versus);
+    final types = deck.stories.map((s) => s.chart?.type).toSet();
+    expect(types, containsAll([ChartType.names, ChartType.records]));
   });
 
   test('not enough in common has no ring; waiting has one and does not open', () {
@@ -157,12 +178,39 @@ void main() {
     }
   });
 
-  testWidgets('a story says where each tile lives', (tester) async {
+  testWidgets('no story says where its tiles live', (tester) async {
     final deck = InCommon.fromJson(body);
     await tester.pumpWidget(MaterialApp(home: StoryViewer(deck: deck)));
     await tester.tapAt(const Offset(300, 400));
     await tester.pump(const Duration(seconds: 1));
-    expect(find.text("ON YOUR PROFILE · IN MEERA'S INSIGHTS"), findsOneWidget);
+    expect(find.textContaining('INSIGHTS'), findsNothing);
+    expect(find.textContaining('PROFILE'), findsNothing);
+  });
+
+  testWidgets('both photos on the intro sit whole inside their box', (tester) async {
+    tester.view.physicalSize = const Size(375, 667);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final deck = InCommon.fromJson(body);
+    await tester.pumpWidget(MaterialApp(home: StoryViewer(deck: deck)));
+    await tester.pump(const Duration(seconds: 1));
+    final faces = find.byKey(StoryViewer.faceKey);
+    // The intro's two, the biggest on screen.
+    final rects = [for (var i = 0; i < faces.evaluate().length; i++) tester.getRect(faces.at(i))]
+      ..sort((a, b) => b.width.compareTo(a.width));
+    final big = rects.take(2).toList();
+    expect(big, hasLength(2));
+    final box = tester.getRect(
+      find.ancestor(of: faces.first, matching: find.byType(SizedBox)).first,
+    );
+    for (final r in rects.where((r) => r.width == big.first.width)) {
+      expect(box.inflate(0.01).contains(r.topLeft), isTrue, reason: '$r in $box');
+      expect(box.inflate(0.01).contains(r.bottomRight), isTrue, reason: '$r in $box');
+    }
+    for (final c in tester.widgetList<Container>(faces)) {
+      final border = (c.decoration! as BoxDecoration).border! as Border;
+      expect(border.top.color, const Color(0xFF000000));
+    }
   });
 
   testWidgets('the question names them, and no is as easy as yes', (tester) async {

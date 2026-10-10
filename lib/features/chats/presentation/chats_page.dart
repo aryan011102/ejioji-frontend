@@ -45,6 +45,15 @@ class ChatsPage extends ConsumerStatefulWidget {
 class _ChatsPageState extends ConsumerState<ChatsPage> {
   _Tab _tab = _Tab.chats;
 
+  @override
+  void initState() {
+    super.initState();
+    // Your own profile, held while Chats is up, so asking back knows whether
+    // you are verified when the sheet opens. Read cold, it is still loading
+    // and the sheet would say "Send reply" to someone who can't.
+    ref.listenManual(myProfileProvider, (_, __) {});
+  }
+
   /// Answering a request opens a conversation, so both lists and the feed all
   /// move at once.
   void _refreshEverything() {

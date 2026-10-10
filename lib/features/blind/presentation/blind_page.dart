@@ -56,6 +56,10 @@ class _BlindPageState extends ConsumerState<BlindPage>
   void initState() {
     super.initState();
     unawaited(_maybeShowHint());
+    // Your own profile, held while Blind is up, so "Chat about this" knows
+    // whether you are verified when the sheet opens. Read cold, it is still
+    // loading and the sheet would say "Send request" to someone who can't.
+    ref.listenManual(myProfileProvider, (_, __) {});
   }
 
   @override

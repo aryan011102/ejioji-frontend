@@ -8,6 +8,7 @@ import '../../../../core/theme/tokens.dart';
 import '../../../../core/theme/typography.dart';
 import '../../../../data/in_common_repository.dart';
 import '../../../../shared/models/chat.dart';
+import '../../../../shared/models/enums.dart';
 import '../../../../shared/models/tile_look.dart';
 import '../../../../shared/widgets/buttons.dart';
 import '../../../../shared/widgets/identity.dart';
@@ -518,6 +519,10 @@ class StoryChartView extends StatelessWidget {
       ChartType.numbers => _Numbers(chart: chart),
       ChartType.versus => _Versus(chart: chart),
       ChartType.ranks => _Ranks(chart: chart, name: name),
+      // Two songs or two artists are two records, like the old ones.
+      ChartType.names when chart.me.category == TileCategory.music &&
+              chart.them.category == TileCategory.music =>
+        _Records(chart: chart),
       ChartType.names => _Names(chart: chart),
       ChartType.records => _Records(chart: chart),
       ChartType.unknown => const SizedBox.shrink(),
@@ -820,7 +825,8 @@ class _Names extends StatelessWidget {
   }
 }
 
-/// Two records, slowly turning, each with its year: the old ones.
+/// Two records, overlapping and slowly turning, with what each one is under
+/// it: two years (the old ones), or two songs or artists.
 class _Records extends StatefulWidget {
   const _Records({required this.chart});
 
@@ -832,6 +838,10 @@ class _Records extends StatefulWidget {
 
 class _RecordsState extends State<_Records> with SingleTickerProviderStateMixin {
   late final _spin = AnimationController(vsync: this, duration: const Duration(seconds: 6));
+
+  // The two labels: gold for you, rose for them, each lit from one side.
+  static const _gold = [Color(0xFFF3E7C6), Color(0xFFC99A55), Color(0xFF94672F)];
+  static const _rose = [Color(0xFFF4D6E0), Color(0xFFC46A82), Color(0xFF8E4058)];
 
   @override
   void initState() {
@@ -847,72 +857,160 @@ class _RecordsState extends State<_Records> with SingleTickerProviderStateMixin 
     super.dispose();
   }
 
-  Widget _disc(Color label) => RotationTransition(
-        turns: _spin,
-        child: Container(
-          width: 128,
-          height: 128,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: RadialGradient(
-              colors: [Color(0xFF2A2A2A), Color(0xFF0A0A0A), Color(0xFF1C1C1C), Color(0xFF050505)],
-              stops: [0.3, 0.55, 0.8, 1],
+  Widget _disc(double size, List<Color> label) {
+    final labelSize = size * 0.4;
+    return SizedBox.square(
+      dimension: size,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Color(0xFF17151B),
+              boxShadow: [BoxShadow(color: AppColors.liquidShadow, blurRadius: 36, spreadRadius: 4)],
             ),
-            boxShadow: [BoxShadow(color: AppColors.liquidShadow, blurRadius: 24)],
           ),
-          alignment: Alignment.center,
-          child: Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: label),
-            alignment: Alignment.topCenter,
-            padding: const EdgeInsets.only(top: 6),
+          // The grooves and the label turn; the light on the label does not.
+          RotationTransition(
+            turns: _spin,
+            child: CustomPaint(
+              size: Size.square(size),
+              painter: const _Grooves(),
+              child: Center(
+                child: Container(
+                  width: labelSize,
+                  height: labelSize,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(colors: [label[1], label[2]]),
+                  ),
+                  alignment: Alignment.topCenter,
+                  padding: EdgeInsets.only(top: labelSize * 0.12),
+                  child: Container(
+                    width: 5,
+                    height: 5,
+                    decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.group),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          IgnorePointer(
             child: Container(
-              width: 6,
-              height: 6,
-              decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.group),
+              width: labelSize,
+              height: labelSize,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  center: const Alignment(0.35, 0.3),
+                  radius: 0.7,
+                  colors: [label[0], label[0].withValues(alpha: 0)],
+                ),
+              ),
             ),
           ),
-        ),
-      );
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    Widget one(ChartSide side, Color colour, CrossAxisAlignment align) {
+    Widget words(ChartSide side, CrossAxisAlignment align) {
       final (who, rest) = _split(side.label);
       final end = align == CrossAxisAlignment.end;
+      final textAlign = end ? TextAlign.right : TextAlign.left;
       return Column(
         crossAxisAlignment: align,
         children: [
-          _disc(colour),
-          const SizedBox(height: 14),
           Text(
             who.toUpperCase(),
+            overflow: TextOverflow.ellipsis,
             style: AppText.micro.copyWith(color: AppColors.label, letterSpacing: 1.4),
           ),
-          const SizedBox(height: 2),
-          Text(side.display, style: AppText.tileNumber(34).copyWith(color: colour)),
-          if (rest.isNotEmpty)
+          const SizedBox(height: 4),
+          Text(
+            side.display,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            textAlign: textAlign,
+            style: AppText.tileNumber(28).copyWith(
+              color: AppColors.storyMe,
+              letterSpacing: -0.8,
+              height: 1.05,
+            ),
+          ),
+          if (rest.isNotEmpty) ...[
+            const SizedBox(height: 4),
             Text(
               rest,
-              maxLines: 2,
+              maxLines: 3,
               overflow: TextOverflow.ellipsis,
-              textAlign: end ? TextAlign.right : TextAlign.left,
+              textAlign: textAlign,
               style: AppText.footnote.copyWith(color: AppColors.label),
             ),
+          ],
         ],
       );
     }
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(child: one(widget.chart.me, AppColors.storyMe, CrossAxisAlignment.start)),
-        const SizedBox(width: 16),
-        Expanded(child: one(widget.chart.them, AppColors.storyThem, CrossAxisAlignment.end)),
-      ],
+    return LayoutBuilder(
+      builder: (context, box) {
+        // Each record a little over half the width, the second over the first.
+        final size = box.maxWidth * 0.54;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              height: size,
+              child: Stack(
+                children: [
+                  Positioned(left: 0, top: 0, child: _disc(size, _gold)),
+                  Positioned(right: 0, top: 0, child: _disc(size, _rose)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 28),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: words(widget.chart.me, CrossAxisAlignment.start)),
+                const SizedBox(width: 16),
+                Expanded(child: words(widget.chart.them, CrossAxisAlignment.end)),
+              ],
+            ),
+          ],
+        );
+      },
     );
   }
+}
+
+/// The rings on a record, faint, from the label out to the edge.
+class _Grooves extends CustomPainter {
+  const _Grooves();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final centre = size.center(Offset.zero);
+    final outer = size.shortestSide / 2;
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    var i = 0;
+    for (var r = outer * 0.24; r < outer * 0.97; r += 3.2) {
+      paint.color = Color((i++).isEven ? 0x12FFFFFF : 0x08FFFFFF);
+      canvas.drawCircle(centre, r, paint);
+    }
+    paint
+      ..color = const Color(0x1FFFFFFF)
+      ..strokeWidth = 1.2;
+    canvas.drawCircle(centre, outer - 0.6, paint);
+  }
+
+  @override
+  bool shouldRepaint(_Grooves oldDelegate) => false;
 }
 
 /// The glass pill at the foot of a story, as Instagram's reply.

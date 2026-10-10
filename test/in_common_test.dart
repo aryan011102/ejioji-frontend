@@ -94,8 +94,18 @@ void main() {
         category: 'food_delivery',
         chart: {
           'type': 'names',
-          'me': side(8, 'Bikkgane Biryani', 'you · 8 orders'),
-          'them': side(9, 'Taco Bell', 'Meera · 9 orders'),
+          'me': side(8, 'Bikkgane Biryani', 'you · 8 orders', 'food_delivery'),
+          'them': side(9, 'Taco Bell', 'Meera · 9 orders', 'food_delivery'),
+        },
+      ),
+      story(
+        'common',
+        'One artist, again and again.',
+        category: 'music',
+        chart: {
+          'type': 'names',
+          'me': side(6, 'Aditya Rikhari', 'you · Saved more than anyone else. 6 songs.'),
+          'them': side(13, 'Faqeeran - Live', 'Meera · The most-played song. 13 times over.'),
         },
       ),
       story(
@@ -141,7 +151,7 @@ void main() {
     final deck = InCommon.fromJson(body);
     expect(deck.state, InCommonState.ready);
     expect(deck.canOpen, isTrue);
-    expect(deck.stories, hasLength(11));
+    expect(deck.stories, hasLength(12));
     final ranks = deck.stories.firstWhere((s) => s.chart?.type == ChartType.ranks).chart!;
     expect(ranks.meRanks.map((r) => r.shared), [true, true, false]);
     expect(ranks.themRanks.first.label, 'Dark');
@@ -152,6 +162,34 @@ void main() {
     expect(deck.stories.last.chart!.type, ChartType.versus);
     final types = deck.stories.map((s) => s.chart?.type).toSet();
     expect(types, containsAll([ChartType.names, ChartType.records]));
+  });
+
+  testWidgets('two songs or artists are records; two kitchens are cards', (tester) async {
+    final deck = InCommon.fromJson(body);
+    StoryChart named(String title) => deck.stories.firstWhere((s) => s.title == title).chart!;
+    final spinning = find.descendant(
+      of: find.byType(StoryChartView),
+      matching: find.byType(RotationTransition),
+    );
+    Future<void> draw(StoryChart chart) => tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SizedBox(width: 327, child: StoryChartView(chart: chart, name: 'Meera')),
+            ),
+          ),
+        );
+
+    await draw(named('One artist, again and again.'));
+    await tester.pump(const Duration(seconds: 1));
+    expect(spinning, findsNWidgets(2));
+    expect(find.text('Aditya Rikhari'), findsOneWidget);
+    expect(find.text('Faqeeran - Live'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await draw(named('Different kitchens. Same loyalty.'));
+    await tester.pump(const Duration(seconds: 1));
+    expect(spinning, findsNothing);
+    expect(find.text('Bikkgane Biryani'), findsOneWidget);
   });
 
   test('not enough in common has no ring; waiting has one and does not open', () {

@@ -54,6 +54,7 @@ class ChatRepository {
     String? mediaId,
     String? clientId,
     ProfileTile? tile,
+    String? storyTitle,
   }) async {
     final body = await _api.post(
       Api.messages(matchId),
@@ -63,6 +64,10 @@ class ChatRepository {
         if (mediaId != null) 'media_id': mediaId,
         // Their tile, quoted above the text. Only with text.
         if (tile != null) 'tile': tile.toRef(),
+        // "Chat about this" on an in common story: its title as shown. The
+        // server finds the story itself, so a phone cannot quote words of its
+        // own in an "In common" frame.
+        if (storyTitle != null) 'story': {'title': storyTitle},
       },
     );
     return Message.fromJson(body);

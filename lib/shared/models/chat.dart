@@ -24,6 +24,7 @@ class Message {
     this.text,
     this.media,
     this.tile,
+    this.story,
   });
 
   final String id;
@@ -42,6 +43,9 @@ class Message {
   /// The other person's tile this message is about, as it read when sent.
   final TileQuote? tile;
 
+  /// The in common story this message replies to, as it read when sent.
+  final StoryQuote? story;
+
   final DateTime sentAt;
 
   bool mine(String myUserId) => senderId == myUserId;
@@ -58,12 +62,44 @@ class Message {
       text: j.strOrNull('text'),
       media: media == null ? null : MediaAsset.fromJson(media),
       tile: TileQuote.maybe(j, 'tile'),
+      story: StoryQuote.maybe(j.objectOrNull('story')),
       sentAt: j.time('sent_at'),
     );
   }
 
   static List<Message> listFrom(List<Json> items) =>
       items.map(Message.fromJson).toList(growable: false);
+}
+
+/// An in common story a message replies to ("Chat about this" on a story), as
+/// it read when sent. [removed] once a withdrawal emptied it.
+@immutable
+class StoryQuote {
+  const StoryQuote({
+    required this.removed,
+    this.kind,
+    this.category,
+    this.eyebrow,
+    this.title,
+  });
+
+  static StoryQuote? maybe(Json? j) {
+    if (j == null) return null;
+    final category = j.strOrNull('category');
+    return StoryQuote(
+      removed: j.flag('removed'),
+      kind: j.strOrNull('kind'),
+      category: category == null ? null : TileCategory.parse(category),
+      eyebrow: j.strOrNull('eyebrow'),
+      title: j.strOrNull('title'),
+    );
+  }
+
+  final bool removed;
+  final String? kind;
+  final TileCategory? category;
+  final String? eyebrow;
+  final String? title;
 }
 
 /// A tile the conversation opens on, before any message: the one the

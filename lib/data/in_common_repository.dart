@@ -47,6 +47,7 @@ enum ChartType {
   bars('bars'),
   numbers('numbers'),
   versus('versus'),
+  ranks('ranks'),
   unknown('');
 
   const ChartType(this.wire);
@@ -82,18 +83,45 @@ class ChartSide {
   final TileCategory category;
 }
 
+/// One place in a top five.
+class RankRow {
+  const RankRow({required this.label, required this.display, required this.shared});
+
+  factory RankRow.fromJson(Json j) => RankRow(
+        label: j.str('label'),
+        display: j.str('display'),
+        shared: j.flag('shared'),
+      );
+
+  final String label;
+  final String display;
+
+  /// In the other person's top five too: drawn lit.
+  final bool shared;
+}
+
 class StoryChart {
-  const StoryChart({required this.type, required this.me, required this.them});
+  const StoryChart({
+    required this.type,
+    required this.me,
+    required this.them,
+    this.meRanks = const [],
+    this.themRanks = const [],
+  });
 
   factory StoryChart.fromJson(Json j) => StoryChart(
         type: ChartType.parse(j.strOrNull('type')),
         me: ChartSide.fromJson(j.object('me')),
         them: ChartSide.fromJson(j.object('them')),
+        meRanks: j.objects('me_ranks').map(RankRow.fromJson).toList(),
+        themRanks: j.objects('them_ranks').map(RankRow.fromJson).toList(),
       );
 
   final ChartType type;
   final ChartSide me;
   final ChartSide them;
+  final List<RankRow> meRanks;
+  final List<RankRow> themRanks;
 }
 
 class Story {

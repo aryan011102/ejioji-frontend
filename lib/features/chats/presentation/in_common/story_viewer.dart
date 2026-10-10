@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,18 +7,24 @@ import 'package:flutter/services.dart';
 import '../../../../core/theme/tokens.dart';
 import '../../../../core/theme/typography.dart';
 import '../../../../data/in_common_repository.dart';
+import '../../../../shared/models/chat.dart';
 import '../../../../shared/models/tile_look.dart';
+import '../../../../shared/widgets/buttons.dart';
 import '../../../../shared/widgets/identity.dart';
 import '../../../../shared/widgets/pressable.dart';
+import '../../../../shared/widgets/quoted_story.dart';
+
+/// Sends a reply to a story. Null on success, or what went wrong, in words.
+typedef StoryReply = Future<String?> Function(Story story, String text);
 
 /// Opens the stories over the chat, growing out of the ring.
-Future<void> showStories(BuildContext context, InCommon deck) {
+Future<void> showStories(BuildContext context, InCommon deck, {StoryReply? onReply}) {
   return Navigator.of(context).push(
     PageRouteBuilder<void>(
       opaque: true,
       transitionDuration: Motion.page,
       reverseTransitionDuration: Motion.fade,
-      pageBuilder: (_, __, ___) => StoryViewer(deck: deck),
+      pageBuilder: (_, __, ___) => StoryViewer(deck: deck, onReply: onReply),
       transitionsBuilder: (_, animation, __, child) {
         final curved = CurvedAnimation(parent: animation, curve: Ease.emphasised);
         return FadeTransition(
@@ -37,9 +44,12 @@ Future<void> showStories(BuildContext context, InCommon deck) {
 /// go on and the left to go back, hold to pause, and the deck closes after the
 /// last one.
 class StoryViewer extends StatefulWidget {
-  const StoryViewer({required this.deck, super.key});
+  const StoryViewer({required this.deck, this.onReply, super.key});
 
   final InCommon deck;
+
+  /// "Chat about this", on every story but the intro. Null hides the button.
+  final StoryReply? onReply;
 
   /// How long one story stays before the next.
   static const perStory = Duration(seconds: 6);
@@ -91,6 +101,29 @@ class _StoryViewerState extends State<StoryViewer> with SingleTickerProviderStat
     _clock.stop();
   }
 
+  Future<void> _reply(Story story) async {
+    final send = widget.onReply;
+    if (send == null) return;
+    _clock.stop();
+    final sent = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0x00000000),
+      barrierColor: AppColors.scrim,
+      builder: (sheetContext) => _ReplySheet(
+        story: story,
+        name: widget.deck.them.firstName,
+        send: (text) => send(story, text),
+      ),
+    );
+    if (!mounted) return;
+    if (sent == true) {
+      Navigator.of(context).maybePop();
+    } else {
+      unawaited(_clock.forward());
+    }
+  }
+
   void _release({required bool forward}) {
     final quick = _watch.elapsed - _downAt < const Duration(milliseconds: 250);
     if (quick) {
@@ -117,7 +150,7 @@ class _StoryViewerState extends State<StoryViewer> with SingleTickerProviderStat
           // Tap zones: a third on the left goes back, the rest goes on.
           Positioned.fill(
             top: 90,
-            bottom: 40,
+            bottom: 96,
             child: Row(
               children: [
                 Expanded(
@@ -140,6 +173,19 @@ class _StoryViewerState extends State<StoryViewer> with SingleTickerProviderStat
               ],
             ),
           ),
+          if (widget.onReply != null && story.kind != StoryKind.intro)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 0,
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _ChatAboutThis(onTap: () => unawaited(_reply(story))),
+                ),
+              ),
+            ),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
@@ -294,9 +340,26 @@ class _Slide extends StatelessWidget {
       );
     final chart = story.chart;
     if (chart != null) {
+      final view = rise(StoryChartView(chart: chart, name: name));
       children
         ..add(const SizedBox(height: 26))
-        ..add(rise(StoryChartView(chart: chart, name: name)));
+        // On a short phone the chart gives way, scaled down, rather than
+        // pushing the footnote off the slide.
+        ..add(
+          Flexible(
+            flex: 8,
+            child: LayoutBuilder(
+              builder: (context, box) => FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.topLeft,
+                child: SizedBox(
+                  width: box.maxWidth,
+                  child: view,
+                ),
+              ),
+            ),
+          ),
+        );
     }
     children.add(const Spacer());
     if (story.footnote != null) children.add(rise(_Small(story.footnote!)));
@@ -336,7 +399,7 @@ class _Frame extends StatelessWidget {
         decoration: const BoxDecoration(gradient: Scrims.flat),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 92, 24, 28),
+            padding: const EdgeInsets.fromLTRB(24, 92, 24, 88),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: center ? MainAxisAlignment.center : MainAxisAlignment.start,
@@ -463,6 +526,7 @@ class StoryChartView extends StatelessWidget {
       ChartType.bars => _BarsChart(chart: chart),
       ChartType.numbers => _Numbers(chart: chart),
       ChartType.versus => _Versus(chart: chart),
+      ChartType.ranks => _Ranks(chart: chart, name: name),
       ChartType.unknown => const SizedBox.shrink(),
     };
   }
@@ -696,6 +760,233 @@ class _Versus extends StatelessWidget {
         Expanded(child: card(chart.me)),
         const SizedBox(width: 12),
         Expanded(child: card(chart.them)),
+      ],
+    );
+  }
+}
+
+
+/// The glass pill at the foot of a story, as Instagram's reply.
+class _ChatAboutThis extends StatelessWidget {
+  const _ChatAboutThis({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      semanticLabel: 'Chat about this',
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(Radii.control),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            height: 52,
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            decoration: BoxDecoration(
+              color: AppColors.glass,
+              borderRadius: BorderRadius.circular(Radii.control),
+              border: Border.all(color: AppColors.glassEdge),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.chat_bubble_outline, size: 22, color: AppColors.accent),
+                const SizedBox(width: 10),
+                Text('Chat about this', style: AppText.bodyStrong),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The story, quoted, and a line to send with it.
+class _ReplySheet extends StatefulWidget {
+  const _ReplySheet({required this.story, required this.name, required this.send});
+
+  final Story story;
+  final String name;
+  final Future<String?> Function(String text) send;
+
+  @override
+  State<_ReplySheet> createState() => _ReplySheetState();
+}
+
+class _ReplySheetState extends State<_ReplySheet> {
+  final _text = TextEditingController();
+  bool _sending = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  Future<void> _go() async {
+    final text = _text.text.trim();
+    if (text.isEmpty || _sending) return;
+    setState(() {
+      _sending = true;
+      _error = null;
+    });
+    final problem = await widget.send(text);
+    if (!mounted) return;
+    if (problem == null) {
+      Navigator.of(context).pop(true);
+    } else {
+      setState(() {
+        _sending = false;
+        _error = problem;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final story = widget.story;
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.row,
+              borderRadius: BorderRadius.circular(Radii.card),
+              border: Border.all(color: AppColors.hairline),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Send to ${widget.name}',
+                    textAlign: TextAlign.center,
+                    style: AppText.title3,
+                  ),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: QuotedStory(
+                      story: StoryQuote(
+                        removed: false,
+                        kind: story.kind.wire,
+                        category: story.category,
+                        eyebrow: story.eyebrow,
+                        title: story.title,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _text,
+                    autofocus: true,
+                    maxLength: 2000,
+                    minLines: 2,
+                    maxLines: 4,
+                    style: AppText.body,
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                      hintText: 'Say something about it',
+                      counterText: '',
+                      filled: true,
+                      fillColor: AppColors.fill2,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(Radii.tile),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      _error!,
+                      style: AppText.footnote.copyWith(color: AppColors.destructive),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  PrimaryButton(
+                    label: 'Send',
+                    busy: _sending,
+                    onPressed: _text.text.trim().isEmpty ? null : _go,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Two top fives side by side, the places in both lit.
+class _Ranks extends StatelessWidget {
+  const _Ranks({required this.chart, required this.name});
+
+  final StoryChart chart;
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget column(String who, List<RankRow> rows) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              who.toUpperCase(),
+              overflow: TextOverflow.ellipsis,
+              style: AppText.micro.copyWith(color: AppColors.label, letterSpacing: 1.4),
+            ),
+            const SizedBox(height: 8),
+            for (var i = 0; i < rows.length; i++)
+              _Rise(
+                delay: Duration(milliseconds: 80 * i),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                  decoration: BoxDecoration(
+                    color: rows[i].shared ? AppColors.group : AppColors.storyDim,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${i + 1}',
+                        style: AppText.micro.copyWith(
+                          color: rows[i].shared ? AppColors.accent : AppColors.label2,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          rows[i].label,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppText.bodyStrong.copyWith(
+                            fontSize: 14.5,
+                            color: rows[i].shared ? AppColors.accent : AppColors.label,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        );
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: column('You', chart.meRanks)),
+        const SizedBox(width: 12),
+        Expanded(child: column(name, chart.themRanks)),
       ],
     );
   }

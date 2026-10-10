@@ -23,6 +23,7 @@ import '../../../shared/widgets/pressable.dart';
 import '../../../shared/widgets/quoted_tile.dart';
 import '../../../shared/widgets/sheets.dart';
 import '../../../shared/widgets/states.dart';
+import 'chat_limit.dart';
 
 enum _Tab { chats, requests, sent }
 
@@ -218,8 +219,14 @@ class _ConversationList extends ConsumerWidget {
                     _ConversationRow(
                       conversation: c,
                       last: c.matchId == sorted.last.matchId,
-                      onTap: () =>
-                          context.push(Routes.conversationWith(c.matchId)),
+                      // Past the open chats: listed, and says why it does
+                      // not open rather than opening onto a refusal.
+                      onTap: () => c.locked
+                          ? showChatLimitSheet(
+                              context,
+                              name: c.person.firstName,
+                            )
+                          : context.push(Routes.conversationWith(c.matchId)),
                     ),
                 ],
               ),
@@ -597,8 +604,11 @@ class _ConversationRow extends StatelessWidget {
   /// What the row says under the name.
   ///
   /// A photo or a video never shows a preview of itself here, and a match
-  /// nobody has written in says so rather than showing an empty line.
+  /// nobody has written in says so rather than showing an empty line. A locked
+  /// one (past the open chats) says how it opens; the server sends nothing of
+  /// what was written in it.
   String get _preview {
+    if (conversation.locked) return 'Unmatch a chat to open this one';
     final message = conversation.lastMessage;
     if (message == null) return 'You can both write now. Say something.';
     return switch (message.kind) {

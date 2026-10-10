@@ -26,6 +26,7 @@ import '../../../shared/widgets/pressable.dart';
 import '../../../shared/widgets/quoted_tile.dart';
 import '../../../shared/widgets/sheets.dart';
 import '../../../shared/widgets/states.dart';
+import 'chat_limit.dart';
 import 'streak_popup.dart';
 import 'unmatch_reason_sheet.dart';
 import 'verify_to_chat.dart';
@@ -153,12 +154,18 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
         });
       }
     } on ApiException catch (e) {
-      if (mounted) {
-        setState(() {
-          _loadError = e;
-          _loading = false;
-        });
+      if (!mounted) return;
+      // Past the open chats: reached from a push, an accept or a stale list.
+      // Says why, then goes back to where they came from.
+      if (e.code == 'chat_limit') {
+        await showChatLimitSheet(context, name: _person?.firstName);
+        if (mounted) context.pop();
+        return;
       }
+      setState(() {
+        _loadError = e;
+        _loading = false;
+      });
     }
   }
 

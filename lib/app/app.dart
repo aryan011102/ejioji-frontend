@@ -57,6 +57,7 @@ class _EjiojiAppState extends ConsumerState<EjiojiApp> {
       case PushKind.match:
         if (id != null) router.push(Routes.conversationWith(id));
       case PushKind.request:
+      case PushKind.unmatched:
         router.go(Routes.chats);
       case PushKind.profileViews:
         router.push(Routes.profileViews);
@@ -80,7 +81,8 @@ class _EjiojiAppState extends ConsumerState<EjiojiApp> {
         open.id == null || open.id != OpenConversations.top,
       PushKind.request ||
       PushKind.profileViews ||
-      PushKind.spotifyUpload =>
+      PushKind.spotifyUpload ||
+      PushKind.unmatched =>
         true,
     };
   }

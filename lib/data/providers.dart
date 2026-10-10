@@ -20,6 +20,7 @@ import 'activity_repository.dart';
 import 'auth_repository.dart';
 import 'chat_repository.dart';
 import 'consent_repository.dart';
+import 'in_common_repository.dart';
 import 'matching_repository.dart';
 import 'media_repository.dart';
 import 'premium_repository.dart';
@@ -101,6 +102,10 @@ final supportRepositoryProvider = Provider<SupportRepository>(
 
 final premiumRepositoryProvider = Provider<PremiumRepository>(
   (ref) => PremiumRepository(ref.watch(apiClientProvider)),
+);
+
+final inCommonRepositoryProvider = Provider<InCommonRepository>(
+  (ref) => InCommonRepository(ref.watch(apiClientProvider)),
 );
 
 final sharingRepositoryProvider = Provider<SharingRepository>(

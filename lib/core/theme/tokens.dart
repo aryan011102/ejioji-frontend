@@ -67,6 +67,28 @@ abstract final class AppColors {
   static const photoEmpty = Color(0xFF1C1C1E);
   static const photoEdge = Color(0x59EF798A);
 
+  // The in common stories: the reader's side and the other person's, on any
+  // tile gradient. Paper for "you", the accent for them, as the design has it.
+  static const storyMe = Color(0xFFFBF6EC);
+  static const storyThem = Color(0xFFEF798A);
+  static const storyDim = Color(0x24FFFFFF); // .14, an unlit hour or day
+  static const storyTrack = Color(0x29FFFFFF); // .16, under a bar
+
+  /// The ring on a photo with stories behind it, Instagram's way round.
+  static const storyRing = SweepGradient(
+    startAngle: 0,
+    endAngle: 6.2832,
+    transform: GradientRotation(3.49),
+    colors: [
+      Color(0xFFEF798A),
+      Color(0xFFC9812B),
+      Color(0xFFF082C5),
+      Color(0xFF9B4487),
+      Color(0xFF5B49A8),
+      Color(0xFFEF798A),
+    ],
+  );
+
   /// The promo surface — the only place plum is a background rather than an
   /// accent.
   static const promo = LinearGradient(

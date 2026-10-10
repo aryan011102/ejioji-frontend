@@ -112,6 +112,7 @@ enum ConsentPurpose {
   aiProcessing('ai_processing', 'AI suggestions'),
   matching('matching', 'Matching'),
   identityVerification('identity_verification', 'DigiLocker verification'),
+  inCommon('in_common', 'In common stories'),
   unknown('', '');
 
   const ConsentPurpose(this.wire, this.label);

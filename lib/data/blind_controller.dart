@@ -60,9 +60,9 @@ class BlindState {
   final bool loadingMore;
   final ApiException? error;
 
-  /// People asked to chat from here. Their tiles stay where they are for the
-  /// rest of this deal, marked, rather than leaving holes; the next deal
-  /// leaves them out, as the server does.
+  /// People asked to chat from here. Every tile of theirs leaves the plane at
+  /// once (Aryan's call, 2026-10-10; until then they stayed, marked "Asked"),
+  /// and the next deal leaves them out, as the server does.
   final Set<String> asked;
 
   bool get hasMore => cursor != null;

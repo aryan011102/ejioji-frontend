@@ -6,9 +6,9 @@ import 'tile.dart';
 
 /// One tile in Go blind, and whose it is.
 ///
-/// The person travels with the tile because a tap opens their profile at once:
-/// fetching it then would show a different profile from the one whose line
-/// was tapped. Nothing on the tile itself names them.
+/// The person travels with the tile for asking: the sheet names them, and the
+/// request goes to them. Their profile does not open from Blind (2026-10-10).
+/// Nothing on the tile itself names them.
 @immutable
 class BlindTile {
   const BlindTile({required this.person, required this.tile});
@@ -33,7 +33,7 @@ class BlindDeal {
   bool get hasMore => nextCursor != null;
 
   /// A dealt tile that is not on its person's card is dropped rather than
-  /// guessed at: the card is what a tap opens, and the two must agree.
+  /// guessed at: the card is who the request goes to, and the two must agree.
   static BlindDeal fromJson(Json j) {
     final people = {
       for (final p in Candidate.listFrom(j.objects('people'))) p.userId: p,

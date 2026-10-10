@@ -5,9 +5,9 @@ import 'package:ejioji/shared/widgets/tiles.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Tap and hold-swipe on Go blind's plane (Aryan, 2026-10-04): a tap opens
-/// the profile; resting a finger on a tile and sliding left asks; touching
-/// and moving at once moves the plane.
+/// Tap and hold-swipe on Go blind's plane (Aryan, 2026-10-04): a tap is passed
+/// on (it no longer opens a profile, 2026-10-10); resting a finger on a tile
+/// and sliding left asks; touching and moving at once moves the plane.
 void main() {
   Map<String, Object?> insight(String key, String value) => {
         'kind': 'insight',
@@ -43,11 +43,11 @@ void main() {
     ],
   }).tiles;
 
-  late List<BlindTile> opened;
+  late List<BlindTile> tapped;
   late List<BlindTile> asked;
 
   Future<void> pump(WidgetTester tester) async {
-    opened = [];
+    tapped = [];
     asked = [];
     await tester.binding.setSurfaceSize(const Size(393, 852));
     await tester.pumpWidget(
@@ -56,7 +56,7 @@ void main() {
           body: BlindField(
             layout: BlindLayout(tiles),
             topInset: 60,
-            onOpen: opened.add,
+            onTap: tapped.add,
             onChat: (t) async => asked.add(t),
             onRunningLow: () {},
           ),
@@ -97,11 +97,11 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('a tap opens whose it is, at once', (tester) async {
+  testWidgets('a tap is passed on, and never asks', (tester) async {
     await pump(tester);
     await tester.tapAt(onScreen(tester));
     await tester.pumpAndSettle();
-    expect(opened, hasLength(1));
+    expect(tapped, hasLength(1));
     expect(asked, isEmpty);
   });
 
@@ -109,7 +109,7 @@ void main() {
     await pump(tester);
     await holdAndSlide(tester, onScreen(tester), 160);
     expect(asked, hasLength(1));
-    expect(opened, isEmpty);
+    expect(tapped, isEmpty);
   });
 
   testWidgets('rest, then a short slide: springs back, asks nothing', (
@@ -118,7 +118,7 @@ void main() {
     await pump(tester);
     await holdAndSlide(tester, onScreen(tester), 40);
     expect(asked, isEmpty);
-    expect(opened, isEmpty);
+    expect(tapped, isEmpty);
   });
 
   testWidgets('rest, then slide right: asks nothing', (tester) async {
@@ -135,7 +135,7 @@ void main() {
     await tester.dragFrom(at, const Offset(-200, 0));
     await tester.pumpAndSettle();
     expect(asked, isEmpty);
-    expect(opened, isEmpty);
+    expect(tapped, isEmpty);
     expect(onScreen(tester), isNot(at));
   });
 }

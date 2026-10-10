@@ -97,6 +97,9 @@ abstract final class Routes {
   // You
   static const editProfile = '/you/profile';
   static const editInfo = '/you/profile/info';
+
+  /// "Who your data thinks you are": choosing one of four archetypes.
+  static const archetype = '/you/profile/archetype';
   /// Edit tiles: the connect screen, opened from the profile.
   static const editSources = '/you/profile/insights';
   static const editCategory = '/you/profile/insights/:index';

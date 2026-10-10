@@ -1,9 +1,14 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../core/theme/tokens.dart';
 import '../../core/theme/typography.dart';
+import '../models/archetype.dart';
 import '../models/tile.dart' show SongMusic;
 import 'pressable.dart';
 
@@ -1041,30 +1046,98 @@ class Slot {
 /// One photo with dots, not a collage: a collage says "here are four small
 /// things", and this is one thing you can swipe.
 ///
+/// With an [archetype], a tap turns it over to "who your data thinks you are"
+/// (Aryan's call, 2026-10-10), and another turns it back. Swiping still pages
+/// the photos, and the page is kept while it is turned over.
+///
 /// The URLs are signed and expire, so a failure here is ordinary rather than
 /// exceptional: it falls back to a plain fill instead of Flutter's grey box
 /// with a crossed-out icon, which on a profile reads as a broken person.
 class PhotosTile extends StatefulWidget {
-  const PhotosTile({required this.photoUrls, super.key});
+  const PhotosTile({required this.photoUrls, this.archetype, super.key});
 
   final List<String> photoUrls;
+
+  /// What the back says. Null leaves the tile photos only.
+  final Archetype? archetype;
 
   @override
   State<PhotosTile> createState() => _PhotosTileState();
 }
 
-class _PhotosTileState extends State<PhotosTile> {
+class _PhotosTileState extends State<PhotosTile>
+    with SingleTickerProviderStateMixin {
   final _controller = PageController();
   int _page = 0;
 
+  /// Built in initState: a ticker first touched in dispose is created during
+  /// unmount, which throws, and a tile with no archetype never touches it
+  /// before then.
+  late final AnimationController _turn;
+
+  @override
+  void initState() {
+    super.initState();
+    _turn = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 460),
+    );
+  }
+
   @override
   void dispose() {
+    _turn.dispose();
     _controller.dispose();
     super.dispose();
   }
 
+  void _toggle() {
+    HapticFeedback.selectionClick();
+    final over = _turn.status == AnimationStatus.forward ||
+        _turn.status == AnimationStatus.completed;
+    unawaited(over ? _turn.reverse() : _turn.forward());
+  }
+
   @override
   Widget build(BuildContext context) {
+    final archetype = widget.archetype;
+    if (archetype == null) return _photos(turns: false);
+    return GestureDetector(
+      onTap: _toggle,
+      child: AnimatedBuilder(
+        animation: _turn,
+        builder: (context, _) {
+          final angle = Curves.easeInOutCubic.transform(_turn.value) * math.pi;
+          final back = angle > math.pi / 2;
+          return Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.identity()
+              ..setEntry(3, 2, 0.0012)
+              ..rotateY(angle),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Kept while turned over, so it turns back to the same photo.
+                Visibility(
+                  visible: !back,
+                  maintainState: true,
+                  child: _photos(turns: true),
+                ),
+                if (back)
+                  Transform(
+                    alignment: Alignment.center,
+                    transform: Matrix4.rotationY(math.pi),
+                    child: ArchetypeFace(archetype: archetype),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _photos({required bool turns}) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(Radii.tile),
       child: Stack(
@@ -1081,6 +1154,20 @@ class _PhotosTileState extends State<PhotosTile> {
                   const ColoredBox(color: AppColors.photoEmpty),
             ),
           ),
+          // That there is a back to turn to.
+          if (turns)
+            const Positioned(
+              top: 10,
+              right: 10,
+              child: _Badge(
+                child: Icon(
+                  Icons.auto_awesome,
+                  size: 14,
+                  color: AppColors.label,
+                  semanticLabel: 'Tap to see who their data thinks they are',
+                ),
+              ),
+            ),
           Positioned(
             left: 0,
             right: 0,
@@ -1105,6 +1192,97 @@ class _PhotosTileState extends State<PhotosTile> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// "Who your data thinks you are", written out: the back of the photo tile,
+/// and each choice on the archetype page.
+///
+/// The label sits on top in the small capitals a prompt tile uses, and the
+/// archetype takes the rest of the tile rather than only its foot, as the copy
+/// on other tiles does. Sizes follow the tile's width, so the same face reads
+/// on the wall and in the picker's grid.
+class ArchetypeFace extends StatelessWidget {
+  const ArchetypeFace({
+    required this.archetype,
+    this.selected = false,
+    super.key,
+  });
+
+  static const label = 'Who your data thinks you are';
+
+  final Archetype archetype;
+
+  /// Chosen in the picker: the same ring a picked tile has.
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = constraints.maxWidth;
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(Radii.tile),
+            gradient: TileTones.indigo,
+            border: Border.all(color: AppColors.tileEdge, width: 0.67),
+            boxShadow: selected
+                ? const [
+                    BoxShadow(color: AppColors.accent, spreadRadius: 4.5),
+                    BoxShadow(color: Color(0xFF000000), spreadRadius: 2),
+                  ]
+                : null,
+          ),
+          child: Padding(
+            padding: EdgeInsets.all((w * 0.08).clamp(10.0, 16.0)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label.toUpperCase(),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.micro.copyWith(
+                    fontSize: (w * 0.056).clamp(8.5, 11.0),
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.7,
+                    color: const Color(0xA8FFFFFF),
+                  ),
+                ),
+                SizedBox(height: w * 0.05),
+                // Never pushes the tile over: a long title gives up lines to
+                // the body first, then ends in an ellipsis.
+                Flexible(
+                  child: Text(
+                    archetype.title,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.bodyStrong.copyWith(
+                      fontSize: (w * 0.12).clamp(15.0, 24.0),
+                      height: 1.15,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.label,
+                    ),
+                  ),
+                ),
+                SizedBox(height: w * 0.04),
+                Expanded(
+                  child: Text(
+                    archetype.body,
+                    overflow: TextOverflow.fade,
+                    style: AppText.callout.copyWith(
+                      fontSize: (w * 0.078).clamp(11.0, 15.0),
+                      height: 1.3,
+                      color: const Color(0xD9FFFFFF),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

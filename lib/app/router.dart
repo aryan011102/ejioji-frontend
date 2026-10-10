@@ -31,6 +31,7 @@ import '../features/onboarding/presentation/instagram_upload_page.dart';
 import '../features/onboarding/presentation/netflix_upload_page.dart';
 import '../features/onboarding/presentation/reading_page.dart';
 import '../features/onboarding/presentation/spotify_upload_page.dart';
+import '../features/profile/presentation/archetype_page.dart';
 import '../features/profile/presentation/edit_info_page.dart';
 import '../features/profile/presentation/profile_page.dart';
 import '../features/safety/presentation/report_page.dart';
@@ -271,6 +272,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const ProfilePage(mode: ProfileMode.owner),
       ),
       GoRoute(path: Routes.editInfo, builder: (_, __) => const EditInfoPage()),
+      GoRoute(
+        path: Routes.archetype,
+        builder: (_, __) => const ArchetypePage(),
+      ),
       GoRoute(
         path: Routes.editSources,
         // Edit tiles is the connect screen again, not a page of its own.

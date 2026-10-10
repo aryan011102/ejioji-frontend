@@ -82,6 +82,41 @@ Future<void> askAboutAiOnce(BuildContext context, WidgetRef ref) async {
 /// once, even before the phone's storage has answered.
 final _askedThisRun = <String>{};
 
+/// The same question, asked because they chose to: from "Who your data thinks
+/// you are", where allowing AI is what gets archetypes written from their data.
+/// Also how someone who said yes to an older notice agrees to the current one,
+/// which covers archetypes. Returns true once the yes has reached the server.
+Future<bool> askForAi(BuildContext context, WidgetRef ref) async {
+  final ConsentNotice? notice;
+  try {
+    notice = (await ref.read(consentProvider.future))
+        .noticeFor(ConsentPurpose.aiProcessing);
+  } on ApiException catch (e) {
+    if (context.mounted) showAppToast(context, e.message);
+    return false;
+  }
+  if (notice == null || !context.mounted) return false;
+  final allowed = await showAppSheet<bool>(
+    context,
+    builder: (sheetContext) => AiConsentCard(
+      onAllow: () => Navigator.of(sheetContext).pop(true),
+      onNotNow: () => Navigator.of(sheetContext).pop(false),
+      onReadNotice: () => _showNotice(sheetContext, notice!),
+    ),
+  );
+  if (allowed != true) return false;
+  try {
+    await ref
+        .read(consentRepositoryProvider)
+        .grant({ConsentPurpose.aiProcessing: notice.version});
+    ref.invalidate(consentProvider);
+    return true;
+  } on ApiException catch (e) {
+    if (context.mounted) showAppToast(context, e.message);
+    return false;
+  }
+}
+
 Future<void> _showNotice(BuildContext context, ConsentNotice notice) {
   return showAppSheet<void>(
     context,
@@ -146,7 +181,8 @@ class AiConsentCard extends StatelessWidget {
           'We send summaries of what you connect to Claude, an AI made by '
           'Anthropic: totals, and the names behind them, like the channels, '
           'artists or restaurants you come back to. It suggests which insights '
-          'to show and writes their captions.',
+          'to show, writes their captions, and writes the archetypes you '
+          'choose "who your data thinks you are" from.',
           style: AppText.callout,
         ),
         const SizedBox(height: 8),

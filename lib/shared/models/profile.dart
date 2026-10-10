@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../core/network/json.dart';
+import 'archetype.dart';
 import 'enums.dart';
 import 'media.dart';
 import 'tile.dart';
@@ -174,10 +175,15 @@ class MyProfile {
     required this.publish,
     this.profile,
     this.verified = false,
+    this.archetype,
   });
 
   /// Null until the person has filled the four fields in.
   final Profile? profile;
+
+  /// Who their data thinks they are, as chosen. Null until they choose, which
+  /// setup asks of everyone.
+  final Archetype? archetype;
 
   final List<MediaAsset> photos;
   final List<ProfileTile> tiles;
@@ -197,6 +203,7 @@ class MyProfile {
       tiles: ProfileTile.listFrom(j.objects('tiles')),
       publish: PublishState.fromJson(j.object('publish')),
       verified: j.flag('verified'),
+      archetype: Archetype.maybe(j.objectOrNull('archetype')),
     );
   }
 }

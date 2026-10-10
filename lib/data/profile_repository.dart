@@ -151,9 +151,9 @@ class ProfileRepository {
   Future<PublishState> enterStealth() async =>
       PublishState.fromJson(await _api.post(Api.stealth));
 
-  /// The Settings switch: others see "PA" instead of "Pritika Agarwal", and her
-  /// LinkedIn only once matched. Women only to switch on (the server answers
-  /// 422 `initials_for_women_only` otherwise).
+  /// The Settings switch: others see "PA" instead of "Pritika Agarwal". Women
+  /// only to switch on (the server answers 422 `initials_for_women_only`
+  /// otherwise).
   Future<Profile> setNameInitials(bool on) async => Profile.fromJson(
         await _api.put(Api.nameInitials, body: {'on': on}),
       );

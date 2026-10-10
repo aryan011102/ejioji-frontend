@@ -42,9 +42,8 @@ import 'ai_consent_sheet.dart';
 /// types or pastes, handed only to people they match with, so they sit in their
 /// own group below the sources and never count towards profile strength.
 ///
-/// LinkedIn is required (2026-09-29): nobody is shown without one, so setup
-/// does not go on until it is there. The server's gate is what enforces it;
-/// this only asks at the right moment.
+/// LinkedIn was required from 2026-09-29 and is optional again from 2026-10-10,
+/// on exactly the same terms as Instagram and X (Aryan's call).
 ///
 /// Every source is read exactly once, when it is connected. There is no
 /// background sync: the access token lives in the server's memory for the
@@ -710,19 +709,6 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
         widget.editing ? Routes.editCategoryAt(0) : Routes.pickCategoryAt(0),
       );
 
-  /// On past this screen, once LinkedIn is settled: asks for it first when it
-  /// is required and missing.
-  Future<void> _nextWithLinkedIn(bool linkedInSettled) async {
-    if (!linkedInSettled) {
-      final added = await showSocialLinkSheet(
-        context,
-        network: SocialNetwork.linkedin,
-      );
-      if (!mounted || !added) return;
-    }
-    _next();
-  }
-
   @override
   Widget build(BuildContext context) {
     final consent = ref.watch(consentProvider);
@@ -751,16 +737,6 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
           const <SocialLink>[])
         l.network: l,
     };
-
-    final hasLinkedIn = socials.containsKey(SocialNetwork.linkedin);
-    // Required only while the server says so: a profile without one is held
-    // back by `no_linkedin` in its blocking list. The server switched it off for
-    // App Review (PROFILE_REQUIRES_LINKEDIN), and turns it back on without a
-    // release. Until the profile has loaded, it is asked for as before.
-    final linkedInRequired =
-        ref.watch(myProfileProvider).valueOrNull?.publish.needsLinkedIn ??
-            !hasLinkedIn;
-    final mustAddLinkedIn = !hasLinkedIn && linkedInRequired;
     final tiles = widget.editing
         ? _tilesGroup(
             linked: linked,
@@ -781,36 +757,13 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
           : Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (mustAddLinkedIn)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(
-                      'Add your LinkedIn to continue. Only your matches see it.',
-                      textAlign: TextAlign.center,
-                      style: AppText.caption,
-                    ),
-                  )
-                else if (!hasLinkedIn)
-                  TextActionButton(
-                    label: 'Add your LinkedIn · only your matches see it',
-                    dim: true,
-                    onPressed: () => unawaited(
-                      showSocialLinkSheet(
-                        context,
-                        network: SocialNetwork.linkedin,
-                      ),
-                    ),
-                  ),
                 PrimaryButton(
-                  label: mustAddLinkedIn ? 'Add LinkedIn' : 'Next',
-                  onPressed: linked.isNotEmpty || mustAddLinkedIn
-                      ? () => unawaited(_nextWithLinkedIn(!mustAddLinkedIn))
-                      : null,
+                  label: 'Next',
+                  onPressed: linked.isNotEmpty ? _next : null,
                 ),
                 // Nothing connected still has a way on: every category comes
-                // back thin, so the walk is all questions. LinkedIn is still
-                // asked for first where it is required.
-                if (linked.isEmpty && !mustAddLinkedIn)
+                // back thin, so the walk is all questions.
+                if (linked.isEmpty)
                   TextActionButton(
                     label: "I'll do this later",
                     dim: true,
@@ -854,7 +807,6 @@ class _ConnectAccountsPageState extends ConsumerState<ConnectAccountsPage> {
                   _SocialRow(
                     network: n,
                     link: socials[n],
-                    required: n == SocialNetwork.linkedin,
                     last: n == SocialNetwork.shown.last,
                     onTap: () => showSocialLinkSheet(
                       context,
@@ -1345,34 +1297,24 @@ class _SocialRow extends StatelessWidget {
     required this.link,
     required this.last,
     required this.onTap,
-    this.required = false,
   });
 
   final SocialNetwork network;
   final SocialLink? link;
-
-  /// Nobody is shown without it (LinkedIn).
-  final bool required;
   final bool last;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final l = link;
-    final (String line, Color tone) = switch (l) {
-      null when required => (
-          'Required · your profile link, for matches only',
-          AppColors.accent,
-        ),
-      null => (
-          network == SocialNetwork.linkedin
-              ? 'Your profile link · for matches only'
-              : 'Your handle · for matches only',
-          AppColors.label3,
-        ),
-      _ when l.shown => ('${l.display} · shown to matches', AppColors.label3),
-      _ => ('${l.display} · hidden from matches', AppColors.label3),
+    final line = switch (l) {
+      null => network == SocialNetwork.linkedin
+          ? 'Your profile link · for matches only'
+          : 'Your handle · for matches only',
+      _ when l.shown => '${l.display} · shown to matches',
+      _ => '${l.display} · hidden from matches',
     };
+    const tone = AppColors.label3;
     return Column(
       children: [
         PressableRow(

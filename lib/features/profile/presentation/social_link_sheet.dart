@@ -95,10 +95,7 @@ class _SocialLinkSheetState extends ConsumerState<_SocialLinkSheet> {
     final choice = await showAppActionSheet(
       context,
       title: 'Remove your $_label?',
-      message: widget.network == SocialNetwork.linkedin
-          ? 'Your matches stop seeing it straight away, and your profile is '
-              'not shown to anyone until you add one again.'
-          : 'Your matches stop seeing it straight away.',
+      message: 'Your matches stop seeing it straight away.',
       actions: const [SheetAction('Remove', destructive: true)],
     );
     if (choice != 0 || !mounted) return;
@@ -144,14 +141,9 @@ class _SocialLinkSheetState extends ConsumerState<_SocialLinkSheet> {
             ],
           ),
           const SizedBox(height: 10),
-          // LinkedIn has no choice here (Aryan, 2026-09-30): it stays shown.
           Text(
-            widget.network == SocialNetwork.linkedin
-                ? 'To maintain trust and credibility, everyone can see your '
-                    'LinkedIn profile. This cannot be changed.'
-                : 'Only people you match with see this, as a link to your '
-                    '$_label. It is never on your profile card or in anyone\'s '
-                    'feed.',
+            'Only people you match with see this, as a link to your '
+            '$_label. It is never on your profile card or in anyone\'s feed.',
             style: AppText.callout.copyWith(height: 20 / 15),
           ),
           const SizedBox(height: 18),
@@ -188,29 +180,27 @@ class _SocialLinkSheetState extends ConsumerState<_SocialLinkSheet> {
               ),
             ),
           ),
-          if (widget.network != SocialNetwork.linkedin) ...[
-            const SizedBox(height: 18),
-            Container(
-              padding: const EdgeInsets.fromLTRB(14, 10, 12, 10),
-              decoration: BoxDecoration(
-                color: AppColors.row,
-                borderRadius: BorderRadius.circular(Radii.row),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text("Don't show to matches", style: AppText.body),
-                  ),
-                  // Worded as the opt-out, so on means hidden.
-                  AppSwitch(
-                    value: !_shown,
-                    onChanged:
-                        _saving ? null : (v) => setState(() => _shown = !v),
-                  ),
-                ],
-              ),
+          const SizedBox(height: 18),
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 10, 12, 10),
+            decoration: BoxDecoration(
+              color: AppColors.row,
+              borderRadius: BorderRadius.circular(Radii.row),
             ),
-          ],
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text("Don't show to matches", style: AppText.body),
+                ),
+                // Worded as the opt-out, so on means hidden.
+                AppSwitch(
+                  value: !_shown,
+                  onChanged:
+                      _saving ? null : (v) => setState(() => _shown = !v),
+                ),
+              ],
+            ),
+          ),
           if (widget.existing != null) ...[
             const SizedBox(height: 24),
             Center(

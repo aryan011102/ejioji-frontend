@@ -47,9 +47,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   /// Waiting on the server for the initials switch.
   bool _initialsBusy = false;
 
-  /// Others see the initials of both names ("PA") instead of the names, and her
-  /// LinkedIn only once matched. Offered to women only; the server checks that
-  /// too. The full name is still what onboarding takes and DigiLocker checks:
+  /// Others see the initials of both names ("PA") instead of the names.
+  /// Offered to women only; the server checks that too. The full name is still what onboarding takes and DigiLocker checks:
   /// this changes only what others see.
   Future<void> _setInitials(bool on) async {
     setState(() => _initialsBusy = true);

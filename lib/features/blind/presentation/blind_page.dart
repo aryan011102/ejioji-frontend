@@ -17,6 +17,7 @@ import '../../../shared/models/enums.dart';
 import '../../../shared/widgets/app_tab_bar.dart';
 import '../../../shared/widgets/ask_about_sheet.dart';
 import '../../../shared/widgets/pressable.dart';
+import '../../../shared/widgets/sheets.dart';
 import '../../../shared/widgets/states.dart';
 import '../../home/presentation/home_page.dart' show feedMissingStep;
 import 'blind_field.dart';
@@ -27,9 +28,10 @@ import 'blind_layout.dart';
 /// Home is a person at a time: you meet them, then their tiles. This is the
 /// other way in. A plane of single tiles from many people, with nothing on
 /// them that says whose, which you drag any way you like. You find someone by
-/// a line of theirs that stops you, and tapping it is when they stop being
-/// anonymous. The people are the same as Home's: the server deals from the
-/// feed's own slate, in shuffled order.
+/// a line of theirs that stops you, and ask about it. Their profile does not
+/// open from here (Aryan's call, 2026-10-10): it opens once they accept or
+/// reply, in the chat. The people are the same as Home's: the server deals
+/// from the feed's own slate, in shuffled order.
 class BlindPage extends ConsumerStatefulWidget {
   const BlindPage({super.key});
 
@@ -43,6 +45,10 @@ class _BlindPageState extends ConsumerState<BlindPage>
 
   BlindLayout? _layout;
   int _layoutDeal = -1;
+
+  /// How many of the deal's tiles the layout has been handed. Not the
+  /// layout's own length: an asked person's tiles leave it.
+  int _handed = 0;
 
   /// The shuffle button's one turn.
   late final AnimationController _spin = AnimationController(
@@ -84,23 +90,32 @@ class _BlindPageState extends ConsumerState<BlindPage>
   }
 
   /// The layout follows the deal: a new deal is a new plane, more of the same
-  /// deal is added to the one in hand.
+  /// deal is added to the one in hand. Anyone asked from here is taken off it
+  /// at once, every tile of theirs (Aryan's call, 2026-10-10), so nobody is
+  /// asked twice; the server leaves them out of the next deal anyway.
   BlindLayout _layoutFor(BlindState state) {
+    bool open(BlindTile t) => !state.asked.contains(t.person.userId);
     final current = _layout;
     if (current == null || _layoutDeal != state.deal) {
       _layoutDeal = state.deal;
-      return _layout = BlindLayout(state.tiles);
+      _handed = state.tiles.length;
+      return _layout = BlindLayout(state.tiles.where(open).toList());
     }
-    if (state.tiles.length > current.length) {
-      current.add(state.tiles.sublist(current.length));
+    if (state.tiles.length > _handed) {
+      current.add(state.tiles.sublist(_handed).where(open).toList());
+      _handed = state.tiles.length;
+    }
+    for (final id in state.asked) {
+      current.removePerson(id);
     }
     return current;
   }
 
-  void _open(BlindTile t) => context.push(
-        Routes.person,
-        extra: PersonArgs(person: t.person, backLabel: 'Blind', canAsk: true),
-      );
+  /// A tap on a tile. Blind never opens a profile (Aryan's call, 2026-10-10):
+  /// who they are is theirs to show, once they accept or reply. So a tap only
+  /// says how to ask.
+  void _tapped(BlindTile t) =>
+      showAppToast(context, 'Hold a tile and slide left to chat about it.');
 
   Future<void> _chat(BlindTile t) async {
     final blind = ref.read(blindProvider.notifier);
@@ -187,7 +202,9 @@ class _BlindPageState extends ConsumerState<BlindPage>
     }
 
     final category = state.category;
-    if (state.tiles.isEmpty) {
+    final layout = _layoutFor(state);
+    // Empty from the server, or emptied here by asking everyone it dealt.
+    if (layout.length == 0) {
       if (category != null) {
         final name = category.label.toLowerCase();
         return EmptyState(
@@ -215,11 +232,10 @@ class _BlindPageState extends ConsumerState<BlindPage>
       onPanDown: _hint ? (_) => setState(() => _hint = false) : null,
       child: BlindField(
         key: ValueKey(state.deal),
-        layout: _layoutFor(state),
+        layout: layout,
         topInset: top + 8,
-        asked: state.asked,
         showCategory: category == null,
-        onOpen: _open,
+        onTap: _tapped,
         onChat: _chat,
         onRunningLow: () => unawaited(ref.read(blindProvider.notifier).more()),
       ),

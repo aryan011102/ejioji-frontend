@@ -44,7 +44,8 @@ typedef _Place = (int bx, int by, int slot);
 /// Three things a finger can do (Aryan, 2026-10-04, after a fast flick and
 /// then a tap-to-lift were both too much work):
 ///
-/// - **Tap** a tile: their profile opens.
+/// - **Tap** a tile: a reminder of how to ask. It opened their profile until
+///   2026-10-10; Blind no longer shows who someone is before they answer.
 /// - **Touch a tile, rest a moment, slide left**: the tile slides to show
 ///   "Chat about this", as a profile tile does, and letting go past the mark
 ///   asks. One movement, no second step.
@@ -56,10 +57,9 @@ class BlindField extends StatefulWidget {
   const BlindField({
     required this.layout,
     required this.topInset,
-    required this.onOpen,
+    required this.onTap,
     required this.onChat,
     required this.onRunningLow,
-    this.asked = const {},
     this.showCategory = true,
     super.key,
   });
@@ -75,14 +75,11 @@ class BlindField extends StatefulWidget {
   /// it rather than under it.
   final double topInset;
 
-  final ValueChanged<BlindTile> onOpen;
+  final ValueChanged<BlindTile> onTap;
   final Future<void> Function(BlindTile) onChat;
 
   /// The plane has laid down most of what it has: time for the next page.
   final VoidCallback onRunningLow;
-
-  /// People already asked from here, by user id.
-  final Set<String> asked;
 
   /// The category's glyph on each tile. On All the mix is the point, so the
   /// glyph earns its place; under one tab it would say the same thing on
@@ -309,12 +306,11 @@ class _BlindFieldState extends State<BlindField> with TickerProviderStateMixin {
                     tile: t,
                     size: size,
                     showCategory: widget.showCategory,
-                    asked: widget.asked.contains(t.person.userId),
                     held: held,
                     slide: held ? _slide : 0,
                     pastMark: held && (_pastMark || _asking),
                     onTap: () {
-                      if (!_asking) widget.onOpen(t);
+                      if (!_asking) widget.onTap(t);
                     },
                   ),
                 ),
@@ -356,7 +352,6 @@ class _Tile extends StatelessWidget {
     required this.tile,
     required this.size,
     required this.showCategory,
-    required this.asked,
     required this.held,
     required this.slide,
     required this.pastMark,
@@ -366,7 +361,6 @@ class _Tile extends StatelessWidget {
   final BlindTile tile;
   final TileSize size;
   final bool showCategory;
-  final bool asked;
 
   /// A finger is resting on it: it rises a little to say so.
   final bool held;
@@ -386,111 +380,82 @@ class _Tile extends StatelessWidget {
     return AnimatedScale(
       scale: held ? 1.03 : 1,
       duration: Motion.press,
-      child: AnimatedOpacity(
-        opacity: asked ? 0.42 : 1,
-        duration: Motion.fade,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Under the tile, shown as it slides left: the way to ask. The
-            // same look as a profile tile's "Chat about this".
-            if (slide > 0)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(Radii.tile),
-                child: ColoredBox(
-                  color: pastMark ? AppColors.accent : AppColors.fill,
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: SizedBox(
-                      width: slide,
-                      child: Opacity(
-                        opacity: (slide / 60).clamp(0.0, 1.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.chat_bubble_outline_rounded,
-                              color: AppColors.onAccent,
-                              size: 24,
-                            ),
-                            if (slide >= 96) ...[
-                              const SizedBox(height: 6),
-                              Text(
-                                'Chat about this',
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                style: AppText.footnote.copyWith(
-                                  color: AppColors.onAccent,
-                                  fontWeight: FontWeight.w600,
-                                ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Under the tile, shown as it slides left: the way to ask. The
+          // same look as a profile tile's "Chat about this".
+          if (slide > 0)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(Radii.tile),
+              child: ColoredBox(
+                color: pastMark ? AppColors.accent : AppColors.fill,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: SizedBox(
+                    width: slide,
+                    child: Opacity(
+                      opacity: (slide / 60).clamp(0.0, 1.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.chat_bubble_outline_rounded,
+                            color: AppColors.onAccent,
+                            size: 24,
+                          ),
+                          if (slide >= 96) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              'Chat about this',
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              style: AppText.footnote.copyWith(
+                                color: AppColors.onAccent,
+                                fontWeight: FontWeight.w600,
                               ),
-                            ],
+                            ),
                           ],
-                        ),
+                        ],
                       ),
                     ),
                   ),
                 ),
               ),
-            Transform.translate(
-              offset: Offset(-slide, 0),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(Radii.tile),
-                  boxShadow: held
-                      ? const [
-                          BoxShadow(
-                            color: AppColors.glow,
-                            blurRadius: 22,
-                            offset: Offset(0, 8),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: InsightTile(
-                  size: size,
-                  number: t.isAnswer ? null : t.headline,
-                  caption: t.isAnswer ? null : t.body,
-                  prompt: t.question,
-                  answer: t.isAnswer ? t.headline : null,
-                  tone: t.tone,
-                  isTrack: t.looksLikeTrack,
-                  music: t.music,
-                  mediaUrl: media?.stillUrl,
-                  videoUrl: media?.videoUrl,
-                  isLivePhoto: media?.kind == MediaKind.livePhoto,
-                  categoryGlyph: showCategory ? t.glyph : null,
-                  onTap: onTap,
-                ),
+            ),
+          Transform.translate(
+            offset: Offset(-slide, 0),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(Radii.tile),
+                boxShadow: held
+                    ? const [
+                        BoxShadow(
+                          color: AppColors.glow,
+                          blurRadius: 22,
+                          offset: Offset(0, 8),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: InsightTile(
+                size: size,
+                number: t.isAnswer ? null : t.headline,
+                caption: t.isAnswer ? null : t.body,
+                prompt: t.question,
+                answer: t.isAnswer ? t.headline : null,
+                tone: t.tone,
+                isTrack: t.looksLikeTrack,
+                music: t.music,
+                mediaUrl: media?.stillUrl,
+                videoUrl: media?.videoUrl,
+                isLivePhoto: media?.kind == MediaKind.livePhoto,
+                categoryGlyph: showCategory ? t.glyph : null,
+                onTap: onTap,
               ),
             ),
-            if (asked) const Positioned(top: 9, right: 9, child: _AskedMark()),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AskedMark extends StatelessWidget {
-  const _AskedMark();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 24,
-      padding: const EdgeInsets.symmetric(horizontal: 9),
-      decoration: BoxDecoration(
-        color: AppColors.fill,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        'Asked',
-        style: AppText.micro.copyWith(
-          color: AppColors.onAccent,
-          fontWeight: FontWeight.w600,
-        ),
+          ),
+        ],
       ),
     );
   }

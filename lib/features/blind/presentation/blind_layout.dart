@@ -49,6 +49,45 @@ class BlindLayout {
   /// More of the same deal. Blocks already filled keep what they hold.
   void add(List<BlindTile> more) => _tiles.addAll(more);
 
+  /// Takes every tile of one person off the plane: someone asked from here
+  /// (Aryan's call, 2026-10-10), so they are not asked twice. Each place they
+  /// held is filled from the deal, so the plane keeps its shape and has no
+  /// holes; every other tile stays where it was.
+  void removePerson(String userId) {
+    bool theirs(BlindTile t) => t.person.userId == userId;
+    if (!_tiles.any(theirs)) return;
+
+    // Where the deal had got to, counted again without them, so the next tile
+    // laid down is the one that would have been.
+    final before = _tiles.length;
+    final pass = _next ~/ before;
+    final at = _next % before;
+    final kept = <int, int>{};
+    for (var i = 0; i < before; i++) {
+      if (!theirs(_tiles[i])) kept[i] = kept.length;
+    }
+    final waiting = [
+      for (final i in _waiting)
+        if (kept.containsKey(i)) kept[i]!,
+    ];
+    final keptBefore = kept.keys.where((i) => i < at).length;
+    _tiles.removeWhere(theirs);
+    _waiting
+      ..clear()
+      ..addAll(waiting);
+    _next = pass * _tiles.length + keptBefore;
+
+    if (_tiles.isEmpty) {
+      _blocks.clear();
+      return;
+    }
+    for (final block in _blocks.values) {
+      for (var k = 0; k < block.length; k++) {
+        if (theirs(block[k])) block[k] = _take(slots[k].$3);
+      }
+    }
+  }
+
   /// The deal is running out: fewer than two blocks' worth left unseen.
   bool get runningLow => _tiles.length - math.min(_laid, _tiles.length) <
       slots.length * 2;

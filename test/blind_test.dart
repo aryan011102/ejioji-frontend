@@ -158,4 +158,63 @@ void main() {
       expect(BlindLayout(const []).block(0, 0), isEmpty);
     });
   });
+
+  group('someone asked from Blind (2026-10-10)', () {
+    /// Two people, their tiles taking turns in the deal.
+    List<BlindTile> twoPeople(int each) => BlindDeal.fromJson({
+          'seed': 1,
+          'people': [
+            for (final id in ['a', 'b'])
+              card(id, [
+                for (var i = 0; i < each; i++) insight('$id$i', '$i'),
+              ]),
+          ],
+          'deal': [
+            for (var i = 0; i < each; i++)
+              for (final id in ['a', 'b'])
+                {'user_id': id, 'kind': 'insight', 'key': '$id$i'},
+          ],
+        }).tiles;
+
+    test('every tile of theirs leaves the plane, with no holes', () {
+      final layout = BlindLayout(twoPeople(30));
+      final before = layout.block(0, 0);
+      final kept = {
+        for (var k = 0; k < before.length; k++)
+          if (before[k].person.userId == 'b') k: before[k],
+      };
+
+      layout.removePerson('a');
+
+      expect(layout.length, 30);
+      final after = layout.block(0, 0);
+      expect(after, hasLength(BlindLayout.slots.length));
+      expect(after.every((t) => t.person.userId == 'b'), isTrue);
+      // Everyone else's tiles stay where they were.
+      for (final MapEntry(key: k, value: t) in kept.entries) {
+        expect(after[k], same(t), reason: 'slot $k');
+      }
+      // And blocks not yet seen never deal them.
+      expect(
+        layout.block(4, 4).every((t) => t.person.userId == 'b'),
+        isTrue,
+      );
+    });
+
+    test('asking everyone dealt leaves an empty plane', () {
+      final layout = BlindLayout(twoPeople(10))..block(0, 0);
+      layout
+        ..removePerson('a')
+        ..removePerson('b');
+      expect(layout.length, 0);
+      expect(layout.block(0, 0), isEmpty);
+    });
+
+    test('someone not on the plane changes nothing', () {
+      final layout = BlindLayout(twoPeople(20));
+      final before = layout.block(0, 0);
+      layout.removePerson('nobody');
+      expect(layout.block(0, 0), same(before));
+    });
+  });
 }

@@ -143,3 +143,19 @@ each one names the endpoint in `core/network/endpoints.dart` it will call.
 `shared/mock/demo_data.dart` supplies the placeholder content, and nothing
 outside `presentation` imports it — when that file deletes cleanly, the backend
 is fully wired.
+
+## Changes that may be reverted
+
+Product calls made knowing they might be undone. Each says what changed, the
+PR that made it, and how to put it back.
+
+- **Go blind shows no profile, and an asked person's tiles vanish**
+  (Aryan, 2026-10-10, [#101](https://github.com/aryan011102/ejioji-frontend/pull/101)).
+  A tap on a Blind tile no longer opens the person's profile; it shows how to
+  ask, and their profile opens once they accept or reply, from the chat.
+  Asking someone takes every tile of theirs off the plane at once
+  (`BlindLayout.removePerson`); before, they stayed, dimmed and marked
+  "Asked". To revert: point `BlindPage._tapped` back at `Routes.person` with
+  `PersonArgs(person: t.person, backLabel: 'Blind', canAsk: true)`, drop the
+  `removePerson` loop in `BlindPage._layoutFor`, and restore the `asked`
+  dimming in `blind_field.dart` from #101's diff.

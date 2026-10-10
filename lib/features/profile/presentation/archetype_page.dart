@@ -9,6 +9,7 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
 import '../../../data/providers.dart';
 import '../../../shared/models/archetype.dart';
+import '../../../shared/models/enums.dart';
 import '../../../shared/widgets/buttons.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/sheets.dart';
@@ -146,6 +147,13 @@ class _ArchetypePageState extends ConsumerState<ArchetypePage> {
   }
 
   Widget _choices(ArchetypeOffer offer, String? picked) {
+    // The current AI notice's version, named on the "agree again" line so
+    // someone who said yes to an older one can see which they are agreeing to.
+    final noticeVersion = ref
+        .watch(consentProvider)
+        .valueOrNull
+        ?.noticeFor(ConsentPurpose.aiProcessing)
+        ?.version;
     return ListView(
       padding: const EdgeInsets.fromLTRB(
         Insets.titleGutter,
@@ -156,7 +164,10 @@ class _ArchetypePageState extends ConsumerState<ArchetypePage> {
       children: [
         Text('Who your data thinks you are', style: AppText.largeTitle),
         const SizedBox(height: 6),
-        Text(_intro(offer), style: AppText.callout.copyWith(height: 20 / 15)),
+        Text(
+          _intro(offer, noticeVersion),
+          style: AppText.callout.copyWith(height: 20 / 15),
+        ),
         const SizedBox(height: 20),
         if (_refreshing)
           const SizedBox(height: 360, child: _Writing())
@@ -196,7 +207,9 @@ class _ArchetypePageState extends ConsumerState<ArchetypePage> {
             child: TextActionButton(
               label: offer.ai == ArchetypeAi.off
                   ? 'Allow AI to write yours'
-                  : 'Agree to the updated AI notice',
+                  : noticeVersion == null
+                      ? 'Agree to the updated AI notice'
+                      : 'Agree to AI notice v$noticeVersion',
               onPressed: _saving ? null : () => unawaited(_allowAi()),
             ),
           ),
@@ -204,7 +217,7 @@ class _ArchetypePageState extends ConsumerState<ArchetypePage> {
     );
   }
 
-  static String _intro(ArchetypeOffer offer) {
+  static String _intro(ArchetypeOffer offer, int? noticeVersion) {
     if (offer.personal) {
       return 'Written from everything you connected, taken together. Pick the '
           'one that sounds most like you. It shows on the back of your photo.';
@@ -212,8 +225,12 @@ class _ArchetypePageState extends ConsumerState<ArchetypePage> {
     return switch (offer.ai) {
       ArchetypeAi.on => 'These are ours for now. Connect an app, and the next '
           'ones are written from your data.',
-      ArchetypeAi.outdated => 'These are ours. Our AI notice now covers '
-          'archetypes: agree to it to get ones written from your data.',
+      ArchetypeAi.outdated => noticeVersion == null
+          ? 'These are ours. Our AI notice now covers archetypes: agree to it '
+              'to get ones written from your data.'
+          : 'These are ours. Version $noticeVersion of our AI notice covers '
+              'archetypes, and you agreed to an earlier one. Agree to '
+              'v$noticeVersion to get ones written from your data.',
       ArchetypeAi.off => 'These are ours, picked to fit what you connected. '
           'Allow AI to get ones written from your data.',
     };

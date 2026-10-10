@@ -83,6 +83,35 @@ class SongMusic {
   }
 }
 
+/// The show or film a tile is about, as TMDB has it.
+///
+/// Set only on a tile about one Netflix show or film that TMDB has a poster
+/// for. The poster goes behind the tile unless the person put their own photo
+/// or video there. Wherever posters show, TMDB must be credited (Support).
+@immutable
+class ShowPoster {
+  const ShowPoster({
+    required this.name,
+    required this.posterUrl,
+    required this.tmdbUrl,
+    this.year,
+  });
+
+  final String name;
+  final int? year;
+
+  /// Portrait, 2:3, on TMDB's image host.
+  final String posterUrl;
+  final String tmdbUrl;
+
+  static ShowPoster fromJson(Json j) => ShowPoster(
+        name: j.str('name'),
+        year: j.intOrNull('year'),
+        posterUrl: j.str('poster_url'),
+        tmdbUrl: j.str('tmdb_url'),
+      );
+}
+
 /// A derived tile: a fact the server computed, with a caption around it.
 ///
 /// The value is never written by a model. A model may propose what to count
@@ -101,6 +130,7 @@ class Insight {
     required this.providers,
     required this.computedAt,
     this.music,
+    this.poster,
   });
 
   /// Stable across refreshes, so a picked tile keeps its place when the data
@@ -129,6 +159,9 @@ class Insight {
   /// The song this tile is about, when it is about one Apple's catalog has.
   final SongMusic? music;
 
+  /// The show or film this tile is about, when TMDB has a poster for it.
+  final ShowPoster? poster;
+
   static Insight fromJson(Json j) => Insight(
         key: j.str('key'),
         origin: TileOrigin.parse(j.strOrNull('origin')),
@@ -143,11 +176,17 @@ class Insight {
             .toList(growable: false),
         computedAt: j.time('computed_at'),
         music: _music(j),
+        poster: _poster(j),
       );
 
   static SongMusic? _music(Json j) {
     final m = j.objectOrNull('music');
     return m == null ? null : SongMusic.fromJson(m);
+  }
+
+  static ShowPoster? _poster(Json j) {
+    final p = j.objectOrNull('poster');
+    return p == null ? null : ShowPoster.fromJson(p);
   }
 
   static List<Insight> listFrom(List<Json> items) =>
@@ -278,6 +317,9 @@ class ProfileTile {
 
   /// The song, on a tile about one.
   SongMusic? get music => insight?.music;
+
+  /// The poster, on a tile about one show or film.
+  ShowPoster? get poster => insight?.poster;
 
   /// The photo or video the person put behind it, if any. It belongs to the
   /// tile rather than the profile, so it survives the tile being dropped and

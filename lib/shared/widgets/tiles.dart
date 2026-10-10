@@ -9,7 +9,7 @@ import 'package:video_player/video_player.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/theme/typography.dart';
 import '../models/archetype.dart';
-import '../models/tile.dart' show SongMusic;
+import '../models/tile.dart' show ShowPoster, SongMusic;
 import 'pressable.dart';
 
 /// How much of the bento grid a tile takes.
@@ -55,6 +55,7 @@ class InsightTile extends StatelessWidget {
     this.mediaBusy = false,
     this.isTrack = false,
     this.music,
+    this.poster,
     this.playMusic = true,
     this.categoryGlyph,
     this.selectable = false,
@@ -98,6 +99,10 @@ class InsightTile extends StatelessWidget {
   /// preview plays from the button top right.
   final SongMusic? music;
 
+  /// The show or film a tile is about, from TMDB: its poster goes behind the
+  /// tile when nothing of the person's own is there and there is no song cover.
+  final ShowPoster? poster;
+
   /// False where a preview would be in the way (the wobbling arrange wall):
   /// the cover still shows.
   final bool playMusic;
@@ -133,8 +138,10 @@ class InsightTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final withMedia = hasMedia || mediaUrl != null;
-    // The person's own photo or video wins over the song's cover.
-    final cover = mediaUrl == null && !hasMedia ? music?.artworkUrl : null;
+    // The person's own photo or video wins over the song's cover or a poster.
+    final cover = mediaUrl == null && !hasMedia
+        ? music?.artworkUrl ?? poster?.posterUrl
+        : null;
     // Over a cover too, so a count about one artist stays readable on it.
     final overMedia = withMedia || isTrack || cover != null;
     // Any tile the server gave a song to: a song, or an artist, whose most
@@ -189,7 +196,10 @@ class InsightTile extends StatelessWidget {
                 else if (mediaUrl != null)
                   _MediaImage(url: mediaUrl!)
                 else if (cover != null)
-                  _MediaImage(url: cover, fill: music?.artworkBackground)
+                  _MediaImage(
+                    url: cover,
+                    fill: music?.artworkUrl != null ? music?.artworkBackground : null,
+                  )
                 else if (hasMedia)
                   const ColoredBox(color: Color(0xFF1A1114)),
                 // Paint only: the scrim covers the whole tile and must not take

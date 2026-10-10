@@ -191,6 +191,7 @@ class _ArrangeableTile extends StatelessWidget {
           // or songs.
           mediaUrl: media?.stillUrl,
           music: tile.music,
+          poster: tile.poster,
           playMusic: false,
         ),
       );

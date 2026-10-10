@@ -447,6 +447,7 @@ class _Tile extends StatelessWidget {
                 tone: t.tone,
                 isTrack: t.looksLikeTrack,
                 music: t.music,
+                poster: t.poster,
                 mediaUrl: media?.stillUrl,
                 videoUrl: media?.videoUrl,
                 isLivePhoto: media?.kind == MediaKind.livePhoto,

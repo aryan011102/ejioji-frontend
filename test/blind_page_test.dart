@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:ejioji/data/blind_controller.dart';
+import 'package:ejioji/data/providers.dart';
 import 'package:ejioji/features/blind/presentation/blind_page.dart';
 import 'package:ejioji/shared/models/blind.dart' as m;
+import 'package:ejioji/shared/models/profile.dart';
 import 'package:ejioji/shared/widgets/tiles.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -74,7 +78,12 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(393, 852));
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [blindProvider.overrideWith(() => dealer)],
+        overrides: [
+          blindProvider.overrideWith(() => dealer),
+          // The page holds your own profile for its sheet; none of these
+          // tests open the sheet, so it never needs to arrive.
+          myProfileProvider.overrideWith((_) => Completer<MyProfile>().future),
+        ],
         child: const MaterialApp(home: Scaffold(body: BlindPage())),
       ),
     );

@@ -110,6 +110,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     if (_theirs && person != null) {
       _look = Timer(_lookAfter, () => _recordLook(person.userId));
     }
+    // Your own profile, held while theirs is up, so "Chat about this" knows
+    // whether you are verified when the sheet opens. Read cold, the autoDispose
+    // provider is still loading, which the sheet takes as verified: the button
+    // said "Send request" and then went to verification.
+    if (_theirs) ref.listenManual(myProfileProvider, (_, __) {});
   }
 
   @override

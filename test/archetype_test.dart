@@ -65,13 +65,21 @@ void main() {
   });
 
   group('the photo tile', () {
-    Future<void> pump(WidgetTester tester, Archetype? archetype) =>
+    Future<void> pump(
+      WidgetTester tester,
+      Archetype? archetype, {
+      bool theirs = false,
+    }) =>
         tester.pumpWidget(
           MaterialApp(
             home: Center(
               child: SizedBox.square(
                 dimension: 180,
-                child: PhotosTile(photoUrls: const [], archetype: archetype),
+                child: PhotosTile(
+                  photoUrls: const [],
+                  archetype: archetype,
+                  theirs: theirs,
+                ),
               ),
             ),
           ),
@@ -90,10 +98,26 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('WHO YOUR DATA THINKS YOU ARE'), findsOneWidget);
       expect(find.text('The Quiet Romantic'), findsOneWidget);
+      // The title only: the line under it is too long to read on a tile.
+      expect(find.text('Nostalgic.'), findsNothing);
 
       await tester.tap(find.byType(PhotosTile));
       await tester.pumpAndSettle();
       expect(find.text('The Quiet Romantic'), findsNothing);
+    });
+
+    testWidgets('on somebody else\'s profile it speaks about them', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        const Archetype(title: 'The Quiet Romantic', body: 'Nostalgic.'),
+        theirs: true,
+      );
+      await tester.tap(find.byType(PhotosTile));
+      await tester.pumpAndSettle();
+      expect(find.text('WHO THEIR DATA THINKS THEY ARE'), findsOneWidget);
+      expect(find.text('WHO YOUR DATA THINKS YOU ARE'), findsNothing);
     });
 
     testWidgets('with no archetype chosen, it stays photos', (tester) async {
@@ -133,12 +157,22 @@ void main() {
 
       expect(find.text('Who your data thinks you are'), findsOneWidget);
       expect(find.text('The Night Owl'), findsOneWidget);
+      // Each choice is the title alone, like any tile: the page title already
+      // says what they are, so no choice repeats it.
+      expect(find.text('WHO YOUR DATA THINKS YOU ARE'), findsNothing);
+      // And each has the circle a tile being picked has, none ticked yet.
+      final ticks = find.descendant(
+        of: find.byType(ArchetypeFace),
+        matching: find.byIcon(Icons.check_rounded),
+      );
+      expect(ticks, findsNothing);
       await tester.tap(find.text('Use this'));
       await tester.pumpAndSettle();
       expect(repo.chosen, isNull);
 
       await tester.tap(find.text('The Night Owl'));
-      await tester.pump();
+      await tester.pumpAndSettle();
+      expect(ticks, findsOneWidget);
       await tester.tap(find.text('Use this'));
       await tester.pumpAndSettle();
       expect(repo.chosen, 'o1');

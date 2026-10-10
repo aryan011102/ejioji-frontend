@@ -483,6 +483,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     p.stillUrl,
                 ],
                 archetype: archetype,
+                theirs: _theirs,
               ),
             );
 

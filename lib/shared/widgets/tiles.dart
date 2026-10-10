@@ -1064,12 +1064,20 @@ class Slot {
 /// exceptional: it falls back to a plain fill instead of Flutter's grey box
 /// with a crossed-out icon, which on a profile reads as a broken person.
 class PhotosTile extends StatefulWidget {
-  const PhotosTile({required this.photoUrls, this.archetype, super.key});
+  const PhotosTile({
+    required this.photoUrls,
+    this.archetype,
+    this.theirs = false,
+    super.key,
+  });
 
   final List<String> photoUrls;
 
   /// What the back says. Null leaves the tile photos only.
   final Archetype? archetype;
+
+  /// Somebody else's profile: the back says "their data", not "your data".
+  final bool theirs;
 
   @override
   State<PhotosTile> createState() => _PhotosTileState();
@@ -1137,7 +1145,10 @@ class _PhotosTileState extends State<PhotosTile>
                   Transform(
                     alignment: Alignment.center,
                     transform: Matrix4.rotationY(math.pi),
-                    child: ArchetypeFace(archetype: archetype),
+                    child: ArchetypeFace(
+                      archetype: archetype,
+                      theirs: widget.theirs,
+                    ),
                   ),
               ],
             ),
@@ -1166,7 +1177,7 @@ class _PhotosTileState extends State<PhotosTile>
           ),
           // That there is a back to turn to.
           if (turns)
-            const Positioned(
+            Positioned(
               top: 10,
               right: 10,
               child: _Badge(
@@ -1174,7 +1185,9 @@ class _PhotosTileState extends State<PhotosTile>
                   Icons.auto_awesome,
                   size: 14,
                   color: AppColors.label,
-                  semanticLabel: 'Tap to see who their data thinks they are',
+                  semanticLabel: widget.theirs
+                      ? 'Tap to see who their data thinks they are'
+                      : 'Tap to see who your data thinks you are',
                 ),
               ),
             ),
@@ -1207,92 +1220,90 @@ class _PhotosTileState extends State<PhotosTile>
 }
 
 /// "Who your data thinks you are", written out: the back of the photo tile,
-/// and each choice on the archetype page.
+/// and each choice on the archetype page. The title only: the line under it
+/// came off on 2026-10-10 (Aryan: too wordy to read on a tile). On somebody
+/// else's profile the label reads "Who their data thinks they are".
 ///
-/// The label sits on top in the small capitals a prompt tile uses, and the
-/// archetype takes the rest of the tile rather than only its foot, as the copy
-/// on other tiles does. Sizes follow the tile's width, so the same face reads
-/// on the wall and in the picker's grid.
+/// Drawn the way a prompt answer is ([InsightTile] with a prompt): the label in
+/// small capitals over the title, both at the foot of the tile, at the same
+/// sizes, so the back of the photo reads as one more tile on the wall.
 class ArchetypeFace extends StatelessWidget {
   const ArchetypeFace({
     required this.archetype,
     this.selected = false,
+    this.selectable = false,
+    this.theirs = false,
     super.key,
   });
 
   static const label = 'Who your data thinks you are';
+  static const theirLabel = 'Who their data thinks they are';
+
+  /// Somebody else's: the label speaks about them, not to them.
+  final bool theirs;
 
   final Archetype archetype;
 
   /// Chosen in the picker: the same ring a picked tile has.
   final bool selected;
 
+  /// One of the choices on the archetype page (Aryan, 2026-10-11): the title
+  /// alone, like any other tile, with the same circle at the top right that
+  /// every tile being picked has. The label is the page's own title there, so
+  /// four copies of it say nothing.
+  final bool selectable;
+
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final w = constraints.maxWidth;
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(Radii.tile),
-            gradient: TileTones.indigo,
-            border: Border.all(color: AppColors.tileEdge, width: 0.67),
-            boxShadow: selected
-                ? const [
-                    BoxShadow(color: AppColors.accent, spreadRadius: 4.5),
-                    BoxShadow(color: Color(0xFF000000), spreadRadius: 2),
-                  ]
-                : null,
-          ),
-          child: Padding(
-            padding: EdgeInsets.all((w * 0.08).clamp(10.0, 16.0)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label.toUpperCase(),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppText.micro.copyWith(
-                    fontSize: (w * 0.056).clamp(8.5, 11.0),
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.7,
-                    color: const Color(0xA8FFFFFF),
-                  ),
+    final face = DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(Radii.tile),
+        gradient: TileTones.indigo,
+        border: Border.all(color: AppColors.tileEdge, width: 0.67),
+        boxShadow: selected
+            ? const [
+                BoxShadow(color: AppColors.accent, spreadRadius: 4.5),
+                BoxShadow(color: Color(0xFF000000), spreadRadius: 2),
+              ]
+            : null,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            if (!selectable) ...[
+              Text(
+                (theirs ? theirLabel : label).toUpperCase(),
+                style: AppText.micro.copyWith(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.7,
+                  color: const Color(0xA8FFFFFF),
                 ),
-                SizedBox(height: w * 0.05),
-                // Never pushes the tile over: a long title gives up lines to
-                // the body first, then ends in an ellipsis.
-                Flexible(
-                  child: Text(
-                    archetype.title,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppText.bodyStrong.copyWith(
-                      fontSize: (w * 0.12).clamp(15.0, 24.0),
-                      height: 1.15,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.label,
-                    ),
-                  ),
-                ),
-                SizedBox(height: w * 0.04),
-                Expanded(
-                  child: Text(
-                    archetype.body,
-                    overflow: TextOverflow.fade,
-                    style: AppText.callout.copyWith(
-                      fontSize: (w * 0.078).clamp(11.0, 15.0),
-                      height: 1.3,
-                      color: const Color(0xD9FFFFFF),
-                    ),
-                  ),
-                ),
-              ],
+              ),
+              const SizedBox(height: 5),
+            ],
+            Text(
+              archetype.title,
+              style: AppText.bodyStrong.copyWith(
+                fontSize: 17,
+                height: 22 / 17,
+                color: AppColors.label,
+              ),
             ),
-          ),
-        );
-      },
+          ],
+        ),
+      ),
+    );
+    if (!selectable) return face;
+    return Stack(
+      fit: StackFit.passthrough,
+      children: [
+        face,
+        Positioned(top: 10, right: 10, child: _Radio(on: selected)),
+      ],
     );
   }
 }

@@ -265,6 +265,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(path: Routes.editInfo, builder: (_, __) => const EditInfoPage()),
       GoRoute(
+        path: Routes.archetype,
+        builder: (_, __) => const ArchetypePage(),
+      ),
+      GoRoute(
         path: Routes.editSources,
         // Edit tiles is the connect screen again, not a page of its own.
         builder: (_, __) => const ConnectAccountsPage(editing: true),

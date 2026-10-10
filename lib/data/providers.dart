@@ -6,6 +6,7 @@ import '../core/session/session.dart';
 import '../core/storage/device.dart';
 import '../core/storage/token_store.dart';
 import '../shared/models/activity.dart';
+import '../shared/models/archetype.dart';
 import '../shared/models/chat.dart';
 import '../shared/models/connection.dart';
 import '../shared/models/consent.dart';
@@ -127,6 +128,11 @@ final myProfileProvider = FutureProvider.autoDispose<MyProfile>(
 /// Your own social links, switches included. Only matches ever see them.
 final mySocialsProvider = FutureProvider.autoDispose<List<SocialLink>>(
   (ref) => ref.watch(profileRepositoryProvider).socials(),
+);
+
+/// "Who your data thinks you are": the four on offer and the one chosen.
+final archetypesProvider = FutureProvider.autoDispose<ArchetypeOffer>(
+  (ref) => ref.watch(profileRepositoryProvider).archetypes(),
 );
 
 final profileOptionsProvider = FutureProvider<ProfileOptions>(

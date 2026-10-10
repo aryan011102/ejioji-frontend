@@ -48,6 +48,8 @@ enum ChartType {
   numbers('numbers'),
   versus('versus'),
   ranks('ranks'),
+  names('names'),
+  records('records'),
   unknown('');
 
   const ChartType(this.wire);

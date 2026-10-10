@@ -51,6 +51,9 @@ class StoryViewer extends StatefulWidget {
   /// "Chat about this", on every story but the intro. Null hides the button.
   final StoryReply? onReply;
 
+  /// Each photo in the pair at the top and on the intro, for tests.
+  static const faceKey = ValueKey('in-common-face');
+
   /// How long one story stays before the next.
   static const perStory = Duration(seconds: 6);
 
@@ -263,7 +266,8 @@ class _Bars extends StatelessWidget {
   }
 }
 
-/// Both photos, overlapping: the reader first.
+/// Both photos, overlapping: the reader first. Each has a black stroke, and
+/// the box is sized to the stroked faces so neither is cut at the edge.
 class _Pair extends StatelessWidget {
   const _Pair({required this.deck, required this.size});
 
@@ -272,20 +276,27 @@ class _Pair extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget face(StoryPerson p) => Container(
+    final stroke = size > 60 ? 3.0 : 1.5;
+    final face = size + stroke * 2;
+    Widget one(StoryPerson p) => Container(
+          key: StoryViewer.faceKey,
+          width: face,
+          height: face,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            border: Border.all(color: AppColors.label, width: size > 60 ? 3 : 1.5),
+            color: AppColors.group,
+            border: Border.all(color: AppColors.group, width: stroke),
           ),
           child: Avatar(seedColor: AppColors.fill, size: size, imageUrl: p.photo?.stillUrl),
         );
     return SizedBox(
-      width: size * 2 - size * 0.3,
-      height: size + 4,
+      width: face + size * 0.7,
+      height: face,
       child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          face(deck.me),
-          Positioned(left: size * 0.7, child: face(deck.them)),
+          one(deck.me),
+          Positioned(left: size * 0.7, child: one(deck.them)),
         ],
       ),
     );
@@ -363,24 +374,7 @@ class _Slide extends StatelessWidget {
     }
     children.add(const Spacer());
     if (story.footnote != null) children.add(rise(_Small(story.footnote!)));
-    final source = _sourceLine(name);
-    if (source != null) {
-      children
-        ..add(const SizedBox(height: 14))
-        ..add(Text(source.toUpperCase(), style: _Small.source));
-    }
     return _Frame(background: _background, children: children);
-  }
-
-  /// "On your profile · in Meera's insights": where each side's tile lives.
-  String? _sourceLine(String name) {
-    final me = story.onProfileMe;
-    final them = story.onProfileThem;
-    if (me == null || them == null) return null;
-    if (me && them) return 'On both profiles';
-    final mine = me ? 'On your profile' : 'In your insights';
-    final theirs = them ? "on $name's profile" : "in $name's insights";
-    return '$mine · $theirs';
   }
 }
 
@@ -441,9 +435,6 @@ class _Small extends StatelessWidget {
   const _Small(this.text);
 
   final String text;
-
-  static TextStyle get source =>
-      AppText.micro.copyWith(color: AppColors.label2, letterSpacing: 1.2);
 
   @override
   Widget build(BuildContext context) =>
@@ -527,6 +518,8 @@ class StoryChartView extends StatelessWidget {
       ChartType.numbers => _Numbers(chart: chart),
       ChartType.versus => _Versus(chart: chart),
       ChartType.ranks => _Ranks(chart: chart, name: name),
+      ChartType.names => _Names(chart: chart),
+      ChartType.records => _Records(chart: chart),
       ChartType.unknown => const SizedBox.shrink(),
     };
   }
@@ -765,6 +758,162 @@ class _Versus extends StatelessWidget {
   }
 }
 
+/// "you · 8 orders" as its two halves: who, and the rest.
+(String, String) _split(String label) {
+  final at = label.indexOf(' · ');
+  if (at < 0) return (label, '');
+  return (label.substring(0, at), label.substring(at + 3));
+}
+
+/// Two named things, a card each: two kitchens, two shows.
+class _Names extends StatelessWidget {
+  const _Names({required this.chart});
+
+  final StoryChart chart;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget card(ChartSide side, Color colour) {
+      final (who, rest) = _split(side.label);
+      return Container(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+        decoration: BoxDecoration(
+          color: AppColors.storyDim,
+          borderRadius: BorderRadius.circular(Radii.tile),
+          border: Border.all(color: AppColors.tileEdge, width: 0.67),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              who.toUpperCase(),
+              overflow: TextOverflow.ellipsis,
+              style: AppText.micro.copyWith(color: AppColors.label, letterSpacing: 1.4),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              side.display,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppText.tileNumber(28).copyWith(color: colour, letterSpacing: -0.8),
+            ),
+            if (rest.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(rest, style: AppText.footnote.copyWith(color: AppColors.label)),
+            ],
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _Rise(delay: Duration.zero, child: card(chart.me, AppColors.storyMe)),
+        const SizedBox(height: 12),
+        _Rise(
+          delay: const Duration(milliseconds: 140),
+          child: card(chart.them, AppColors.storyThem),
+        ),
+      ],
+    );
+  }
+}
+
+/// Two records, slowly turning, each with its year: the old ones.
+class _Records extends StatefulWidget {
+  const _Records({required this.chart});
+
+  final StoryChart chart;
+
+  @override
+  State<_Records> createState() => _RecordsState();
+}
+
+class _RecordsState extends State<_Records> with SingleTickerProviderStateMixin {
+  late final _spin = AnimationController(vsync: this, duration: const Duration(seconds: 6));
+
+  @override
+  void initState() {
+    super.initState();
+    if (!WidgetsBinding.instance.platformDispatcher.accessibilityFeatures.disableAnimations) {
+      unawaited(_spin.repeat());
+    }
+  }
+
+  @override
+  void dispose() {
+    _spin.dispose();
+    super.dispose();
+  }
+
+  Widget _disc(Color label) => RotationTransition(
+        turns: _spin,
+        child: Container(
+          width: 128,
+          height: 128,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: RadialGradient(
+              colors: [Color(0xFF2A2A2A), Color(0xFF0A0A0A), Color(0xFF1C1C1C), Color(0xFF050505)],
+              stops: [0.3, 0.55, 0.8, 1],
+            ),
+            boxShadow: [BoxShadow(color: AppColors.liquidShadow, blurRadius: 24)],
+          ),
+          alignment: Alignment.center,
+          child: Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: label),
+            alignment: Alignment.topCenter,
+            padding: const EdgeInsets.only(top: 6),
+            child: Container(
+              width: 6,
+              height: 6,
+              decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.group),
+            ),
+          ),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    Widget one(ChartSide side, Color colour, CrossAxisAlignment align) {
+      final (who, rest) = _split(side.label);
+      final end = align == CrossAxisAlignment.end;
+      return Column(
+        crossAxisAlignment: align,
+        children: [
+          _disc(colour),
+          const SizedBox(height: 14),
+          Text(
+            who.toUpperCase(),
+            style: AppText.micro.copyWith(color: AppColors.label, letterSpacing: 1.4),
+          ),
+          const SizedBox(height: 2),
+          Text(side.display, style: AppText.tileNumber(34).copyWith(color: colour)),
+          if (rest.isNotEmpty)
+            Text(
+              rest,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: end ? TextAlign.right : TextAlign.left,
+              style: AppText.footnote.copyWith(color: AppColors.label),
+            ),
+        ],
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: one(widget.chart.me, AppColors.storyMe, CrossAxisAlignment.start)),
+        const SizedBox(width: 16),
+        Expanded(child: one(widget.chart.them, AppColors.storyThem, CrossAxisAlignment.end)),
+      ],
+    );
+  }
+}
 
 /// The glass pill at the foot of a story, as Instagram's reply.
 class _ChatAboutThis extends StatelessWidget {

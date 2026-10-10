@@ -9,11 +9,14 @@ import '../../../core/theme/typography.dart';
 import '../../../data/photo_controller.dart';
 import '../../../data/providers.dart';
 import '../../../shared/models/enums.dart';
+import '../../../shared/models/social.dart';
 import '../../../shared/widgets/entry.dart';
 import '../../../shared/widgets/identity.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/sheets.dart';
+import '../../../shared/widgets/social_mark.dart';
 import '../../../shared/widgets/states.dart';
+import 'social_link_sheet.dart';
 
 /// The same fields again, revisited rather than filled in.
 ///
@@ -343,6 +346,11 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
   Widget build(BuildContext context) {
     final mine = ref.watch(myProfileProvider);
     final photos = ref.watch(photoPoolProvider);
+    final socials = {
+      for (final l in ref.watch(mySocialsProvider).valueOrNull ??
+          const <SocialLink>[])
+        l.network: l,
+    };
 
     final details = mine.valueOrNull?.profile;
     if (!_seeded && details != null) {
@@ -520,11 +528,43 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
                 ),
               ],
             ),
+            // Moved here from Edit tiles (Aryan, 2026-10-10): a handle is
+            // something about you, like your city, not a source of tiles.
+            // Edit tiles now has Instagram as a source, which is a different
+            // thing, so the two must not sit side by side.
+            SectionGroup(
+              header: 'Socials',
+              footer: 'Only people you match with see these, and only the '
+                  'ones you leave switched on.',
+              children: [
+                for (final n in SocialNetwork.shown)
+                  AppRow(
+                    leading: SocialMark(n),
+                    label: n.label,
+                    subtitle: _socialLine(n, socials[n]),
+                    last: n == SocialNetwork.shown.last,
+                    onTap: () => showSocialLinkSheet(
+                      context,
+                      network: n,
+                      existing: socials[n],
+                    ),
+                  ),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
+
+  static String _socialLine(SocialNetwork network, SocialLink? link) =>
+      switch (link) {
+        null => network == SocialNetwork.linkedin
+            ? 'Add your profile link'
+            : 'Add your handle',
+        final l when l.shown => '${l.display} · shown to matches',
+        final l => '${l.display} · hidden from matches',
+      };
 
   /// Two names, then a count: twelve labels would not fit the row.
   String get _languageSummary {

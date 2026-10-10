@@ -291,8 +291,8 @@ class WhatOthersSeePage extends StatelessWidget {
         _Section('After you match', [
           (
             'Your socials',
-            'Instagram, X and LinkedIn, only while their switch is on in '
-                'Settings.',
+            'Instagram, X and LinkedIn handles, only while their switch is '
+                'on in Edit info.',
           ),
           ('Your messages', 'Only the two of you, in your chat.'),
           (

@@ -338,9 +338,9 @@ class _SentList extends ConsumerWidget {
                     AppRow(
                       label: r.person.displayName,
                       subtitle: r.tile == null
-                          ? 'Asked ${relativeTime(r.requestedAt)} ago'
+                          ? 'Asked ${relativeTimeAgo(r.requestedAt)}'
                           : 'Asked about a tile '
-                              '${relativeTime(r.requestedAt)} ago',
+                              '${relativeTimeAgo(r.requestedAt)}',
                       last: r.id == out.requests.last.id,
                       leading: Avatar(
                         seedColor: AppColors.fill,
@@ -517,7 +517,7 @@ class _RequestCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'Asked ${relativeTime(request.requestedAt)} ago',
+                          'Asked ${relativeTimeAgo(request.requestedAt)}',
                           style: AppText.footnote,
                         ),
                       ],

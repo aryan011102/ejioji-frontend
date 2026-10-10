@@ -33,6 +33,15 @@ String relativeTime(DateTime at, {DateTime? now}) {
   return '${days ~/ 365}y';
 }
 
+/// [relativeTime] inside a sentence, as in "Asked 4m ago". Only a span takes
+/// "ago": "Asked now" and "Asked yesterday" already say when.
+String relativeTimeAgo(DateTime at, {DateTime? now}) {
+  final when = relativeTime(at, now: now);
+  if (when == 'now') return when;
+  if (when == 'Yesterday') return 'yesterday';
+  return '$when ago';
+}
+
 /// The time of day, for a message bubble.
 String clockTime(DateTime at) {
   final hour = at.hour % 12 == 0 ? 12 : at.hour % 12;

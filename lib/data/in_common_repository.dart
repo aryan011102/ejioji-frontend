@@ -50,6 +50,10 @@ enum ChartType {
   ranks('ranks'),
   names('names'),
   records('records'),
+  // Each side's year of weeks, with its number: how often.
+  year('year'),
+  // No picture: the headline and footnote stand alone.
+  words('words'),
   unknown('');
 
   const ChartType(this.wire);

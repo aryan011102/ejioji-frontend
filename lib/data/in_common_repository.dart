@@ -59,12 +59,49 @@ enum ChartType {
       values.firstWhere((v) => v.wire == raw, orElse: () => unknown);
 }
 
+/// How often, across the year up to one person's latest row: a count per
+/// week and per month. Never a date.
+class StoryCalendar {
+  const StoryCalendar({
+    required this.weeks,
+    required this.months,
+    required this.firstMonth,
+    required this.firstYear,
+  });
+
+  static StoryCalendar? fromJson(Json? j) {
+    if (j == null) return null;
+    final weeks = j.ints('weeks');
+    final months = j.ints('months');
+    if (weeks.isEmpty || months.isEmpty) return null;
+    return StoryCalendar(
+      weeks: weeks,
+      months: months,
+      firstMonth: j.intOr('first_month', 1),
+      firstYear: j.intOr('first_year', 2000),
+    );
+  }
+
+  /// Oldest first; the last holds the latest row.
+  final List<int> weeks;
+
+  /// Twelve calendar months, oldest first, from [firstMonth] of [firstYear].
+  final List<int> months;
+  final int firstMonth;
+  final int firstYear;
+
+  int get total => months.fold(0, (a, b) => a + b);
+  int get weeksWithAny => weeks.where((w) => w > 0).length;
+}
+
 class ChartSide {
   const ChartSide({
     required this.value,
     required this.display,
     required this.label,
     required this.category,
+    this.series = const [],
+    this.calendar,
   });
 
   factory ChartSide.fromJson(Json j) => ChartSide(
@@ -72,7 +109,17 @@ class ChartSide {
         display: j.str('display'),
         label: j.str('label'),
         category: TileCategory.parse(j.strOrNull('category')),
+        series: j.ints('series'),
+        calendar: StoryCalendar.fromJson(j.objectOrNull('calendar')),
       );
+
+  /// How the rows spread: 24 hours on an hours chart, 7 weekdays (Monday
+  /// first) under the weekend story. Empty from an older server.
+  final List<int> series;
+
+  /// A year of how often, under a story about a count. Null when there is too
+  /// little to draw, and then null on the other side too.
+  final StoryCalendar? calendar;
 
   /// The tile's own number: an hour 0 to 23, a weekday (Monday 0), a month
   /// (January 1), a count, a fraction, seconds or a year, by chart type.

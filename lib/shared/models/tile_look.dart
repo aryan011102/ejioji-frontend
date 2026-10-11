@@ -31,6 +31,7 @@ extension TileLook on ProfileTile {
   /// "62%" is set at.
   TileSize get tileSize {
     if (isAnswer) return TileSize.wide;
+    if (isWords) return wordsSize(headline);
 
     final value = headline;
     if (value.length > 12) return TileSize.large;
@@ -42,6 +43,9 @@ extension TileLook on ProfileTile {
   /// treats those differently: a track or a show gets the record-sleeve
   /// treatment, a count does not.
   bool get isEntity => insight?.value.kind == ValueKind.entity;
+
+  /// Set as words, not as a number: a quote or a list.
+  bool get isWords => insight?.value.kind.isWords ?? false;
 
   /// Only music entities get the track look, and only when there is something
   /// to name.
@@ -79,7 +83,10 @@ extension CandidateLook on Insight {
 
   String get glyph => category.glyph;
 
+  bool get isWords => value.kind.isWords;
+
   TileSize get tileSize {
+    if (isWords) return wordsSize(displayValue);
     if (displayValue.length > 12) return TileSize.large;
     if (displayValue.length > 6) return TileSize.wide;
     return TileSize.small;
@@ -101,3 +108,12 @@ extension CandidateLook on Insight {
     return 'Read over a year ago';
   }
 }
+
+extension WordsKind on ValueKind {
+  bool get isWords => this == ValueKind.quote || this == ValueKind.list;
+}
+
+/// A quote or a list reads at body size, so it needs width, and height once it
+/// runs past a line or two.
+TileSize wordsSize(String words) =>
+    words.length > 48 ? TileSize.large : TileSize.wide;

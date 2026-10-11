@@ -300,6 +300,12 @@ enum ValueKind {
   /// number, which `tileSize` works out from the string on its own.
   time('time'),
   weekday('weekday'),
+  month('month'),
+  /// Something the person wrote, printed whole (a bio, a caption, a comment),
+  /// and the first few winners together ("Haan, nahi, mein, bhai"). Both are
+  /// words rather than a number, so the tile sets them as text.
+  quote('quote'),
+  list('list'),
   unknown('');
 
   const ValueKind(this.wire);

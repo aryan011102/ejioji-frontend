@@ -135,6 +135,9 @@ class InsightTile extends StatelessWidget {
       TileSize.large => 52.0,
     };
     final n = number?.length ?? 0;
+    // Words rather than a number: a headline the server sent in its place.
+    // Set as a short sentence that wraps, not a figure that must not.
+    if (n > 14) return base * 0.56;
     if (n > 7) return base * 0.68;
     if (n > 4) return base * 0.86;
     return base;

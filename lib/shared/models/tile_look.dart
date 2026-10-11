@@ -32,6 +32,8 @@ extension TileLook on ProfileTile {
   TileSize get tileSize {
     if (isAnswer) return TileSize.wide;
     if (isWords) return wordsSize(headline);
+    final words = insight?.headline;
+    if (words != null) return headlineSize(words);
 
     final value = headline;
     if (value.length > 12) return TileSize.large;
@@ -52,6 +54,11 @@ extension TileLook on ProfileTile {
   bool get looksLikeTrack =>
       isEntity && category == TileCategory.music;
 }
+
+/// A tile that leads with words is a short sentence, so it always takes the
+/// width, and the long ones the height as well.
+TileSize headlineSize(String words) =>
+    words.length > 30 ? TileSize.large : TileSize.wide;
 
 /// The colour family of a category. One per category, so a wall reads as a
 /// set rather than a paint chart, and a tile quoted in a request or a chat
@@ -86,7 +93,9 @@ extension CandidateLook on Insight {
   bool get isWords => value.kind.isWords;
 
   TileSize get tileSize {
-    if (isWords) return wordsSize(displayValue);
+    if (isWords) return wordsSize(headline ?? displayValue);
+    final words = headline;
+    if (words != null) return headlineSize(words);
     if (displayValue.length > 12) return TileSize.large;
     if (displayValue.length > 6) return TileSize.wide;
     return TileSize.small;

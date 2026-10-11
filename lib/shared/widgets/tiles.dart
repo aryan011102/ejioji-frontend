@@ -54,6 +54,7 @@ class InsightTile extends StatelessWidget {
     this.isLivePhoto = false,
     this.mediaBusy = false,
     this.isTrack = false,
+    this.words = false,
     this.music,
     this.poster,
     this.playMusic = true,
@@ -93,6 +94,10 @@ class InsightTile extends StatelessWidget {
   final bool mediaBusy;
 
   final bool isTrack;
+
+  /// The value is words (a quote of theirs, or a list) rather than a number,
+  /// and is set as text: at number size a sentence would not fit.
+  final bool words;
 
   /// The song a track tile is about, from Apple Music's catalog: its cover
   /// goes behind the tile when nothing of the person's own is there, and its
@@ -238,10 +243,22 @@ class InsightTile extends StatelessWidget {
                             ),
                           ]
                         : [
-                            Text(
-                              number ?? '',
-                              style: AppText.tileNumber(_numberSize),
-                            ),
+                            if (words)
+                              Text(
+                                number ?? '',
+                                maxLines: size == TileSize.large ? 6 : 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppText.bodyStrong.copyWith(
+                                  fontSize: size == TileSize.large ? 22 : 18,
+                                  height: 1.25,
+                                  color: AppColors.label,
+                                ),
+                              )
+                            else
+                              Text(
+                                number ?? '',
+                                style: AppText.tileNumber(_numberSize),
+                              ),
                             const SizedBox(height: 6),
                             Text(caption ?? '', style: AppText.tileCaption),
                           ],

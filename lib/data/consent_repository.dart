@@ -82,6 +82,15 @@ class ConsentRepository {
     await grant({purpose: notice.version});
   }
 
+  /// Grants [purpose] at the current notice, whatever was agreed before. For a
+  /// step the server refused as covered only by an older notice
+  /// (`notice_out_of_date`), taken again by the person tapping it.
+  Future<void> grantCurrent(ConsentPurpose purpose) async {
+    final notice = (await load()).noticeFor(purpose);
+    if (notice == null) return;
+    await grant({purpose: notice.version});
+  }
+
   /// Withdrawal reaches the data in the same transaction: revoking a source
   /// purges what it produced, not just the link. There is nothing for the
   /// client to clean up afterwards beyond refetching.

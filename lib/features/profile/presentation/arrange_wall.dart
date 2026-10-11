@@ -187,6 +187,7 @@ class _ArrangeableTile extends StatelessWidget {
           answer: tile.isAnswer ? tile.headline : null,
           tone: tile.tone,
           isTrack: tile.looksLikeTrack,
+          words: tile.isWords,
           // The still only: a wall of wobbling tiles is no place to play clips,
           // or songs.
           mediaUrl: media?.stillUrl,

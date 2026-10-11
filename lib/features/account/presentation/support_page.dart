@@ -19,7 +19,6 @@ class SupportPage extends ConsumerWidget {
 
   static final _privacy = Uri.parse('https://theonebytwo.com/privacy');
   static final _terms = Uri.parse('https://theonebytwo.com/terms');
-  static final _tmdb = Uri.parse('https://www.themoviedb.org');
 
   /// The policies live on the website, so there is one copy of each. Opened
   /// in the browser, never a WebView.
@@ -90,20 +89,6 @@ class SupportPage extends ConsumerWidget {
                 last: true,
                 control: _external,
                 onTap: () => _open(context, _terms),
-              ),
-            ],
-          ),
-          // TMDB's terms ask for this wherever its posters show.
-          SectionGroup(
-            header: 'Show and film posters',
-            footer: 'This product uses the TMDB API but is not endorsed or '
-                'certified by TMDB.',
-            children: [
-              AppRow(
-                label: 'The Movie Database (TMDB)',
-                last: true,
-                control: _external,
-                onTap: () => _open(context, _tmdb),
               ),
             ],
           ),

@@ -214,18 +214,23 @@ void main() {
   });
 
   group('how a tile looks', () {
-    ProfileTile tileWith(String value, TileCategory category) =>
+    ProfileTile tileWith(
+      String value,
+      TileCategory category, {
+      String? headline,
+    }) =>
         ProfileTile.fromJson(<String, Object?>{
           'kind': 'insight',
           'key': 'k',
           'category': category.wire,
           'insight': {
             'key': 'k',
-            'origin': 'template',
+            'origin': 'model',
             'category': category.wire,
             'value': {'kind': 'count', 'number': 1},
             'display_value': value,
             'caption': 'c',
+            if (headline != null) 'headline': headline,
             'support': 10,
             'providers': <Object?>[],
             'computed_at': '2026-09-16T04:30:00Z',
@@ -242,6 +247,34 @@ void main() {
         tileWith('Prateek Kuhad', TileCategory.music).tileSize,
         TileSize.large,
       );
+    });
+
+    test('a tile with a headline leads with its words', () {
+      // The server judged words say more than the number, so the number moves
+      // into the caption and the words take the large place.
+      final t = tileWith(
+        '2,508',
+        TileCategory.netflix,
+        headline: 'Will start any show once',
+      );
+      expect(t.headline, 'Will start any show once');
+      expect(t.leadsWithWords, isTrue);
+      expect(t.tileSize, TileSize.wide);
+      expect(
+        tileWith(
+          '2,508',
+          TileCategory.netflix,
+          headline: 'Rewatches the comfort show on a bad day',
+        ).tileSize,
+        TileSize.large,
+      );
+    });
+
+    test('a tile without one leads with its number, as before', () {
+      final t = tileWith('9 PM', TileCategory.foodDelivery);
+      expect(t.headline, '9 PM');
+      expect(t.leadsWithWords, isFalse);
+      expect(t.tileSize, TileSize.small);
     });
 
     test('colour follows the category, not the position', () {

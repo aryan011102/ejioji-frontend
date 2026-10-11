@@ -129,6 +129,7 @@ class Insight {
     required this.support,
     required this.providers,
     required this.computedAt,
+    this.headline,
     this.music,
     this.poster,
   });
@@ -146,6 +147,11 @@ class Insight {
   final String displayValue;
 
   final String caption;
+
+  /// Words the tile leads with in place of [displayValue], when the server
+  /// judged words say more than the number. The [caption] then carries the
+  /// number. Null leads with [displayValue], as every tile used to.
+  final String? headline;
 
   /// How many records stand behind this. Confidence, roughly.
   final int support;
@@ -169,6 +175,7 @@ class Insight {
         value: TileValue.fromJson(j.object('value')),
         displayValue: j.str('display_value'),
         caption: j.str('caption'),
+        headline: j.strOrNull('headline'),
         support: j.intOr('support', 0),
         providers: j
             .strings('providers')
@@ -303,9 +310,14 @@ class ProfileTile {
   final Insight? insight;
   final PromptAnswer? prompt;
 
-  /// What the tile leads with. An insight shows its number; an answer shows
-  /// the answer, with the question above it.
-  String get headline => insight?.displayValue ?? prompt?.answer ?? '';
+  /// What the tile leads with. An insight shows its headline if it has one
+  /// and its number if not; an answer shows the answer, with the question
+  /// above it.
+  String get headline =>
+      insight?.headline ?? insight?.displayValue ?? prompt?.answer ?? '';
+
+  /// Whether the large text is words rather than a number or a name.
+  bool get leadsWithWords => insight?.headline != null;
 
   /// The line under the headline.
   String get body => insight?.caption ?? '';
@@ -364,6 +376,7 @@ class TileQuote {
     this.valueKind,
     this.displayValue,
     this.caption,
+    this.headline,
     this.question,
     this.answer,
   });
@@ -382,6 +395,9 @@ class TileQuote {
   final ValueKind? valueKind;
   final String? displayValue;
   final String? caption;
+
+  /// Set on an insight that led with words, as [Insight.headline].
+  final String? headline;
 
   /// Set on an answer that is still there.
   final String? question;
@@ -404,6 +420,7 @@ class TileQuote {
           : ValueKind.parse(insight.strOrNull('value_kind')),
       displayValue: insight?.strOrNull('display_value'),
       caption: insight?.strOrNull('caption'),
+      headline: insight?.strOrNull('headline'),
       question: prompt?.strOrNull('question'),
       answer: prompt?.strOrNull('answer'),
     );
@@ -421,6 +438,7 @@ class TileQuote {
         valueKind: t.insight?.value.kind,
         displayValue: t.insight?.displayValue,
         caption: t.insight?.caption,
+        headline: t.insight?.headline,
         question: t.prompt?.question,
         answer: t.prompt?.answer,
       );

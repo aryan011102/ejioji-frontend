@@ -49,7 +49,8 @@ class QuotedTile extends StatelessWidget {
     }
 
     final kicker = tile.isAnswer ? tile.question : null;
-    final headline = tile.isAnswer ? tile.answer : tile.displayValue;
+    final headline =
+        tile.isAnswer ? tile.answer : tile.headline ?? tile.displayValue;
     final body = tile.isAnswer ? null : tile.caption;
 
     return _frame(
@@ -78,7 +79,9 @@ class QuotedTile extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: tile.isAnswer
                 ? AppText.bodyStrong.copyWith(color: AppColors.label)
-                : AppText.tileNumber(compact ? 20 : 26),
+                : AppText.tileNumber(
+                    tile.headline != null ? (compact ? 16 : 20) : (compact ? 20 : 26),
+                  ),
           ),
           if (body != null && body.isNotEmpty) ...[
             const SizedBox(height: 3),

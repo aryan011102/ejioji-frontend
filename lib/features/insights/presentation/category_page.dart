@@ -419,7 +419,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                       media: media,
                       serverMedia: saved[TileMedia.id(TileKind.insight, ins.key)],
                       size: ins.tileSize,
-                      number: ins.displayValue,
+                      number: ins.headline ?? ins.displayValue,
                       caption: ins.caption,
                       tone: ins.tone,
                       isTrack: ins.looksLikeTrack,

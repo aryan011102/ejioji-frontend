@@ -406,7 +406,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                           isTrack: t.looksLikeTrack,
                           words: t.isWords,
                           music: t.music,
-                          poster: t.poster,
                           mediaUrl: _media(t)?.stillUrl,
                           videoUrl: _media(t)?.videoUrl,
                           isLivePhoto: _media(t)?.kind == MediaKind.livePhoto,

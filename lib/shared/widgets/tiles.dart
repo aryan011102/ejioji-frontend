@@ -9,7 +9,7 @@ import 'package:video_player/video_player.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/theme/typography.dart';
 import '../models/archetype.dart';
-import '../models/tile.dart' show ShowPoster, SongMusic;
+import '../models/tile.dart' show SongMusic;
 import 'pressable.dart';
 
 /// How much of the bento grid a tile takes.
@@ -56,7 +56,6 @@ class InsightTile extends StatelessWidget {
     this.isTrack = false,
     this.words = false,
     this.music,
-    this.poster,
     this.playMusic = true,
     this.categoryGlyph,
     this.selectable = false,
@@ -104,9 +103,6 @@ class InsightTile extends StatelessWidget {
   /// preview plays from the button top right.
   final SongMusic? music;
 
-  /// The show or film a tile is about, from TMDB: its poster goes behind the
-  /// tile when nothing of the person's own is there and there is no song cover.
-  final ShowPoster? poster;
 
   /// False where a preview would be in the way (the wobbling arrange wall):
   /// the cover still shows.
@@ -146,9 +142,9 @@ class InsightTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final withMedia = hasMedia || mediaUrl != null;
-    // The person's own photo or video wins over the song's cover or a poster.
+    // The person's own photo or video wins over the song's cover.
     final cover = mediaUrl == null && !hasMedia
-        ? music?.artworkUrl ?? poster?.posterUrl
+        ? music?.artworkUrl
         : null;
     // Over a cover too, so a count about one artist stays readable on it.
     final overMedia = withMedia || isTrack || cover != null;

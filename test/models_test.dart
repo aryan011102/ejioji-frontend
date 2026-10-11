@@ -22,7 +22,7 @@ void main() {
       // waiting for an app release. A client that threw on one would break in
       // the field for everybody who had not updated.
       expect(City.parse('kochi'), City.unknown);
-      expect(SourceProvider.parse('instagram'), SourceProvider.unknown);
+      expect(SourceProvider.parse('strava'), SourceProvider.unknown);
       expect(TileCategory.parse('gaming'), TileCategory.unknown);
       expect(RunStatus.parse('paused'), RunStatus.unknown);
       expect(City.parse(null), City.unknown);

@@ -423,6 +423,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                       caption: ins.caption,
                       tone: ins.tone,
                       isTrack: ins.looksLikeTrack,
+                      words: ins.isWords,
                       music: ins.music,
                       poster: ins.poster,
                     ),
@@ -498,6 +499,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
     String? prompt,
     String? answer,
     bool isTrack = false,
+    bool words = false,
     SongMusic? music,
     ShowPoster? poster,
   }) {
@@ -513,6 +515,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
         answer: answer,
         tone: tone,
         isTrack: isTrack,
+        words: words,
         music: music,
         poster: poster,
         mediaUrl: behind?.stillUrl,

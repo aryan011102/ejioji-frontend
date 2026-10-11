@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:isolate';
 
 import 'package:archive/archive_io.dart';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,7 +13,9 @@ import '../../../app/routes.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
+import '../../../data/instagram_download.dart';
 import '../../../data/providers.dart';
+import '../../../shared/models/enums.dart';
 import '../../../shared/widgets/buttons.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/sheets.dart';
@@ -22,10 +26,10 @@ import '../../../shared/widgets/states.dart';
 ///
 /// So the person asks Instagram for their own download, and uploads it here.
 /// The download is a zip of several hundred files with every direct message in
-/// it, so the zip is opened on this phone and only five files leave it: who
-/// they follow, what they liked and saved, and the reels and posts they looked
-/// at. Messages, photos, comments, searches and logins never leave the phone,
-/// and the server refuses any other file if one were sent.
+/// it, so the zip is opened on this phone and only what [InstagramDownload]
+/// picks leaves it: their activity on other people's posts, and a summary of
+/// their own messages worked out here (when, and the words and emoji they use
+/// most), never a message. The server refuses any other file if one were sent.
 class InstagramUploadPage extends ConsumerStatefulWidget {
   const InstagramUploadPage({this.editing = false, super.key});
 
@@ -46,17 +50,6 @@ class _InstagramUploadPageState extends ConsumerState<InstagramUploadPage> {
     'https://accountscenter.instagram.com/info_and_permissions/dyi/',
   );
 
-  /// The five files read, by the name the server knows them as, and where each
-  /// sits in the zip. Matched on the end of the path: the zip may wrap them in
-  /// a folder of its own.
-  static const _files = {
-    'following': 'connections/followers_and_following/following.html',
-    'liked_posts': 'your_instagram_activity/likes/liked_posts.html',
-    'saved_posts': 'your_instagram_activity/saved/saved_posts.html',
-    'videos_watched': 'ads_information/ads_and_topics/videos_watched.html',
-    'posts_viewed': 'ads_information/ads_and_topics/posts_viewed.html',
-  };
-
   static const _steps = [
     (
       '1',
@@ -67,8 +60,8 @@ class _InstagramUploadPageState extends ConsumerState<InstagramUploadPage> {
     (
       '2',
       'Choose Some of your information',
-      'Tick Followers and following, Likes, Saved, and Ads information. '
-          'Nothing else is needed, and a smaller download arrives sooner.',
+      'Choose All available information. Your phone picks out what we read '
+          'and leaves the rest, messages included, where it is.',
     ),
     (
       '3',
@@ -94,25 +87,23 @@ class _InstagramUploadPageState extends ConsumerState<InstagramUploadPage> {
     }
   }
 
-  /// The five files, read out of the zip at [path], as text. Nothing else in
-  /// the zip is decompressed, let alone read.
-  static Map<String, String> _extract(String path) {
-    final input = InputFileStream(path);
+  /// What leaves the phone, read out of the zip at [path] off the main
+  /// thread: a year of messages is a lot of HTML to go through.
+  static Future<Map<String, Object>> _extract(String path) =>
+      Isolate.run(() => InstagramDownload.read(path));
+
+  /// Sends [body], asking once for the current notice if the server says the
+  /// one agreed to does not cover it (the five-file notice of 2026-10-10).
+  Future<String> _upload(String body) async {
+    final sources = ref.read(sourcesRepositoryProvider);
     try {
-      final zip = ZipDecoder().decodeStream(input);
-      final found = <String, String>{};
-      for (final entry in zip.files) {
-        if (!entry.isFile) continue;
-        final name = entry.name.replaceAll(r'\', '/');
-        for (final MapEntry(key: key, value: suffix) in _files.entries) {
-          if (name == suffix || name.endsWith('/$suffix')) {
-            found[key] = utf8.decode(entry.content, allowMalformed: true);
-          }
-        }
-      }
-      return found;
-    } finally {
-      input.closeSync();
+      return (await sources.uploadInstagram(body)).id;
+    } on ApiException catch (e) {
+      if (e.code != 'notice_out_of_date') rethrow;
+      await ref
+          .read(consentRepositoryProvider)
+          .grantCurrent(ConsentPurpose.instagramUpload);
+      return (await sources.uploadInstagram(body)).id;
     }
   }
 
@@ -140,9 +131,9 @@ class _InstagramUploadPageState extends ConsumerState<InstagramUploadPage> {
       final path = picked?.files.singleOrNull?.path;
       if (path == null) return;
 
-      final Map<String, String> files;
+      final Map<String, Object> files;
       try {
-        files = _extract(path);
+        files = await _extract(path);
       } on Object {
         if (mounted) showAppToast(context, 'That file is not a zip we can open.');
         return;
@@ -158,9 +149,7 @@ class _InstagramUploadPageState extends ConsumerState<InstagramUploadPage> {
         return;
       }
 
-      final run = await ref
-          .read(sourcesRepositoryProvider)
-          .uploadInstagram(jsonEncode(files));
+      final runId = await _upload(jsonEncode(files));
       if (!mounted) return;
 
       ref
@@ -171,7 +160,7 @@ class _InstagramUploadPageState extends ConsumerState<InstagramUploadPage> {
       // The upload opens and finishes its run inside the request; the topics
       // of the accounts are worked out just after, so tiles follow shortly.
       context.pushReplacement(
-        Routes.readingRun(run.id, editing: widget.editing),
+        Routes.readingRun(runId, editing: widget.editing),
       );
     } on ApiException catch (e) {
       if (mounted) showAppToast(context, e.message);
@@ -228,11 +217,12 @@ class _InstagramUploadPageState extends ConsumerState<InstagramUploadPage> {
             padding: EdgeInsets.symmetric(horizontal: Insets.gutter),
             child: NoteCard(
               icon: Icons.lock_outline,
-              text: 'Your phone opens the zip and sends us five files: who you '
-                  'follow, what you liked and saved, and what you watched. '
-                  'Your messages, photos, comments and searches never leave '
-                  'your phone. We keep whose post it was and when, never the '
-                  'caption, and friends\' accounts count for nothing.',
+              text: 'Your phone opens the zip and sends us what you follow, '
+                  'like, save, watch, comment on and search for, your own '
+                  'posts and bio, and when you message. Your messages never '
+                  'leave your phone: it counts the words and emoji you use '
+                  'most, with names taken out. We never keep other people\'s '
+                  'captions, and friends\' accounts count for nothing.',
             ),
           ),
         ],

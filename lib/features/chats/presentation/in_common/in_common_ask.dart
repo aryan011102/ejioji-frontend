@@ -10,8 +10,8 @@ import '../../../../shared/widgets/layout.dart';
 /// profile. One yes covers every match after it, and nothing is shown to
 /// anyone until the other person has said yes too.
 ///
-/// A signpost, as the AI question is: the notice itself is one tap away and is
-/// what the grant records.
+/// Just the question (Aryan, 2026-10-11): what it reads and who sees what is
+/// in the notice, one tap away, which is what the grant records.
 class InCommonAskCard extends StatelessWidget {
   const InCommonAskCard({
     required this.name,
@@ -51,25 +51,7 @@ class InCommonAskCard extends StatelessWidget {
               : 'See what you and $name have in common?',
           style: AppText.title3,
         ),
-        const SizedBox(height: 8),
-        Text(
-          'We pick out the few things you two share, and one way you differ, '
-          'from your insights. That includes the ones you kept off your '
-          'profile, so the stories can find more than your profile shows.',
-          style: AppText.callout,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '$name only ever sees those few things, never the rest, and only once '
-          'you have both said yes. Nothing new is collected.',
-          style: AppText.caption,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'This is asked once, for all your matches. You can turn it off in '
-          'Settings, under Privacy choices.',
-          style: AppText.caption,
-        ),
+        const SizedBox(height: 4),
         Align(
           alignment: Alignment.centerLeft,
           child: TextActionButton(

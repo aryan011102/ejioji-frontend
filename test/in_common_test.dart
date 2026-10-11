@@ -269,7 +269,7 @@ void main() {
       ),
     );
     expect(find.text('Meera wants to see what you two have in common'), findsOneWidget);
-    expect(find.textContaining('kept off your profile'), findsOneWidget);
+    expect(find.textContaining('kept off your profile'), findsNothing);
     await tester.tap(find.text('Show me'));
     await tester.tap(find.text('Not now'));
     await tester.tap(find.text('Read the full notice'));

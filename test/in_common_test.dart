@@ -10,6 +10,19 @@ void main() {
   Map<String, Object?> side(double value, String display, String label, [String c = 'music']) =>
       {'value': value, 'display': display, 'label': label, 'category': c};
 
+  List<int> day(int peak) => [for (var h = 0; h < 24; h++) h == peak ? 30 : (h + peak) % 5];
+
+  Map<String, Object?> year(List<int> weeks) => {
+        'weeks': weeks,
+        'months': [for (var m = 0; m < 12; m++) weeks.skip(m * 4).take(4).fold<int>(0, (a, b) => a + b)],
+        'first_month': 11,
+        'first_year': 2025,
+      };
+
+  // A table nearly every week, and a handful of trips.
+  final often = year([for (var w = 0; w < 52; w++) w % 7 == 3 ? 0 : 1]);
+  final rarely = year([for (var w = 0; w < 52; w++) w == 4 || w == 30 || w == 31 ? 1 : 0]);
+
   Map<String, Object?> story(
     String kind,
     String title, {
@@ -40,7 +53,11 @@ void main() {
         'common',
         '2 PM. For both of you.',
         category: 'food_delivery',
-        chart: {'type': 'hours', 'me': side(14, '2 PM', 'you'), 'them': side(14, '2 PM', 'Meera')},
+        chart: {
+          'type': 'hours',
+          'me': {...side(14, '2 PM', 'you'), 'series': day(14)},
+          'them': {...side(14, '2 PM', 'Meera'), 'series': day(13)},
+        },
         me: true,
         them: false,
       ),
@@ -94,8 +111,11 @@ void main() {
         category: 'food_delivery',
         chart: {
           'type': 'names',
-          'me': side(8, 'Bikkgane Biryani', 'you · 8 orders', 'food_delivery'),
-          'them': side(9, 'Taco Bell', 'Meera · 9 orders', 'food_delivery'),
+          'me': {
+            ...side(8, 'Bikkgane Biryani', 'you · 8 orders', 'food_delivery'),
+            'calendar': rarely,
+          },
+          'them': {...side(9, 'Taco Bell', 'Meera · 9 orders', 'food_delivery'), 'calendar': rarely},
         },
       ),
       story(
@@ -134,14 +154,42 @@ void main() {
           ],
         },
       },
+      story(
+        'common',
+        'Weekends are when it happens. For both of you.',
+        chart: {
+          'type': 'numbers',
+          'me': {...side(0.52, '52%', 'you · on a weekend', 'social'), 'series': [3, 3, 4, 3, 5, 9, 10]},
+          'them': {
+            ...side(0.48, '48%', 'Meera · on a weekend', 'social'),
+            'series': [2, 4, 3, 3, 6, 8, 9],
+          },
+        },
+      ),
+      {
+        ...story('common', 'Arijit Singh. Number one for both of you.', category: 'music'),
+        'chart': {
+          'type': 'ranks',
+          'me': side(40, 'Arijit Singh', 'you'),
+          'them': side(31, 'Arijit Singh', 'Meera'),
+          'me_ranks': [
+            {'label': 'Arijit Singh', 'display': '40', 'shared': true},
+            {'label': 'Prateek Kuhad', 'display': '12', 'shared': false},
+          ],
+          'them_ranks': [
+            {'label': 'Arijit Singh', 'display': '31', 'shared': true},
+            {'label': 'Anuv Jain', 'display': '9', 'shared': false},
+          ],
+        },
+      },
       story('thought', 'You bought a projector. Meera keeps going back to Friends.'),
       story(
         'differ',
         'You travel. Meera goes out.',
         chart: {
           'type': 'versus',
-          'me': side(11, '11', 'you · flights booked', 'travel'),
-          'them': side(55, '55', 'Meera · evenings out', 'going_out'),
+          'me': {...side(11, '11', 'you · flights booked', 'travel'), 'calendar': rarely},
+          'them': {...side(55, '55', 'Meera · evenings out', 'going_out'), 'calendar': often},
         },
       ),
     ],
@@ -151,7 +199,11 @@ void main() {
     final deck = InCommon.fromJson(body);
     expect(deck.state, InCommonState.ready);
     expect(deck.canOpen, isTrue);
-    expect(deck.stories, hasLength(12));
+    expect(deck.stories, hasLength(14));
+    expect(deck.stories[1].chart!.me.series, hasLength(24));
+    final differ = deck.stories.last.chart!;
+    expect(differ.me.calendar!.weeks, hasLength(52));
+    expect(differ.them.calendar!.total, greaterThan(StoryCalendarView.dotsUpTo));
     final ranks = deck.stories.firstWhere((s) => s.chart?.type == ChartType.ranks).chart!;
     expect(ranks.meRanks.map((r) => r.shared), [true, true, false]);
     expect(ranks.themRanks.first.label, 'Dark');
@@ -190,6 +242,64 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     expect(spinning, findsNothing);
     expect(find.text('Bikkgane Biryani'), findsOneWidget);
+  });
+
+  testWidgets('every music story is two records, a ranking included', (tester) async {
+    final deck = InCommon.fromJson(body);
+    StoryChart named(String title) => deck.stories.firstWhere((s) => s.title == title).chart!;
+    final spinning = find.descendant(
+      of: find.byType(StoryChartView),
+      matching: find.byType(RotationTransition),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: SizedBox(
+              width: 327,
+              child: StoryChartView(
+                chart: named('Arijit Singh. Number one for both of you.'),
+                name: 'Meera',
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(seconds: 1));
+    expect(spinning, findsNWidgets(2));
+    expect(find.text('Prateek Kuhad'), findsOneWidget, reason: 'the list is still under them');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a year of how often: weeks when there are many, dots when few', (tester) async {
+    final deck = InCommon.fromJson(body);
+    StoryChart named(String title) => deck.stories.firstWhere((s) => s.title == title).chart!;
+    Future<void> draw(StoryChart chart) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: SizedBox(width: 327, child: StoryChartView(chart: chart, name: 'Meera')),
+            ),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(seconds: 2));
+    }
+
+    await draw(named('You travel. Meera goes out.'));
+    expect(find.byType(StoryCalendarView), findsOneWidget);
+    expect(find.text('J'), findsNothing, reason: 'a busy year is weeks, not month dots');
+    expect(tester.takeException(), isNull);
+
+    await draw(named('Different kitchens. Same loyalty.'));
+    expect(find.byType(StoryCalendarView), findsOneWidget);
+    expect(find.text('N'), findsWidgets, reason: 'a few things get a dot each, by month');
+    expect(tester.takeException(), isNull);
+
+    await draw(named("You've both lost a whole day to Netflix."));
+    expect(find.byType(StoryCalendarView), findsNothing, reason: 'no calendar was sent');
   });
 
   test('not enough in common has no ring; waiting has one and does not open', () {

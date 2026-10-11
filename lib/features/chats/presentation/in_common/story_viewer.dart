@@ -493,9 +493,65 @@ class StoryChartView extends StatelessWidget {
   final StoryChart chart;
   final String name;
 
+  bool get _music =>
+      chart.me.category == TileCategory.music && chart.them.category == TileCategory.music;
+
   @override
   Widget build(BuildContext context) {
+    final picture = _picture();
+    final me = chart.me.calendar;
+    final them = chart.them.calendar;
+    if (me == null || them == null) return picture;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        picture,
+        const SizedBox(height: 26),
+        _Rise(
+          delay: const Duration(milliseconds: 260),
+          child: StoryCalendarView(me: me, them: them, name: name),
+        ),
+      ],
+    );
+  }
+
+  Widget _picture() {
+    // Every music story is two records (the founder, 2026-10-11): a ranking
+    // puts each number one on its record, the list under them.
+    if (_music && chart.type == ChartType.ranks) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (chart.meRanks.isNotEmpty && chart.themRanks.isNotEmpty) ...[
+            _Records(chart: _numberOnes(chart)),
+            const SizedBox(height: 22),
+          ],
+          _Ranks(chart: chart, name: name),
+        ],
+      );
+    }
+    if (_music && chart.type != ChartType.hours) return _Records(chart: chart);
     return switch (chart.type) {
+      ChartType.hours when chart.me.series.length == 24 && chart.them.series.length == 24 =>
+        _Spread(
+          chart: chart,
+          name: name,
+          labels: const ['12a', '6a', '12p', '6p', '11p'],
+        ),
+      ChartType.numbers when chart.me.series.length == 7 && chart.them.series.length == 7 =>
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _Spread(
+              chart: chart,
+              name: name,
+              cellLabels: const ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
+              highlight: const {5, 6},
+            ),
+            const SizedBox(height: 18),
+            _Numbers(chart: chart),
+          ],
+        ),
       ChartType.hours => _Strips(
           chart: chart,
           name: name,
@@ -519,15 +575,336 @@ class StoryChartView extends StatelessWidget {
       ChartType.numbers => _Numbers(chart: chart),
       ChartType.versus => _Versus(chart: chart),
       ChartType.ranks => _Ranks(chart: chart, name: name),
-      // Two songs or two artists are two records, like the old ones.
-      ChartType.names when chart.me.category == TileCategory.music &&
-              chart.them.category == TileCategory.music =>
-        _Records(chart: chart),
       ChartType.names => _Names(chart: chart),
       ChartType.records => _Records(chart: chart),
       ChartType.unknown => const SizedBox.shrink(),
     };
   }
+}
+
+/// Each person's number one, as a chart the records can draw.
+StoryChart _numberOnes(StoryChart chart) {
+  ChartSide one(ChartSide side, RankRow top, String who) => ChartSide(
+        value: side.value,
+        display: top.label,
+        label: '$who · number one',
+        category: side.category,
+      );
+  return StoryChart(
+    type: ChartType.records,
+    me: one(chart.me, chart.meRanks.first, 'you'),
+    them: one(chart.them, chart.themRanks.first, chart.them.label.split(' · ').first),
+    meRanks: const [],
+    themRanks: const [],
+  );
+}
+
+/// Each person's whole day, or week, as bars: the height is how much happens
+/// then, the tallest lit. Replaces a row of identical squares with one lit,
+/// which read as empty or still loading.
+class _Spread extends StatelessWidget {
+  const _Spread({
+    required this.chart,
+    required this.name,
+    this.labels,
+    this.cellLabels,
+    this.highlight = const {},
+  });
+
+  final StoryChart chart;
+  final String name;
+  final List<String>? labels;
+  final List<String>? cellLabels;
+
+  /// Slots drawn a little brighter whatever their height (the weekend).
+  final Set<int> highlight;
+
+  static const _tall = 72.0;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget row(String who, List<int> counts, Color colour) {
+      final top = counts.fold<int>(0, (a, b) => b > a ? b : a);
+      final peak = counts.indexOf(top);
+      final narrow = counts.length > 12;
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          SizedBox(
+            width: 64,
+            child: Text(
+              who.toUpperCase(),
+              overflow: TextOverflow.ellipsis,
+              style: AppText.micro.copyWith(color: AppColors.label, letterSpacing: 1),
+            ),
+          ),
+          for (var i = 0; i < counts.length; i++) ...[
+            if (i > 0) SizedBox(width: narrow ? 2 : 6),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: top == 0 ? 0 : counts[i] / top),
+                    duration: Duration(milliseconds: 700 + i * 22),
+                    curve: Ease.emphasised,
+                    builder: (context, t, _) => Container(
+                      height: counts[i] == 0 ? 4 : 6 + (_tall - 6) * t,
+                      decoration: BoxDecoration(
+                        color: counts[i] == 0
+                            ? AppColors.storyDim
+                            : colour.withValues(
+                                alpha: i == peak ? 1 : (highlight.contains(i) ? 0.8 : 0.5),
+                              ),
+                        borderRadius: BorderRadius.circular(narrow ? 2 : 6),
+                      ),
+                    ),
+                  ),
+                  if (cellLabels != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      cellLabels![i],
+                      style: AppText.micro.copyWith(
+                        color: highlight.contains(i) ? AppColors.label : AppColors.label2,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        row('You', chart.me.series, AppColors.storyMe),
+        const SizedBox(height: 16),
+        row(name, chart.them.series, AppColors.storyThem),
+        if (labels != null) ...[
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.only(left: 64),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                for (final l in labels!)
+                  Text(l, style: AppText.micro.copyWith(color: AppColors.label2)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          _Numbers(chart: chart),
+        ],
+      ],
+    );
+  }
+}
+
+const _monthInitials = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+
+/// How often, over each person's year. A handful of things is a dot per thing
+/// in the month it happened ("4 trips this year"); more is a year of weeks, a
+/// square per week lit by how much happened in it ("a table nearly every
+/// week"). Counts only, never a date.
+class StoryCalendarView extends StatelessWidget {
+  const StoryCalendarView({required this.me, required this.them, required this.name, super.key});
+
+  final StoryCalendar me;
+  final StoryCalendar them;
+  final String name;
+
+  /// At most this many in either year and every one gets its own dot.
+  static const dotsUpTo = 12;
+
+  @override
+  Widget build(BuildContext context) {
+    final few = me.total <= dotsUpTo && them.total <= dotsUpTo;
+    if (few) return _MonthDots(me: me, them: them, name: name);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _WeekGrid(calendar: me, who: 'You', colour: AppColors.storyMe),
+        const SizedBox(height: 14),
+        _WeekGrid(calendar: them, who: name, colour: AppColors.storyThem),
+      ],
+    );
+  }
+}
+
+/// Fifty-two squares, thirteen to a row: one per week, oldest first.
+class _WeekGrid extends StatelessWidget {
+  const _WeekGrid({required this.calendar, required this.who, required this.colour});
+
+  final StoryCalendar calendar;
+  final String who;
+  final Color colour;
+
+  @override
+  Widget build(BuildContext context) {
+    final weeks = calendar.weeks;
+    final top = weeks.fold<int>(0, (a, b) => b > a ? b : a);
+    const perRow = 13;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          who.toUpperCase(),
+          overflow: TextOverflow.ellipsis,
+          style: AppText.micro.copyWith(color: AppColors.label, letterSpacing: 1.4),
+        ),
+        const SizedBox(height: 8),
+        for (var r = 0; r * perRow < weeks.length; r++) ...[
+          if (r > 0) const SizedBox(height: 5),
+          Row(
+            children: [
+              for (var c = 0; c < perRow; c++) ...[
+                if (c > 0) const SizedBox(width: 5),
+                Expanded(
+                  child: AspectRatio(
+                    aspectRatio: 1,
+                    child: Builder(
+                      builder: (context) {
+                        final i = r * perRow + c;
+                        final n = i < weeks.length ? weeks[i] : 0;
+                        return TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0, end: 1),
+                          duration: Duration(milliseconds: 300 + i * 14),
+                          curve: Ease.emphasised,
+                          builder: (context, t, _) => DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: n == 0 || top == 0
+                                  ? AppColors.storyDim
+                                  : colour.withValues(alpha: t * (0.45 + 0.55 * n / top)),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Twelve months, a dot for each thing, both people's dots side by side in
+/// each month.
+class _MonthDots extends StatelessWidget {
+  const _MonthDots({required this.me, required this.them, required this.name});
+
+  final StoryCalendar me;
+  final StoryCalendar them;
+  final String name;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(builder: (context, box) => _build(box.maxWidth));
+
+  Widget _build(double width) {
+    // Both years end at their own latest row; the axis follows the reader's.
+    final top = [...me.months, ...them.months].fold<int>(1, (a, b) => b > a ? b : a);
+    // Two dots side by side in a twelfth of the width, never bigger than 16.
+    final dot = ((width / 12 - 4) / 2).clamp(6.0, 16.0);
+    final height = (top * (dot + 4)).clamp(dot * 3, dot * 7).toDouble() + 12;
+
+    Widget stack(int n, Color colour) => Column(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            for (var k = 0; k < n; k++)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Container(
+                  width: dot,
+                  height: dot,
+                  decoration: BoxDecoration(color: colour, shape: BoxShape.circle),
+                ),
+              ),
+          ],
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const _Key(colour: AppColors.storyMe, who: 'You'),
+            const SizedBox(width: 16),
+            _Key(colour: AppColors.storyThem, who: name),
+          ],
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: height,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              for (var m = 0; m < 12; m++)
+                Expanded(
+                  child: Stack(
+                    alignment: Alignment.bottomCenter,
+                    children: [
+                      Container(width: 1.5, color: AppColors.storyDim),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          FittedBox(child: stack(me.months[m], AppColors.storyMe)),
+                          FittedBox(child: stack(them.months[m], AppColors.storyThem)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            for (var m = 0; m < 12; m++)
+              Expanded(
+                child: Text(
+                  _monthInitials[(me.firstMonth - 1 + m) % 12],
+                  textAlign: TextAlign.center,
+                  style: AppText.micro.copyWith(color: AppColors.label2),
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _Key extends StatelessWidget {
+  const _Key({required this.colour, required this.who});
+
+  final Color colour;
+  final String who;
+
+  @override
+  Widget build(BuildContext context) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(color: colour, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            who.toUpperCase(),
+            style: AppText.micro.copyWith(color: AppColors.label, letterSpacing: 1.2),
+          ),
+        ],
+      );
 }
 
 /// One row each, a cell per hour, day or month, with each person's own lit.

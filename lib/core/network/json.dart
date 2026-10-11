@@ -123,4 +123,12 @@ extension JsonReader on Json {
     if (v is! List) return const [];
     return v.whereType<String>().toList(growable: false);
   }
+
+  /// A list of whole numbers. Anything else in it is skipped, and a missing key
+  /// is an empty list, so an older server reads as having sent none.
+  List<int> ints(String key) {
+    final v = this[key];
+    if (v is! List) return const [];
+    return v.whereType<num>().map((n) => n.toInt()).toList(growable: false);
+  }
 }

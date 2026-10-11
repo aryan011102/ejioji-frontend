@@ -8,7 +8,6 @@ import '../../../../core/theme/tokens.dart';
 import '../../../../core/theme/typography.dart';
 import '../../../../data/in_common_repository.dart';
 import '../../../../shared/models/chat.dart';
-import '../../../../shared/models/enums.dart';
 import '../../../../shared/models/tile_look.dart';
 import '../../../../shared/widgets/buttons.dart';
 import '../../../../shared/widgets/identity.dart';
@@ -54,6 +53,9 @@ class StoryViewer extends StatefulWidget {
 
   /// Each photo in the pair at the top and on the intro, for tests.
   static const faceKey = ValueKey('in-common-face');
+
+  /// The box a story's picture is fitted into, for tests.
+  static const pictureKey = ValueKey('in-common-picture');
 
   /// How long one story stays before the next.
   static const perStory = Duration(seconds: 6);
@@ -339,40 +341,43 @@ class _Slide extends StatelessWidget {
       return _Frame(background: _background, center: true, children: children);
     }
 
+    final chart = story.chart;
+    // A model may choose no picture (2026-10-11): the words carry the slide.
+    final pictured = chart != null && chart.type != ChartType.words && chart.type != ChartType.unknown;
     children
       ..add(rise(_Eyebrow(story.eyebrow)))
       ..add(const SizedBox(height: 14))
+      ..add(rise(Text(story.title, style: _Big.of(story, pictured: pictured))));
+    if (!pictured) {
+      if (story.footnote != null) {
+        children
+          ..add(const SizedBox(height: 22))
+          ..add(rise(_Small(story.footnote!, large: true)));
+      }
+      return _Frame(background: _background, children: children);
+    }
+    final view = rise(StoryChartView(chart: chart, name: name));
+    children
+      ..add(const SizedBox(height: 26))
+      // The picture takes the room left. If a very short phone still cannot
+      // hold it, it gives way, scaled down, rather than pushing the footnote
+      // off the slide; every picture is sized so this is the exception.
       ..add(
-        rise(
-          Text(
-            story.title,
-            style: story.kind == StoryKind.thought ? _Big.thought : _Big.claim,
-          ),
-        ),
-      );
-    final chart = story.chart;
-    if (chart != null) {
-      final view = rise(StoryChartView(chart: chart, name: name));
-      children
-        ..add(const SizedBox(height: 26))
-        // On a short phone the chart gives way, scaled down, rather than
-        // pushing the footnote off the slide.
-        ..add(
-          Flexible(
-            flex: 8,
-            child: LayoutBuilder(
-              builder: (context, box) => FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.topLeft,
-                child: SizedBox(
-                  width: box.maxWidth,
-                  child: view,
-                ),
+        Flexible(
+          flex: 8,
+          child: LayoutBuilder(
+            builder: (context, box) => FittedBox(
+              key: StoryViewer.pictureKey,
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.topLeft,
+              child: SizedBox(
+                width: box.maxWidth,
+                child: view,
               ),
             ),
           ),
-        );
-    }
+        ),
+      );
     children.add(const Spacer());
     if (story.footnote != null) children.add(rise(_Small(story.footnote!)));
     return _Frame(background: _background, children: children);
@@ -410,10 +415,18 @@ class _Frame extends StatelessWidget {
 abstract final class _Big {
   static TextStyle get intro =>
       AppText.tileNumber(54).copyWith(fontWeight: FontWeight.w900, letterSpacing: -2.4);
-  static TextStyle get claim =>
-      AppText.tileNumber(38).copyWith(fontWeight: FontWeight.w900, letterSpacing: -1.6);
-  static TextStyle get thought =>
-      AppText.tileNumber(32).copyWith(fontWeight: FontWeight.w800, letterSpacing: -1.1);
+
+  /// The headline: larger with no picture under it, a step smaller when it
+  /// runs long, so a long line wraps rather than crowding the picture.
+  static TextStyle of(Story story, {required bool pictured}) {
+    final long = story.title.length;
+    if (story.kind == StoryKind.thought) {
+      return AppText.tileNumber(long > 90 ? 28 : 32)
+          .copyWith(fontWeight: FontWeight.w800, letterSpacing: -1.1);
+    }
+    final size = pictured ? (long > 40 ? 32.0 : 38.0) : (long > 40 ? 40.0 : 48.0);
+    return AppText.tileNumber(size).copyWith(fontWeight: FontWeight.w900, letterSpacing: -1.6);
+  }
 }
 
 class _Eyebrow extends StatelessWidget {
@@ -433,13 +446,18 @@ class _Eyebrow extends StatelessWidget {
 }
 
 class _Small extends StatelessWidget {
-  const _Small(this.text);
+  const _Small(this.text, {this.large = false});
 
   final String text;
 
+  /// Under a headline with no picture: the closing line reads as a sentence.
+  final bool large;
+
   @override
-  Widget build(BuildContext context) =>
-      Text(text, style: AppText.footnote.copyWith(color: AppColors.label));
+  Widget build(BuildContext context) => Text(
+        text,
+        style: (large ? AppText.body : AppText.footnote).copyWith(color: AppColors.label),
+      );
 }
 
 /// Fades and lifts its child into place once, after [delay].
@@ -493,44 +511,36 @@ class StoryChartView extends StatelessWidget {
   final StoryChart chart;
   final String name;
 
-  bool get _music =>
-      chart.me.category == TileCategory.music && chart.them.category == TileCategory.music;
-
+  /// One picture per story, the one the server sent: a model may have chosen
+  /// it, and the server already turns a music story into records when nobody
+  /// did. Nothing is stacked under it (2026-10-11: a calendar under every
+  /// count read as forced, and shrank the slide's words to fit).
   @override
   Widget build(BuildContext context) {
-    final picture = _picture();
     final me = chart.me.calendar;
     final them = chart.them.calendar;
-    if (me == null || them == null) return picture;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        picture,
-        const SizedBox(height: 26),
-        _Rise(
-          delay: const Duration(milliseconds: 260),
-          child: StoryCalendarView(me: me, them: them, name: name),
+    return switch (chart.type) {
+      ChartType.year when me != null && them != null => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            StoryCalendarView(me: me, them: them, name: name),
+            const SizedBox(height: 18),
+            _Numbers(chart: chart, size: 32),
+          ],
         ),
-      ],
-    );
+      ChartType.weekdays when chart.me.series.length == 7 && chart.them.series.length == 7 =>
+        _Spread(
+          chart: chart,
+          name: name,
+          cellLabels: const ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
+          withNumbers: true,
+        ),
+      ChartType.year || ChartType.words => _Numbers(chart: chart),
+      _ => _picture(),
+    };
   }
 
   Widget _picture() {
-    // Every music story is two records (the founder, 2026-10-11): a ranking
-    // puts each number one on its record, the list under them.
-    if (_music && chart.type == ChartType.ranks) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (chart.meRanks.isNotEmpty && chart.themRanks.isNotEmpty) ...[
-            _Records(chart: _numberOnes(chart)),
-            const SizedBox(height: 22),
-          ],
-          _Ranks(chart: chart, name: name),
-        ],
-      );
-    }
-    if (_music && chart.type != ChartType.hours) return _Records(chart: chart);
     return switch (chart.type) {
       ChartType.hours when chart.me.series.length == 24 && chart.them.series.length == 24 =>
         _Spread(
@@ -577,26 +587,9 @@ class StoryChartView extends StatelessWidget {
       ChartType.ranks => _Ranks(chart: chart, name: name),
       ChartType.names => _Names(chart: chart),
       ChartType.records => _Records(chart: chart),
-      ChartType.unknown => const SizedBox.shrink(),
+      ChartType.year || ChartType.words || ChartType.unknown => const SizedBox.shrink(),
     };
   }
-}
-
-/// Each person's number one, as a chart the records can draw.
-StoryChart _numberOnes(StoryChart chart) {
-  ChartSide one(ChartSide side, RankRow top, String who) => ChartSide(
-        value: side.value,
-        display: top.label,
-        label: '$who · number one',
-        category: side.category,
-      );
-  return StoryChart(
-    type: ChartType.records,
-    me: one(chart.me, chart.meRanks.first, 'you'),
-    them: one(chart.them, chart.themRanks.first, chart.them.label.split(' · ').first),
-    meRanks: const [],
-    themRanks: const [],
-  );
 }
 
 /// Each person's whole day, or week, as bars: the height is how much happens
@@ -609,12 +602,16 @@ class _Spread extends StatelessWidget {
     this.labels,
     this.cellLabels,
     this.highlight = const {},
+    this.withNumbers = false,
   });
 
   final StoryChart chart;
   final String name;
   final List<String>? labels;
   final List<String>? cellLabels;
+
+  /// The two numbers under the bars. Always under a day.
+  final bool withNumbers;
 
   /// Slots drawn a little brighter whatever their height (the weekend).
   final Set<int> highlight;
@@ -695,6 +692,8 @@ class _Spread extends StatelessWidget {
               ],
             ),
           ),
+        ],
+        if (labels != null || withNumbers) ...[
           const SizedBox(height: 18),
           _Numbers(chart: chart),
         ],
@@ -1065,9 +1064,10 @@ class _BarsChart extends StatelessWidget {
 
 /// Two big numbers, side by side.
 class _Numbers extends StatelessWidget {
-  const _Numbers({required this.chart});
+  const _Numbers({required this.chart, this.size = 44});
 
   final StoryChart chart;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
@@ -1077,10 +1077,15 @@ class _Numbers extends StatelessWidget {
             FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
-              child: Text(side.display, style: AppText.tileNumber(44).copyWith(color: colour)),
+              child: Text(side.display, style: AppText.tileNumber(size).copyWith(color: colour)),
             ),
             const SizedBox(height: 4),
-            Text(side.label, style: AppText.footnote.copyWith(color: AppColors.label)),
+            Text(
+              side.label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppText.footnote.copyWith(color: AppColors.label),
+            ),
           ],
         );
     return Row(
@@ -1181,7 +1186,12 @@ class _Names extends StatelessWidget {
             ),
             if (rest.isNotEmpty) ...[
               const SizedBox(height: 4),
-              Text(rest, style: AppText.footnote.copyWith(color: AppColors.label)),
+              Text(
+                rest,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.footnote.copyWith(color: AppColors.label),
+              ),
             ],
           ],
         ),
@@ -1309,7 +1319,7 @@ class _RecordsState extends State<_Records> with SingleTickerProviderStateMixin 
           const SizedBox(height: 4),
           Text(
             side.display,
-            maxLines: 3,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
             textAlign: textAlign,
             style: AppText.tileNumber(28).copyWith(
@@ -1322,7 +1332,7 @@ class _RecordsState extends State<_Records> with SingleTickerProviderStateMixin 
             const SizedBox(height: 4),
             Text(
               rest,
-              maxLines: 3,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               textAlign: textAlign,
               style: AppText.footnote.copyWith(color: AppColors.label),
@@ -1334,8 +1344,10 @@ class _RecordsState extends State<_Records> with SingleTickerProviderStateMixin 
 
     return LayoutBuilder(
       builder: (context, box) {
-        // Each record a little over half the width, the second over the first.
-        final size = box.maxWidth * 0.54;
+        // Each record a little under half the width, the second over the
+        // first: small enough that the words under them keep their full size
+        // on a phone's slide rather than the whole picture being shrunk.
+        final size = box.maxWidth * 0.48;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

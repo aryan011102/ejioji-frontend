@@ -106,6 +106,7 @@ class ChartSide {
     required this.category,
     this.series = const [],
     this.calendar,
+    this.name,
   });
 
   factory ChartSide.fromJson(Json j) => ChartSide(
@@ -115,6 +116,7 @@ class ChartSide {
         category: TileCategory.parse(j.strOrNull('category')),
         series: j.ints('series'),
         calendar: StoryCalendar.fromJson(j.objectOrNull('calendar')),
+        name: j.strOrNull('name'),
       );
 
   /// How the rows spread: 24 hours on an hours chart, 7 weekdays (Monday
@@ -124,6 +126,10 @@ class ChartSide {
   /// A year of how often, under a story about a count. Null when there is too
   /// little to draw, and then null on the other side too.
   final StoryCalendar? calendar;
+
+  /// The named thing behind the number, drawn under it: the song under the
+  /// year on a record. Null where the number names nothing.
+  final String? name;
 
   /// The tile's own number: an hour 0 to 23, a weekday (Monday 0), a month
   /// (January 1), a count, a fraction, seconds or a year, by chart type.

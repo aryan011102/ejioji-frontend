@@ -151,8 +151,14 @@ void main() {
         'You both keep the old ones close.',
         chart: {
           'type': 'records',
-          'me': {...side(1971, '1971', 'you · oldest song saved'), 'name': 'Kahin Door Jab Din Dhal Jaye'},
-          'them': {...side(1949, '1949', 'Meera · oldest song played'), 'name': 'Lag Ja Gale Se Phir'},
+          'me': {
+            ...side(1971, '1971', 'you · The year the oldest song saved came out. It is Kahin Door Jab Din Dhal Jaye.'),
+            'name': 'Kahin Door Jab Din Dhal Jaye',
+          },
+          'them': {
+            ...side(1949, '1949', 'Meera · The year the oldest song played came out. It is Lag Ja Gale Se Phir.'),
+            'name': 'Lag Ja Gale Se Phir',
+          },
         },
       ),
       {
@@ -378,10 +384,19 @@ void main() {
     expect(find.text('Kahin Door Jab Din Dhal Jaye'), findsOneWidget);
     expect(find.text('Lag Ja Gale Se Phir'), findsOneWidget);
     // Never cut: a name wraps rather than ending in an ellipsis.
-    for (final name in tester.widgetList<Text>(find.byKey(const ValueKey('in-common-record-name')))) {
-      expect(name.maxLines, isNull);
-      expect(name.overflow, isNot(TextOverflow.ellipsis));
+    for (final key in ['in-common-record-name', 'in-common-record-label']) {
+      final texts = tester.widgetList<Text>(find.byKey(ValueKey(key)));
+      expect(texts, hasLength(2), reason: key);
+      for (final text in texts) {
+        expect(text.maxLines, isNull, reason: key);
+        expect(text.overflow, isNot(TextOverflow.ellipsis), reason: key);
+      }
     }
+    // The whole caption is there, song and all.
+    expect(
+      find.text('The year the oldest song played came out. It is Lag Ja Gale Se Phir.'),
+      findsOneWidget,
+    );
     // The second record sits over the first.
     final discs = find.descendant(
       of: find.byType(StoryChartView),
@@ -393,7 +408,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the thought carries a nudge saying what to do with it', (tester) async {
+  testWidgets('the thought carries a nudge, as plain sub copy', (tester) async {
     final deck = InCommon.fromJson(body);
     final at = deck.stories.indexWhere((s) => s.kind == StoryKind.thought);
     await tester.pumpWidget(MaterialApp(home: StoryViewer(deck: deck)));
@@ -403,8 +418,13 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
     }
     await tester.pump(const Duration(seconds: 2));
-    expect(find.byKey(const ValueKey('in-common-nudge')), findsOneWidget);
-    expect(find.text('Ask Meera which season to skip first. Loser picks dinner.'), findsOneWidget);
+    final nudge = find.text('Ask Meera which season to skip first. Loser picks dinner.');
+    expect(nudge, findsOneWidget);
+    // No box around it: nothing decorated sits between it and the slide.
+    expect(
+      find.ancestor(of: nudge, matching: find.byWidgetPredicate((w) => w is Container && w.decoration != null)),
+      findsNothing,
+    );
   });
 
   test('not enough in common has no ring; waiting has one and does not open', () {

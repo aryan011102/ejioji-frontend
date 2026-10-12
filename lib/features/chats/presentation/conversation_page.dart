@@ -31,6 +31,7 @@ import '../../../shared/widgets/states.dart';
 import 'chat_limit.dart';
 import 'in_common/in_common_flow.dart';
 import 'in_common/story_ring.dart';
+import 'photo_preview.dart';
 import 'streak_popup.dart';
 import 'unmatch_reason_sheet.dart';
 import 'verify_to_chat.dart';
@@ -377,12 +378,18 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
       imageQuality: 92,
     );
     if (picked == null || !mounted) return;
+    final bytes = await picked.readAsBytes();
+    if (!mounted) return;
+    // Seen before it goes, so a wrong tap in the gallery sends nothing.
+    final send = await confirmPhoto(context, bytes: bytes, name: _person?.firstName);
+    // The chat can end or pause while they look.
+    if (!send || !mounted || _ended || _paused) return;
     final pending = _Pending(clientId: Ids.uuid(), photo: true);
     setState(() => _pending.add(pending));
     try {
       final asset = await ref.read(mediaRepositoryProvider).uploadToChat(
             matchId: _matchId,
-            bytes: await picked.readAsBytes(),
+            bytes: bytes,
             kind: MediaKind.photo,
           );
       pending.mediaId = asset.id;

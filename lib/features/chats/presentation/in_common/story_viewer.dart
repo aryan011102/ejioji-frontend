@@ -356,15 +356,27 @@ class _Slide extends StatelessWidget {
           // Under the thought, the line is what to do with it: the nudge.
           ..add(
             rise(
-              story.kind == StoryKind.thought
-                  ? _Nudge(footnote)
-                  : _Small(footnote, large: true),
+              // Under the thought it is the nudge, plain sub copy like any
+              // other (the founder, 2026-10-12: no box).
+              _Small(footnote, large: true),
             ),
           );
       }
       return _Frame(background: _background, children: children);
     }
     final view = rise(StoryChartView(chart: chart, name: name));
+    if (chart.type == ChartType.records) {
+      // Records size themselves to the room left, so their words never shrink.
+      children
+        ..add(const SizedBox(height: 26))
+        ..add(Expanded(flex: 8, child: view));
+      if (story.footnote != null) {
+        children
+          ..add(const SizedBox(height: 16))
+          ..add(rise(_Small(story.footnote!)));
+      }
+      return _Frame(background: _background, children: children);
+    }
     children
       ..add(const SizedBox(height: 26))
       // The picture takes the room left. If a very short phone still cannot
@@ -465,42 +477,6 @@ class _Small extends StatelessWidget {
   Widget build(BuildContext context) => Text(
         text,
         style: (large ? AppText.body : AppText.footnote).copyWith(color: AppColors.label),
-      );
-}
-
-/// The line under the thought that says what to do with it: a question to
-/// open with, a small dare. Set apart so it reads as the thing to tap
-/// "Chat about this" for.
-class _Nudge extends StatelessWidget {
-  const _Nudge(this.text);
-
-  final String text;
-
-  /// For tests.
-  static const nudgeKey = ValueKey('in-common-nudge');
-
-  @override
-  Widget build(BuildContext context) => Container(
-        key: nudgeKey,
-        padding: const EdgeInsets.fromLTRB(14, 12, 16, 12),
-        decoration: BoxDecoration(
-          color: AppColors.glass,
-          borderRadius: BorderRadius.circular(Radii.tile),
-          border: Border.all(color: AppColors.glassEdge),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Padding(
-              padding: EdgeInsets.only(top: 2),
-              child: Icon(Icons.chat_bubble_outline, size: 18, color: AppColors.accent),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(text, style: AppText.bodyStrong.copyWith(color: AppColors.label)),
-            ),
-          ],
-        ),
       );
 }
 
@@ -1266,12 +1242,67 @@ class _Records extends StatefulWidget {
   /// The song or artist under a year, for tests.
   static const nameKey = ValueKey('in-common-record-name');
 
+  /// The few words under each record, for tests.
+  static const labelKey = ValueKey('in-common-record-label');
+
   @override
   State<_Records> createState() => _RecordsState();
 }
 
 class _RecordsState extends State<_Records> with SingleTickerProviderStateMixin {
   late final _spin = AnimationController(vsync: this, duration: const Duration(seconds: 6));
+
+  // Each record's share of the width, how much of one the other covers, the
+  // smallest they get before the picture is scaled instead, and the gap above
+  // the words.
+  static const _share = 0.6;
+  static const _overlap = 0.35;
+  static const _floor = 0.3;
+  static const _gap = 22.0;
+
+  static TextStyle get _whoStyle =>
+      AppText.micro.copyWith(color: AppColors.label, letterSpacing: 1.4);
+  static TextStyle get _nameStyle =>
+      AppText.bodyStrong.copyWith(color: AppColors.label, height: 1.2);
+  static TextStyle get _restStyle => AppText.footnote.copyWith(color: AppColors.label2);
+
+  /// One side's words: who, the big text's style, and the rest of the label.
+  static ({String who, String rest, TextStyle bigStyle}) _lines(ChartSide side) {
+    final (who, rest) = _split(side.label);
+    // A name is never cut (2026-10-12): it wraps, a little smaller when long.
+    final big = side.display.length > 14 ? 22.0 : 28.0;
+    return (
+      who: who.toUpperCase(),
+      rest: rest,
+      bigStyle: AppText.tileNumber(big).copyWith(
+        color: AppColors.storyMe,
+        letterSpacing: -0.8,
+        height: 1.05,
+      ),
+    );
+  }
+
+  /// How tall one side's words lay out at [width], as `words` draws them.
+  static double _wordsHeight(ChartSide side, double width, TextScaler scaler) {
+    final lines = _lines(side);
+    double measure(String text, TextStyle style, {int? maxLines}) {
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: style),
+        textDirection: TextDirection.ltr,
+        textScaler: scaler,
+        maxLines: maxLines,
+      )..layout(maxWidth: width);
+      final height = painter.height;
+      painter.dispose();
+      return height;
+    }
+
+    var height = measure(lines.who, _whoStyle, maxLines: 1) + 4;
+    height += measure(side.display, lines.bigStyle);
+    if (side.name != null) height += 4 + measure(side.name!, _nameStyle);
+    if (lines.rest.isNotEmpty) height += 4 + measure(lines.rest, _restStyle);
+    return height;
+  }
 
   // The two labels: gold for you, rose for them, each lit from one side.
   static const _gold = [Color(0xFFF3E7C6), Color(0xFFC99A55), Color(0xFF94672F)];
@@ -1352,80 +1383,82 @@ class _RecordsState extends State<_Records> with SingleTickerProviderStateMixin 
   @override
   Widget build(BuildContext context) {
     Widget words(ChartSide side, CrossAxisAlignment align) {
-      final (who, rest) = _split(side.label);
+      final lines = _lines(side);
       final end = align == CrossAxisAlignment.end;
       final textAlign = end ? TextAlign.right : TextAlign.left;
-      // A name is never cut (2026-10-12): it wraps, a little smaller when long.
-      final big = side.display.length > 14 ? 22.0 : 28.0;
       return Column(
         crossAxisAlignment: align,
         children: [
-          Text(
-            who.toUpperCase(),
-            overflow: TextOverflow.ellipsis,
-            style: AppText.micro.copyWith(color: AppColors.label, letterSpacing: 1.4),
-          ),
+          Text(lines.who, overflow: TextOverflow.ellipsis, style: _whoStyle),
           const SizedBox(height: 4),
-          Text(
-            side.display,
-            textAlign: textAlign,
-            style: AppText.tileNumber(big).copyWith(
-              color: AppColors.storyMe,
-              letterSpacing: -0.8,
-              height: 1.05,
-            ),
-          ),
+          Text(side.display, textAlign: textAlign, style: lines.bigStyle),
           if (side.name != null) ...[
             const SizedBox(height: 4),
-            Text(
-              side.name!,
-              key: _Records.nameKey,
-              textAlign: textAlign,
-              style: AppText.bodyStrong.copyWith(color: AppColors.label, height: 1.2),
-            ),
+            Text(side.name!, key: _Records.nameKey, textAlign: textAlign, style: _nameStyle),
           ],
-          if (rest.isNotEmpty) ...[
+          if (lines.rest.isNotEmpty) ...[
             const SizedBox(height: 4),
-            Text(
-              rest,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: textAlign,
-              style: AppText.footnote.copyWith(color: AppColors.label2),
-            ),
+            // Wraps onto as many lines as it takes, never cut (2026-10-12).
+            Text(lines.rest, key: _Records.labelKey, textAlign: textAlign, style: _restStyle),
           ],
         ],
       );
     }
 
+    // Two big records, the second over the first by a third of one (the
+    // founder, 2026-10-12: "should be overlapping"), centred. The words under
+    // them always get their full size; where the slide is short, the records
+    // give way rather than the words (they used to be shrunk with everything).
+    Widget discs(double width, double size) {
+      final left = (width - size * (2 - _overlap)) / 2;
+      return SizedBox(
+        width: width,
+        height: size,
+        child: Stack(
+          children: [
+            Positioned(left: left, top: 0, child: _disc(size, _gold)),
+            Positioned(left: left + size * (1 - _overlap), top: 0, child: _disc(size, _rose)),
+          ],
+        ),
+      );
+    }
+
+    final names = Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: words(widget.chart.me, CrossAxisAlignment.start)),
+        const SizedBox(width: 16),
+        Expanded(child: words(widget.chart.them, CrossAxisAlignment.end)),
+      ],
+    );
     return LayoutBuilder(
       builder: (context, box) {
-        // Two big records, the second over the first: each 60% of the width,
-        // so they overlap by a third of one (the founder, 2026-10-12: "should
-        // be overlapping"), and still leave the words under them full size.
-        final size = box.maxWidth * 0.6;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(
-              height: size,
-              child: Stack(
-                children: [
-                  Positioned(left: 0, top: 0, child: _disc(size, _gold)),
-                  Positioned(right: 0, top: 0, child: _disc(size, _rose)),
-                ],
-              ),
-            ),
-            const SizedBox(height: 22),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: words(widget.chart.me, CrossAxisAlignment.start)),
-                const SizedBox(width: 16),
-                Expanded(child: words(widget.chart.them, CrossAxisAlignment.end)),
-              ],
-            ),
-          ],
+        final width = box.maxWidth;
+        final full = width * _share;
+        Widget picture(double size) => Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [discs(width, size), const SizedBox(height: _gap), names],
+            );
+        if (!box.hasBoundedHeight) return picture(full);
+        // The words are measured first and always get their full size; the
+        // records take the height left, down to a floor.
+        final scaler = MediaQuery.textScalerOf(context);
+        final column = (width - 16) / 2;
+        final wordsHeight = [widget.chart.me, widget.chart.them]
+            .map((side) => _wordsHeight(side, column, scaler))
+            .reduce((a, b) => a > b ? a : b);
+        final room = box.maxHeight - wordsHeight - _gap;
+        final floor = width * _floor;
+        final size = room < floor ? floor : (room > full ? full : room);
+        final needed = size + _gap + wordsHeight;
+        // Only a phone too short for even the smallest records and the words
+        // scales the picture, and then all of it together.
+        return FittedBox(
+          key: StoryViewer.pictureKey,
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.topCenter,
+          child: SizedBox(width: width, height: needed, child: picture(size)),
         );
       },
     );

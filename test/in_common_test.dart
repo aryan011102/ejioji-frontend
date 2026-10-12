@@ -151,8 +151,8 @@ void main() {
         'You both keep the old ones close.',
         chart: {
           'type': 'records',
-          'me': side(1971, '1971', 'you · The oldest song saved.'),
-          'them': side(1975, '1975', 'Meera · The oldest video liked.', 'watching'),
+          'me': {...side(1971, '1971', 'you · oldest song saved'), 'name': 'Kahin Door Jab Din Dhal Jaye'},
+          'them': {...side(1949, '1949', 'Meera · oldest song played'), 'name': 'Lag Ja Gale Se Phir'},
         },
       ),
       {
@@ -200,7 +200,10 @@ void main() {
           ],
         },
       },
-      story('thought', 'You bought a projector. Meera keeps going back to Friends.'),
+      {
+        ...story('thought', 'You bought a projector. Meera keeps going back to Friends.'),
+        'footnote': 'Ask Meera which season to skip first. Loser picks dinner.',
+      },
       story(
         'differ',
         'You travel. Meera goes out.',
@@ -356,6 +359,52 @@ void main() {
     expect(find.text(deck.stories[at].title), findsOneWidget);
     expect(find.byType(StoryChartView), findsNothing);
     expect(find.text('Kurzgesagt'), findsNothing, reason: 'the words carry it');
+  });
+
+  testWidgets('the old songs are two overlapping records, each song named in full',
+      (tester) async {
+    final deck = InCommon.fromJson(body);
+    final chart =
+        deck.stories.firstWhere((s) => s.title == 'You both keep the old ones close.').chart!;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(width: 342, child: StoryChartView(chart: chart, name: 'Meera')),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('1971'), findsOneWidget);
+    expect(find.text('Kahin Door Jab Din Dhal Jaye'), findsOneWidget);
+    expect(find.text('Lag Ja Gale Se Phir'), findsOneWidget);
+    // Never cut: a name wraps rather than ending in an ellipsis.
+    for (final name in tester.widgetList<Text>(find.byKey(const ValueKey('in-common-record-name')))) {
+      expect(name.maxLines, isNull);
+      expect(name.overflow, isNot(TextOverflow.ellipsis));
+    }
+    // The second record sits over the first.
+    final discs = find.descendant(
+      of: find.byType(StoryChartView),
+      matching: find.byType(RotationTransition),
+    );
+    final first = tester.getRect(discs.at(0));
+    final second = tester.getRect(discs.at(1));
+    expect(second.left, lessThan(first.right - 40));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the thought carries a nudge saying what to do with it', (tester) async {
+    final deck = InCommon.fromJson(body);
+    final at = deck.stories.indexWhere((s) => s.kind == StoryKind.thought);
+    await tester.pumpWidget(MaterialApp(home: StoryViewer(deck: deck)));
+    for (var i = 0; i < at; i++) {
+      await tester.pump(const Duration(seconds: 1));
+      await tester.tapAt(const Offset(300, 400));
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+    await tester.pump(const Duration(seconds: 2));
+    expect(find.byKey(const ValueKey('in-common-nudge')), findsOneWidget);
+    expect(find.text('Ask Meera which season to skip first. Loser picks dinner.'), findsOneWidget);
   });
 
   test('not enough in common has no ring; waiting has one and does not open', () {

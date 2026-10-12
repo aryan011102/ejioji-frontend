@@ -349,10 +349,18 @@ class _Slide extends StatelessWidget {
       ..add(const SizedBox(height: 14))
       ..add(rise(Text(story.title, style: _Big.of(story, pictured: pictured))));
     if (!pictured) {
-      if (story.footnote != null) {
+      final footnote = story.footnote;
+      if (footnote != null) {
         children
           ..add(const SizedBox(height: 22))
-          ..add(rise(_Small(story.footnote!, large: true)));
+          // Under the thought, the line is what to do with it: the nudge.
+          ..add(
+            rise(
+              story.kind == StoryKind.thought
+                  ? _Nudge(footnote)
+                  : _Small(footnote, large: true),
+            ),
+          );
       }
       return _Frame(background: _background, children: children);
     }
@@ -457,6 +465,42 @@ class _Small extends StatelessWidget {
   Widget build(BuildContext context) => Text(
         text,
         style: (large ? AppText.body : AppText.footnote).copyWith(color: AppColors.label),
+      );
+}
+
+/// The line under the thought that says what to do with it: a question to
+/// open with, a small dare. Set apart so it reads as the thing to tap
+/// "Chat about this" for.
+class _Nudge extends StatelessWidget {
+  const _Nudge(this.text);
+
+  final String text;
+
+  /// For tests.
+  static const nudgeKey = ValueKey('in-common-nudge');
+
+  @override
+  Widget build(BuildContext context) => Container(
+        key: nudgeKey,
+        padding: const EdgeInsets.fromLTRB(14, 12, 16, 12),
+        decoration: BoxDecoration(
+          color: AppColors.glass,
+          borderRadius: BorderRadius.circular(Radii.tile),
+          border: Border.all(color: AppColors.glassEdge),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(top: 2),
+              child: Icon(Icons.chat_bubble_outline, size: 18, color: AppColors.accent),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(text, style: AppText.bodyStrong.copyWith(color: AppColors.label)),
+            ),
+          ],
+        ),
       );
 }
 
@@ -1219,6 +1263,9 @@ class _Records extends StatefulWidget {
 
   final StoryChart chart;
 
+  /// The song or artist under a year, for tests.
+  static const nameKey = ValueKey('in-common-record-name');
+
   @override
   State<_Records> createState() => _RecordsState();
 }
@@ -1308,6 +1355,8 @@ class _RecordsState extends State<_Records> with SingleTickerProviderStateMixin 
       final (who, rest) = _split(side.label);
       final end = align == CrossAxisAlignment.end;
       final textAlign = end ? TextAlign.right : TextAlign.left;
+      // A name is never cut (2026-10-12): it wraps, a little smaller when long.
+      final big = side.display.length > 14 ? 22.0 : 28.0;
       return Column(
         crossAxisAlignment: align,
         children: [
@@ -1319,15 +1368,22 @@ class _RecordsState extends State<_Records> with SingleTickerProviderStateMixin 
           const SizedBox(height: 4),
           Text(
             side.display,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
             textAlign: textAlign,
-            style: AppText.tileNumber(28).copyWith(
+            style: AppText.tileNumber(big).copyWith(
               color: AppColors.storyMe,
               letterSpacing: -0.8,
               height: 1.05,
             ),
           ),
+          if (side.name != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              side.name!,
+              key: _Records.nameKey,
+              textAlign: textAlign,
+              style: AppText.bodyStrong.copyWith(color: AppColors.label, height: 1.2),
+            ),
+          ],
           if (rest.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
@@ -1335,7 +1391,7 @@ class _RecordsState extends State<_Records> with SingleTickerProviderStateMixin 
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               textAlign: textAlign,
-              style: AppText.footnote.copyWith(color: AppColors.label),
+              style: AppText.footnote.copyWith(color: AppColors.label2),
             ),
           ],
         ],
@@ -1344,10 +1400,10 @@ class _RecordsState extends State<_Records> with SingleTickerProviderStateMixin 
 
     return LayoutBuilder(
       builder: (context, box) {
-        // Each record a little under half the width, the second over the
-        // first: small enough that the words under them keep their full size
-        // on a phone's slide rather than the whole picture being shrunk.
-        final size = box.maxWidth * 0.48;
+        // Two big records, the second over the first: each 60% of the width,
+        // so they overlap by a third of one (the founder, 2026-10-12: "should
+        // be overlapping"), and still leave the words under them full size.
+        final size = box.maxWidth * 0.6;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -1360,7 +1416,7 @@ class _RecordsState extends State<_Records> with SingleTickerProviderStateMixin 
                 ],
               ),
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 22),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

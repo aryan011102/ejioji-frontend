@@ -10,12 +10,8 @@ import '../../../shared/widgets/sheets.dart';
 /// Chat streaks: days in a row on which both people wrote.
 ///
 /// The server decides everything (what counts as a day, when it breaks, which
-/// milestone was reached, what the popup says). The app shows the count under
-/// the name and pops up once per milestone of each streak on this phone. A
-/// broken streak says nothing: it just stops showing.
-
-/// The line under the name at the top of a conversation.
-String streakLabel(Streak streak) => '🔥 ${streak.days} days in a row';
+/// milestone was reached, what the popup says). The app pops up once per
+/// milestone of each streak on this phone. A broken streak says nothing.
 
 /// Shown this session already, so two events arriving together pop up once
 /// even before the phone's storage has answered.

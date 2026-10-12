@@ -28,7 +28,6 @@ void main() {
     expect(s.days, 4);
     expect(s.milestone, 3);
     expect(s.line, 'Careful, this is how it starts.');
-    expect(streakLabel(s), '🔥 4 days in a row');
   });
 
   test('no streak, or an older server, is nothing to show', () {

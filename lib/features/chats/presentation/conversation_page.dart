@@ -670,7 +670,6 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
         navBar: AppNavBar(
           title: name,
           titleLeading: _ring(),
-          subtitle: _ended || _streak == null ? null : streakLabel(_streak!),
           // No door once the match is over: there is nothing on the other side.
           // None on a founder conversation either: it is text only.
           onTitle: _ended || _person == null || _founderLine ? null : _openProfile,

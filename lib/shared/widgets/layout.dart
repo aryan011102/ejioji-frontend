@@ -75,7 +75,6 @@ class AppScaffold extends StatelessWidget {
 class AppNavBar extends StatelessWidget implements PreferredSizeWidget {
   const AppNavBar({
     this.title,
-    this.subtitle,
     this.onTitle,
     this.backLabel,
     this.onBack,
@@ -94,9 +93,6 @@ class AppNavBar extends StatelessWidget implements PreferredSizeWidget {
   /// Something drawn just before the title, like the other person's photo with
   /// its story ring at the top of a chat.
   final Widget? titleLeading;
-
-  /// One short line under the title: a conversation's streak.
-  final String? subtitle;
 
   /// Makes the title itself the way to the thing it names, which on a
   /// conversation is the person. Null leaves it as plain text.
@@ -180,10 +176,12 @@ class AppNavBar extends StatelessWidget implements PreferredSizeWidget {
                   ),
           ),
           Expanded(
-            child: _withLeading(_withSubtitle(onTitle == null
+            child: _withLeading(onTitle == null
                 ? Text(
                     title ?? '',
                     textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: AppText.navTitle,
                   )
                 : Pressable(
@@ -196,6 +194,7 @@ class AppNavBar extends StatelessWidget implements PreferredSizeWidget {
                         Flexible(
                           child: Text(
                             title ?? '',
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: AppText.navTitle,
                           ),
@@ -208,7 +207,6 @@ class AppNavBar extends StatelessWidget implements PreferredSizeWidget {
                       ],
                     ),
                   ),
-              ),
             ),
           ),
           if (trailing != null)
@@ -260,24 +258,6 @@ class AppNavBar extends StatelessWidget implements PreferredSizeWidget {
         leading,
         const SizedBox(width: 8),
         Flexible(child: title),
-      ],
-    );
-  }
-
-  /// The title, with [subtitle] in small type under it when there is one.
-  Widget _withSubtitle(Widget title) {
-    final line = subtitle;
-    if (line == null) return title;
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        title,
-        Text(
-          line,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: AppText.micro.copyWith(color: AppColors.label2),
-        ),
       ],
     );
   }

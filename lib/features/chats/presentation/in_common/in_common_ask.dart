@@ -19,6 +19,7 @@ class InCommonAskCard extends StatelessWidget {
     required this.onAllow,
     required this.onNotNow,
     required this.onReadNotice,
+    this.opposites = false,
     super.key,
   });
 
@@ -28,16 +29,31 @@ class InCommonAskCard extends StatelessWidget {
   final VoidCallback onNotNow;
   final VoidCallback onReadNotice;
 
+  /// Asking for the opposites deck: two people with too little in common, so
+  /// the stories are where they differ (2026-10-12).
+  final bool opposites;
+
+  String get _question {
+    if (opposites) {
+      return themSaidYes
+          ? '$name wants to see where you two differ'
+          : 'See where you and $name differ?';
+    }
+    return themSaidYes
+        ? '$name wants to see what you two have in common'
+        : 'See what you and $name have in common?';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Align(
+        Align(
           alignment: Alignment.centerLeft,
           child: IconPlate(
-            Icons.join_inner,
+            opposites ? Icons.compare_arrows : Icons.join_inner,
             size: 44,
             radius: 13,
             background: AppColors.glow,
@@ -45,12 +61,7 @@ class InCommonAskCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
-        Text(
-          themSaidYes
-              ? '$name wants to see what you two have in common'
-              : 'See what you and $name have in common?',
-          style: AppText.title3,
-        ),
+        Text(_question, style: AppText.title3),
         const SizedBox(height: 4),
         Align(
           alignment: Alignment.centerLeft,

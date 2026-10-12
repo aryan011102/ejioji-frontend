@@ -166,6 +166,7 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
     if (_ended || _founderLine || deck == null || !deck.hasRing) return null;
     return StoryRing(
       name: deck.them.firstName,
+      opposites: deck.opposites,
       imageUrl: deck.them.photo?.stillUrl ?? _person?.photo?.stillUrl,
       seen: _inCommonSeen && deck.canOpen,
       loading: _ringLoading,

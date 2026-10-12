@@ -17,7 +17,8 @@ enum InCommonState {
   preparing('preparing'),
   ready('ready'),
 
-  /// Both said yes and there is too little in common. No ring.
+  /// Both said yes and there is too little in common, and too few opposites,
+  /// for any deck. No ring.
   notEnough('not_enough');
 
   const InCommonState(this.wire);
@@ -25,6 +26,21 @@ enum InCommonState {
 
   static InCommonState parse(String? raw) =>
       values.firstWhere((v) => v.wire == raw, orElse: () => notEnough);
+}
+
+/// Which deck the ring opens (2026-10-12). Opposites is for two people with
+/// too little in common: the stories are where they differ, so they still have
+/// something to talk about. The server sends it while asking again for the
+/// notice that covers it, so the question can say what it is for.
+enum InCommonDeck {
+  inCommon('in_common'),
+  opposites('opposites');
+
+  const InCommonDeck(this.wire);
+  final String wire;
+
+  static InCommonDeck parse(String? raw) =>
+      values.firstWhere((v) => v.wire == raw, orElse: () => inCommon);
 }
 
 enum StoryKind {
@@ -245,10 +261,12 @@ class InCommon {
     required this.me,
     required this.them,
     required this.stories,
+    this.deck = InCommonDeck.inCommon,
   });
 
   factory InCommon.fromJson(Json j) => InCommon(
         state: InCommonState.parse(j.strOrNull('state')),
+        deck: InCommonDeck.parse(j.strOrNull('deck')),
         themSaidYes: j.flag('them_said_yes'),
         me: StoryPerson.fromJson(j.object('me')),
         them: StoryPerson.fromJson(j.object('them')),
@@ -256,6 +274,9 @@ class InCommon {
       );
 
   final InCommonState state;
+  final InCommonDeck deck;
+
+  bool get opposites => deck == InCommonDeck.opposites;
 
   /// The other person has said yes, so the question can say so.
   final bool themSaidYes;

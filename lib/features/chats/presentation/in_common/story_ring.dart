@@ -11,6 +11,7 @@ class StoryRing extends StatefulWidget {
   const StoryRing({
     required this.name,
     required this.onTap,
+    this.opposites = false,
     this.imageUrl,
     this.seen = false,
     this.loading = false,
@@ -24,6 +25,9 @@ class StoryRing extends StatefulWidget {
   final bool loading;
   final double size;
   final VoidCallback onTap;
+
+  /// The ring opens an opposites deck: where the two differ (2026-10-12).
+  final bool opposites;
 
   @override
   State<StoryRing> createState() => _StoryRingState();
@@ -68,7 +72,9 @@ class _StoryRingState extends State<StoryRing> with SingleTickerProviderStateMix
     final outer = widget.size + 7;
     return Pressable(
       onTap: widget.onTap,
-      semanticLabel: 'See what you and ${widget.name} have in common',
+      semanticLabel: widget.opposites
+          ? 'See where you and ${widget.name} differ'
+          : 'See what you and ${widget.name} have in common',
       child: SizedBox.square(
         dimension: outer,
         child: Stack(

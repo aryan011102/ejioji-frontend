@@ -122,6 +122,7 @@ Future<bool> _ask(BuildContext context, WidgetRef ref, InCommon deck) async {
     builder: (sheetContext) => InCommonAskCard(
       name: deck.them.firstName,
       themSaidYes: deck.themSaidYes,
+      opposites: deck.opposites,
       onAllow: () => Navigator.of(sheetContext).pop(true),
       onNotNow: () => Navigator.of(sheetContext).pop(false),
       onReadNotice: () => unawaited(_showNotice(sheetContext, notice!)),

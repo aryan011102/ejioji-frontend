@@ -538,4 +538,61 @@ void main() {
     await tester.pumpAndSettle();
     expect(replies, ['2 PM. For both of you.|same, 2pm is sacred']);
   });
+
+  test('the deck is in common unless the server says opposites', () {
+    expect(InCommon.fromJson(body).deck, InCommonDeck.inCommon);
+    expect(InCommon.fromJson(body).opposites, isFalse);
+    final opposites = InCommon.fromJson({...body, 'deck': 'opposites'});
+    expect(opposites.opposites, isTrue);
+    // A value this build does not know reads as in common, never a crash.
+    expect(InCommon.fromJson({...body, 'deck': 'something_new'}).deck, InCommonDeck.inCommon);
+  });
+
+  testWidgets('an opposites deck opens like any other, its differences included', (tester) async {
+    final deck = InCommon.fromJson({
+      ...body,
+      'deck': 'opposites',
+      'stories': [
+        {...story('intro', 'You & Meera. Opposites, mostly.'), 'eyebrow': 'Opposites'},
+        story(
+          'differ',
+          "You're up at 12 AM. Meera's up at 7 AM.",
+          chart: {
+            'type': 'hours',
+            'me': {...side(0, '12 AM', 'you'), 'series': day(0)},
+            'them': {...side(7, '7 AM', 'Meera'), 'series': day(7)},
+            'me_ranks': <Object>[],
+            'them_ranks': <Object>[],
+          },
+        ),
+        story('thought', 'Ask Meera what the mornings are like.'),
+      ],
+    });
+    expect(deck.canOpen, isTrue);
+    expect(deck.stories.map((s) => s.kind), [StoryKind.intro, StoryKind.differ, StoryKind.thought]);
+  });
+
+  testWidgets('asking for the opposites deck says what it is for', (tester) async {
+    Future<void> ask({required bool themSaidYes}) => tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: InCommonAskCard(
+                  name: 'Meera',
+                  themSaidYes: themSaidYes,
+                  opposites: true,
+                  onAllow: () {},
+                  onNotNow: () {},
+                  onReadNotice: () {},
+                ),
+              ),
+            ),
+          ),
+        );
+    await ask(themSaidYes: false);
+    expect(find.text('See where you and Meera differ?'), findsOneWidget);
+    expect(find.textContaining('in common'), findsNothing);
+    await ask(themSaidYes: true);
+    expect(find.text('Meera wants to see where you two differ'), findsOneWidget);
+  });
 }

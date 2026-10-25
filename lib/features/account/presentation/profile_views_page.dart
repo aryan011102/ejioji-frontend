@@ -117,7 +117,7 @@ class ProfileViewsPage extends ConsumerWidget {
                             last: v == seen.visitors.last,
                             leading: Avatar(
                               seedColor: const Color(0xFF8E7B93),
-                              imageUrl: v.person.photos.firstOrNull?.stillUrl,
+                              imageUrl: v.person.photos.firstOrNull?.faceUrl,
                               size: 29,
                             ),
                             onTap: () => context.push(

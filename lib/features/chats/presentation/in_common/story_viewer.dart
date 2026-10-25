@@ -290,7 +290,7 @@ class _Pair extends StatelessWidget {
             color: AppColors.group,
             border: Border.all(color: AppColors.group, width: stroke),
           ),
-          child: Avatar(seedColor: AppColors.fill, size: size, imageUrl: p.photo?.stillUrl),
+          child: Avatar(seedColor: AppColors.fill, size: size, imageUrl: p.photo?.faceUrl),
         );
     return SizedBox(
       width: face + size * 0.7,

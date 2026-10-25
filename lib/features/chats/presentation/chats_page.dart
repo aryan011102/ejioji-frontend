@@ -352,7 +352,7 @@ class _SentList extends ConsumerWidget {
                       leading: Avatar(
                         seedColor: AppColors.fill,
                         size: 29,
-                        imageUrl: r.person.leadPhoto?.stillUrl,
+                        imageUrl: r.person.leadPhoto?.faceUrl,
                       ),
                     ),
                 ],
@@ -632,7 +632,7 @@ class _ConversationRow extends StatelessWidget {
               children: [
                 Avatar(
                   seedColor: AppColors.fill,
-                  imageUrl: conversation.person.photo?.stillUrl,
+                  imageUrl: conversation.person.photo?.faceUrl,
                 ),
                 const SizedBox(width: 12),
                 Expanded(

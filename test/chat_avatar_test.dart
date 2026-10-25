@@ -1,5 +1,6 @@
 import 'package:ejioji/core/theme/tokens.dart';
 import 'package:ejioji/features/chats/presentation/in_common/story_ring.dart';
+import 'package:ejioji/shared/models/media.dart';
 import 'package:ejioji/shared/widgets/identity.dart';
 import 'package:ejioji/shared/widgets/pressable.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +18,24 @@ void main() {
 
   ImageProvider<Object> imageOf(WidgetTester tester) =>
       tester.widget<Image>(find.byType(Image)).image;
+
+  test('a face is the small square when the server has one, the still if not', () {
+    Map<String, Object?> json({String? thumb}) => {
+          'id': 'm1',
+          'kind': 'photo',
+          'width': 1200,
+          'height': 1600,
+          'still_url': 'https://example.test/still.jpg',
+          if (thumb != null) 'thumb_url': thumb,
+          'video_url': null,
+          'video_duration_ms': null,
+          'urls_expire_at': '2026-10-25T12:00:00Z',
+        };
+    final withThumb = MediaAsset.fromJson(json(thumb: 'https://example.test/thumb.jpg'));
+    expect(withThumb.faceUrl, 'https://example.test/thumb.jpg');
+    expect(withThumb.stillUrl, 'https://example.test/still.jpg');
+    expect(MediaAsset.fromJson(json()).faceUrl, 'https://example.test/still.jpg');
+  });
 
   testWidgets('a face is decoded small, not at the size of the still', (tester) async {
     await pump(tester, const Avatar(seedColor: AppColors.fill, imageUrl: url));

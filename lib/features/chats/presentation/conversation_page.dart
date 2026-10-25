@@ -172,7 +172,7 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
     if (_ended || _founderLine) return null;
     final deck = _inCommon;
     final ringed = deck != null && deck.hasRing;
-    final url = _person?.photo?.stillUrl ?? deck?.them.photo?.stillUrl;
+    final url = _person?.photo?.faceUrl ?? deck?.them.photo?.faceUrl;
     if (url == null && !ringed) return null;
     return StoryRing(
       name: deck?.them.firstName ?? _person?.firstName ?? '',

@@ -135,7 +135,7 @@ class _ProfileCard extends StatelessWidget {
                 Avatar(
                   seedColor: AppColors.fill,
                   size: 62,
-                  imageUrl: profile?.photos.firstOrNull?.stillUrl,
+                  imageUrl: profile?.photos.firstOrNull?.faceUrl,
                 ),
                 const SizedBox(width: 14),
                 Expanded(

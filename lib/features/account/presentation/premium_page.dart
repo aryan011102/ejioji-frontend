@@ -10,6 +10,7 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
 import '../../../data/providers.dart';
 import '../../../shared/format.dart';
+import '../../../shared/models/enums.dart';
 import '../../../shared/models/premium.dart';
 import '../../../shared/widgets/buttons.dart';
 import '../../../shared/widgets/layout.dart';
@@ -39,18 +40,21 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
   String _plan = 'm3';
   bool _starting = false;
 
+  /// Women only, so it is left off the list for everyone else.
+  static const _stealth = (
+    Icons.visibility_off_outlined,
+    'Stealth mode',
+    "Browse without appearing in anyone's feed, and without landing on "
+        'their views list.',
+  );
+
   static const _features = <(IconData, String, String)>[
     (
       Icons.visibility_outlined,
       'See who viewed you',
       'Names and faces, not just a number.',
     ),
-    (
-      Icons.visibility_off_outlined,
-      'Stealth mode',
-      "Browse without appearing in anyone's feed, and without landing on "
-          'their views list.',
-    ),
+    _stealth,
     (
       Icons.auto_awesome,
       'Priority in feeds',
@@ -194,6 +198,12 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
     final renewing =
         status != null && status.fromStore && (status.current?.renews ?? false);
     final prices = ref.watch(storePricesProvider).valueOrNull ?? const {};
+    final isWoman = ref.watch(myProfileProvider).valueOrNull?.profile?.gender ==
+        Gender.woman;
+    final features = [
+      for (final f in _features)
+        if (f != _stealth || isWoman) f,
+    ];
 
     return AppScaffold(
       navBar: AppNavBar(
@@ -290,11 +300,11 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
           ),
           SectionGroup(
             children: [
-              for (final (icon, title, body) in _features)
+              for (final (icon, title, body) in features)
                 AppRow(
                   label: title,
                   subtitle: body,
-                  last: title == _features.last.$2,
+                  last: title == features.last.$2,
                   leading: Icon(icon, size: 18, color: AppColors.label2),
                 ),
             ],

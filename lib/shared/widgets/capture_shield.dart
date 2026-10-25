@@ -25,6 +25,10 @@ class CaptureShield extends StatefulWidget {
 
   static const recordingNote = 'Hidden while your screen is recorded or shared.';
 
+  /// DEMO BUILD ONLY (branch demo-recording, never merged): off, so the
+  /// product demo can be screen recorded. On `main` there is no switch.
+  static var enabled = false;
+
   @override
   State<CaptureShield> createState() => _CaptureShieldState();
 }
@@ -40,6 +44,7 @@ class _CaptureShieldState extends State<CaptureShield> {
   @override
   void initState() {
     super.initState();
+    if (!CaptureShield.enabled) return;
     _live.add(this);
     ScreenCapture.protect();
     _shots = ScreenCapture.screenshots.listen((_) => _onScreenshot());
@@ -47,6 +52,7 @@ class _CaptureShieldState extends State<CaptureShield> {
 
   @override
   void dispose() {
+    if (!CaptureShield.enabled) return super.dispose();
     unawaited(_shots?.cancel());
     _live.remove(this);
     ScreenCapture.release();
@@ -68,6 +74,7 @@ class _CaptureShieldState extends State<CaptureShield> {
 
   @override
   Widget build(BuildContext context) {
+    if (!CaptureShield.enabled) return widget.child;
     return ValueListenableBuilder<bool>(
       valueListenable: ScreenCapture.captured,
       child: widget.child,

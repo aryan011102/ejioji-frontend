@@ -19,6 +19,7 @@ void main() {
   var recording = false;
 
   setUp(() {
+    CaptureShield.enabled = true;
     ScreenCapture.reset();
     sent = [];
     recording = false;
@@ -41,6 +42,7 @@ void main() {
       (_) {},
     );
   }
+
 
   Widget app(Widget home) => MaterialApp(home: Scaffold(body: home));
 
@@ -132,5 +134,16 @@ void main() {
     await tester.pump();
     expect(find.text('Asha'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('switched off, a shield asks the phone for nothing', (tester) async {
+    CaptureShield.enabled = false;
+    await tester.pumpWidget(app(const CaptureShield(child: Text('Asha'))));
+    recording = true;
+    await fromNative('captured', true);
+    await tester.pump();
+    expect(sent, isEmpty);
+    expect(find.text('Asha'), findsOneWidget);
+    expect(find.text(CaptureShield.recordingNote), findsNothing);
   });
 }

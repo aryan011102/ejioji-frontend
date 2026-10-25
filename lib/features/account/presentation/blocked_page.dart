@@ -96,7 +96,7 @@ class _BlockedPageState extends ConsumerState<BlockedPage> {
                           last: person == people.last,
                           leading: Avatar(
                             seedColor: const Color(0xFF8E7B93),
-                            imageUrl: person.photo?.stillUrl,
+                            imageUrl: person.photo?.faceUrl,
                             size: 29,
                           ),
                           control: MiniButton(

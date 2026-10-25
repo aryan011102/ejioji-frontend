@@ -94,7 +94,7 @@ class SavedPage extends ConsumerWidget {
                             last: s == list.saved.last,
                             leading: Avatar(
                               seedColor: const Color(0xFF8E7B93),
-                              imageUrl: s.person.photos.firstOrNull?.stillUrl,
+                              imageUrl: s.person.photos.firstOrNull?.faceUrl,
                               size: 29,
                             ),
                             onTap: () => context.push(

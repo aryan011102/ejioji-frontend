@@ -18,6 +18,7 @@ class MediaAsset {
     required this.height,
     required this.stillUrl,
     required this.expiresAt,
+    this.thumbUrl,
     this.videoUrl,
     this.videoDuration,
   });
@@ -29,6 +30,10 @@ class MediaAsset {
   final String stillUrl;
   final DateTime expiresAt;
 
+  /// A 320-pixel square from the middle of the still, for a round photo. Null
+  /// on an upload from before the server made them, until it has one.
+  final String? thumbUrl;
+
   /// Present on a live photo (the motion half) and on a chat video.
   final String? videoUrl;
   final Duration? videoDuration;
@@ -36,6 +41,10 @@ class MediaAsset {
   double get aspectRatio => height == 0 ? 1 : width / height;
 
   bool get hasMotion => videoUrl != null;
+
+  /// What to draw in a circle: the small square when there is one. A face in
+  /// a list then downloads about 20 KB rather than the whole still.
+  String get faceUrl => thumbUrl ?? stillUrl;
 
   bool get isStale => DateTime.now().isAfter(expiresAt);
 
@@ -47,6 +56,7 @@ class MediaAsset {
       width: j.intOr('width', 0),
       height: j.intOr('height', 0),
       stillUrl: j.str('still_url'),
+      thumbUrl: j.strOrNull('thumb_url'),
       videoUrl: j.strOrNull('video_url'),
       videoDuration: ms == null ? null : Duration(milliseconds: ms),
       expiresAt: j.time('urls_expire_at'),

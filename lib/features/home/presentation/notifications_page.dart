@@ -203,7 +203,7 @@ class ActivityRow extends StatelessWidget {
                   Avatar(
                     seedColor: AppColors.fill,
                     size: 50,
-                    imageUrl: person.photo?.stillUrl,
+                    imageUrl: person.photo?.faceUrl,
                   )
                 else
                   _SystemGlyph(kind: item.kind),

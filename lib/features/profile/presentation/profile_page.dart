@@ -643,7 +643,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 Avatar(
                   seedColor: AppColors.fill,
                   size: 84,
-                  imageUrl: photos.isEmpty ? null : photos.first.stillUrl,
+                  imageUrl: photos.isEmpty ? null : photos.first.faceUrl,
                 ),
                 const SizedBox(width: 14),
                 Expanded(

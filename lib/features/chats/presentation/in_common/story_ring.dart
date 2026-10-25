@@ -11,6 +11,7 @@ class StoryRing extends StatefulWidget {
   const StoryRing({
     required this.name,
     required this.onTap,
+    this.ringed = true,
     this.opposites = false,
     this.imageUrl,
     this.seen = false,
@@ -25,6 +26,10 @@ class StoryRing extends StatefulWidget {
   final bool loading;
   final double size;
   final VoidCallback onTap;
+
+  /// False draws the photo alone, in the same space, and it does not take a
+  /// tap: nothing in common yet, or the read has not answered.
+  final bool ringed;
 
   /// The ring opens an opposites deck: where the two differ (2026-10-12).
   final bool opposites;
@@ -70,16 +75,15 @@ class _StoryRingState extends State<StoryRing> with SingleTickerProviderStateMix
   @override
   Widget build(BuildContext context) {
     final outer = widget.size + 7;
-    return Pressable(
-      onTap: widget.onTap,
-      semanticLabel: widget.opposites
-          ? 'See where you and ${widget.name} differ'
-          : 'See what you and ${widget.name} have in common',
-      child: SizedBox.square(
-        dimension: outer,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
+    // The same space with or without the ring, so the title does not shift
+    // when it arrives. The photo built again then joins the same image load,
+    // finished or not, so it does not blink.
+    final face = SizedBox.square(
+      dimension: outer,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          if (widget.ringed) ...[
             RotationTransition(
               turns: _spin,
               child: Container(
@@ -100,14 +104,22 @@ class _StoryRingState extends State<StoryRing> with SingleTickerProviderStateMix
                 color: AppColors.group,
               ),
             ),
-            Avatar(
-              seedColor: AppColors.fill,
-              size: widget.size,
-              imageUrl: widget.imageUrl,
-            ),
           ],
-        ),
+          Avatar(
+            seedColor: AppColors.fill,
+            size: widget.size,
+            imageUrl: widget.imageUrl,
+          ),
+        ],
       ),
+    );
+    if (!widget.ringed) return face;
+    return Pressable(
+      onTap: widget.onTap,
+      semanticLabel: widget.opposites
+          ? 'See where you and ${widget.name} differ'
+          : 'See what you and ${widget.name} have in common',
+      child: face,
     );
   }
 }

@@ -43,7 +43,7 @@ class SubscriptionPage extends ConsumerWidget {
       Uri.parse('https://apps.apple.com/account/subscriptions');
 
   static const _afterwards = 'When it ends you are back on free, and anything '
-      'onebytwo plus turned on, like stealth, turns off with it.';
+      'onebytwo plus turned on turns off with it.';
 
   /// What the footer says depends on where the plan came from: a free plan
   /// and a pass just end, a subscription renews until it is cancelled in

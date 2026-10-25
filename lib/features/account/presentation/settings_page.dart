@@ -196,6 +196,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final premium = ref.watch(premiumProvider).valueOrNull;
     final stealthOn = ref.watch(sessionProvider).publish?.stealth ?? false;
     final details = ref.watch(myProfileProvider).valueOrNull?.profile;
+    final isWoman = details?.gender == Gender.woman;
 
     return AppScaffold(
       navBar: AppNavBar(
@@ -226,10 +227,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ),
                 onTap: () => context.push(Routes.profileViews),
               ),
-              // Without Plus the switch is replaced by the Plus chip, so it does
-              // not look free and then refuse. Someone already in stealth keeps
-              // the switch, so they can always turn it off.
-              if ((premium?.active ?? false) || stealthOn)
+              // Stealth is for women only. Without Plus the switch is replaced
+              // by the Plus chip, so it does not look free and then refuse.
+              // Someone already in stealth keeps the switch, whoever they are,
+              // so they can always turn it off.
+              if (stealthOn || (isWoman && (premium?.active ?? false)))
                 AppRow(
                   label: 'Stealth mode',
                   subtitle: 'Only matches can see you',
@@ -243,7 +245,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     onChanged: _stealthBusy ? null : _setStealth,
                   ),
                 )
-              else
+              else if (isWoman)
                 AppRow(
                   label: 'Stealth mode',
                   subtitle: 'Only matches can see you',
@@ -255,7 +257,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ),
                   onTap: () => context.push(Routes.premium),
                 ),
-              if (details?.gender == Gender.woman)
+              if (isWoman)
                 AppRow(
                   label: 'Show name as initials',
                   subtitle: '✨ This feature is exclusively for women',

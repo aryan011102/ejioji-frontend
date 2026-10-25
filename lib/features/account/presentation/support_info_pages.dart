@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
+import '../../../data/providers.dart';
+import '../../../shared/models/enums.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/states.dart';
 
@@ -259,17 +262,20 @@ class WhatWeReadPage extends StatelessWidget {
 }
 
 /// Who sees what, and when.
-class WhatOthersSeePage extends StatelessWidget {
+class WhatOthersSeePage extends ConsumerWidget {
   const WhatOthersSeePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return const _InfoPage(
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Stealth is for women only, so nobody else is told about it.
+    final isWoman = ref.watch(myProfileProvider).valueOrNull?.profile?.gender ==
+        Gender.woman;
+    return _InfoPage(
       title: 'What others see',
       intro: 'Your profile shows what you chose for it, and nothing you did '
           'not. Here is who sees what.',
       sections: [
-        _Section('Anyone shown your profile', [
+        const _Section('Anyone shown your profile', [
           (
             'About you',
             'Your first name, age and city, and your last name, pronouns, '
@@ -288,7 +294,7 @@ class WhatOthersSeePage extends StatelessWidget {
                 'told us.',
           ),
         ]),
-        _Section('After you match', [
+        const _Section('After you match', [
           (
             'Your socials',
             'Instagram, X and LinkedIn handles, only while their switch is '
@@ -306,11 +312,12 @@ class WhatOthersSeePage extends StatelessWidget {
             'If their profile is on your screen for a few seconds, you appear '
                 'in their profile views.',
           ),
-          (
-            'Stealth mode',
-            'In stealth you are out of every feed, only people you ask can see '
-                'you, and your looks are not recorded.',
-          ),
+          if (isWoman)
+            (
+              'Stealth mode',
+              'In stealth you are out of every feed, only people you ask can '
+                  'see you, and your looks are not recorded.',
+            ),
         ]),
       ],
       note: 'Insights you hide still help us find your matches. Other people '

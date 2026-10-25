@@ -161,14 +161,25 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
     });
   }
 
+  /// Their photo at the top, ringed once the in common read says there is
+  /// something behind it.
+  ///
+  /// The photo comes from the chats list, which already holds it and has it in
+  /// the image cache, so it paints with the first frame. It used to wait for
+  /// the in common read, which works the stories out on the server on every
+  /// call and is far too slow to hold a face back for.
   Widget? _ring() {
+    if (_ended || _founderLine) return null;
     final deck = _inCommon;
-    if (_ended || _founderLine || deck == null || !deck.hasRing) return null;
+    final ringed = deck != null && deck.hasRing;
+    final url = _person?.photo?.stillUrl ?? deck?.them.photo?.stillUrl;
+    if (url == null && !ringed) return null;
     return StoryRing(
-      name: deck.them.firstName,
-      opposites: deck.opposites,
-      imageUrl: deck.them.photo?.stillUrl ?? _person?.photo?.stillUrl,
-      seen: _inCommonSeen && deck.canOpen,
+      name: deck?.them.firstName ?? _person?.firstName ?? '',
+      ringed: ringed,
+      opposites: deck?.opposites ?? false,
+      imageUrl: url,
+      seen: _inCommonSeen && (deck?.canOpen ?? false),
       loading: _ringLoading,
       onTap: () => unawaited(_tapRing()),
     );

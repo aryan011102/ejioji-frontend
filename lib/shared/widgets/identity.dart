@@ -87,6 +87,9 @@ class Avatar extends StatelessWidget {
   final String? imageUrl;
   final bool blurred;
 
+  /// Sharp at three times the largest face drawn, the 104 in the stories.
+  static const _decodeWidth = 320;
+
   @override
   Widget build(BuildContext context) {
     // The URL is signed and expires, so it is only ever held in the in-memory
@@ -113,6 +116,12 @@ class Avatar extends StatelessWidget {
               url,
               width: size,
               height: size,
+              // The still is up to 1600 pixels a side. Decoded at full size, a
+              // dozen faces fill Flutter's image cache and push each other out,
+              // so a chat seen a minute ago downloads its photo again. One
+              // decode width for every size keeps it one cache entry per photo,
+              // shared by the chats list, the top of the chat and the stories.
+              cacheWidth: _decodeWidth,
               fit: BoxFit.cover,
               // A signature that has expired, or a photo taken down between
               // the read and the render. Falling back to the plain circle is

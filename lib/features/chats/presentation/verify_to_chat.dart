@@ -70,8 +70,8 @@ class VerifyToChatCard extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'DigiLocker checks your name and date of birth against Aadhaar. It '
-          'takes about a minute.',
+          'Verify with DigiLocker in about a minute, or with a selfie in a few '
+          'seconds.',
           style: AppText.caption,
         ),
         const SizedBox(height: 20),

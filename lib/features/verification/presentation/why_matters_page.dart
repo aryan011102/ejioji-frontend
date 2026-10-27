@@ -18,15 +18,23 @@ class WhyMattersPage extends ConsumerWidget {
   static const _sections = <(String, String)>[
     (
       'What the blue tick means',
-      'DigiLocker checked that your first name and date of birth are the ones '
-          'on your Aadhaar. That is enough to start a conversation.',
+      'One of two things was checked: either DigiLocker says your first name '
+          'and date of birth are the ones on your Aadhaar, or a selfie says '
+          'the photos on this profile are of you. Either is enough to start a '
+          'conversation.',
+    ),
+    (
+      'What the gold tick means',
+      'Both. It gives no extra features and no better placement. It exists '
+          'because this is the question a family asks first, and it deserves '
+          'an answer that took more than a minute to earn.',
     ),
     (
       'What we never see',
       'DigiLocker shares your name and date of birth with us and nothing else. '
-          'Your Aadhaar number never reaches onebytwo, and what DigiLocker '
-          'shares is never shown to another person: not to matches, not to '
-          'families, not on your profile.',
+          'Your Aadhaar number never reaches onebytwo. The selfie is compared '
+          'with your photos and thrown away, and it is never shown to another '
+          'person: not to matches, not to families, not on your profile.',
     ),
     (
       'Why chat waits for it',
@@ -37,9 +45,9 @@ class WhyMattersPage extends ConsumerWidget {
     ),
     (
       'If a check fails',
-      'Nothing happens to your profile and nobody is told. You can try again. '
-          'A failed check is almost always a name spelt differently rather than '
-          'a bad person.',
+      'Nothing happens to your profile and nobody is told. You can try again, '
+          'or use the other check. A failed check is almost always a name spelt '
+          'differently or a dark selfie rather than a bad person.',
     ),
   ];
 

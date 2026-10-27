@@ -100,6 +100,33 @@ class ApiClient {
         ),
       );
 
+  /// One file as a multipart form field, for the selfie check: the server
+  /// reads it straight from the request and keeps nothing.
+  Future<Json> postFile(
+    String path, {
+    required String field,
+    required List<int> bytes,
+    required String filename,
+    required String contentType,
+    Duration? receiveTimeout,
+  }) async => asJson(
+    await _body(
+      () => _dio.post<Object?>(
+        path,
+        data: FormData.fromMap({
+          field: MultipartFile.fromBytes(
+            bytes,
+            filename: filename,
+            contentType: DioMediaType.parse(contentType),
+          ),
+        }),
+        options: receiveTimeout == null
+            ? null
+            : Options(receiveTimeout: receiveTimeout),
+      ),
+    ),
+  );
+
   Future<Object?> _body(Future<Response<Object?>> Function() call) async {
     final res = await _run(call);
     final data = res.data;

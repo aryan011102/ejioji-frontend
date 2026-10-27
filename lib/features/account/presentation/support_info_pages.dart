@@ -236,6 +236,19 @@ class WhatWeReadPage extends StatelessWidget {
                 'from DigiLocker is used for matches or insights.',
           ),
         ]),
+        _Section('Selfie check', [
+          (
+            'We check',
+            'That the face in your selfie is the face in each of your profile '
+                'photos, for the verified tick. Amazon Rekognition compares '
+                'them for us, in India.',
+          ),
+          (
+            'We never keep',
+            'The selfie, or any measurement of your face. We keep only that '
+                'it matched, when, and which photos were checked.',
+          ),
+        ]),
         _Section('The AI that suggests insights', [
           (
             'It is sent',
@@ -290,8 +303,8 @@ class WhatOthersSeePage extends ConsumerWidget {
           ),
           (
             'Your tick',
-            'If you verified with DigiLocker, the tick. Never what DigiLocker '
-                'told us.',
+            'If you verified, the tick. Never what DigiLocker told us, and '
+                'never your selfie.',
           ),
         ]),
         const _Section('After you match', [
@@ -427,8 +440,9 @@ class SafetyTipsPage extends StatelessWidget {
           ),
           (
             'The tick',
-            'A verified tick means their name and date of birth matched '
-                'DigiLocker. It is not a promise about the person.',
+            'A blue tick means their name and date of birth matched DigiLocker, '
+                'or their photos matched a selfie. Gold means both. It is not '
+                'a promise about the person.',
           ),
         ]),
         _Section('Meeting', [

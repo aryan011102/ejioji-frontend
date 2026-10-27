@@ -3,20 +3,46 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/routes.dart';
+import '../../../data/providers.dart';
 import '../../../shared/widgets/buttons.dart';
+import '../../../shared/widgets/identity.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/states.dart';
 import '../../../shared/widgets/steps.dart';
 
-/// DigiLocker's outcome.
+/// The two ways to the tick.
+enum VerifyRoute {
+  digilocker('DigiLocker'),
+  selfie('Selfie check');
+
+  const VerifyRoute(this.title);
+
+  final String title;
+}
+
+/// Either check's outcome, one screen.
 ///
-/// DigiLocker is instant, and this screen is only reached after the server
-/// said `verified`: the tick is the server's, never something awarded here.
+/// Both are instant, and this screen is only reached after the server said
+/// `verified`: the tick is the server's, never something awarded here.
+/// [tier] is the server's answer after this check, so a person who already
+/// had the other one sees gold straight away. DigiLocker's answer does not
+/// carry it, so without one it is read from the profile, which completing
+/// the check reloads.
 class VerifyResultPage extends ConsumerWidget {
-  const VerifyResultPage({super.key});
+  const VerifyResultPage({required this.route, this.tier, super.key});
+
+  final VerifyRoute route;
+  final VerificationTier? tier;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final gold = (tier ?? ref.watch(myProfileProvider).valueOrNull?.tier) ==
+        VerificationTier.gold;
+    final checked = switch (route) {
+      VerifyRoute.digilocker => 'Your name and date of birth match your Aadhaar.',
+      VerifyRoute.selfie => 'Your selfie matches the photos on your profile.',
+    };
+
     return AppScaffold(
       navBar: const AppNavBar(),
       footer: Column(
@@ -32,14 +58,22 @@ class VerifyResultPage extends ConsumerWidget {
           ),
         ],
       ),
-      child: const ResultScaffoldBody(
-        mark: ResultMark(icon: Icons.check, filled: true),
+      child: ResultScaffoldBody(
+        mark: const ResultMark(icon: Icons.check, filled: true),
         title: 'Verified.',
-        body: 'Your name and date of birth match your Aadhaar. Your profile '
-            'now carries a blue tick.',
+        body: gold
+            ? '$checked With both checks done, your profile now carries the '
+                'gold tick.'
+            : '$checked Your profile now carries a blue tick.',
         note: NoteCard(
-          text: 'Change the first name or date of birth on your profile '
-              'and the tick goes until you verify again.',
+          text: switch (route) {
+            VerifyRoute.digilocker =>
+              'Change the first name or date of birth on your profile and the '
+                  'tick goes until you verify again.',
+            VerifyRoute.selfie =>
+              'Add or replace a photo on your profile and the selfie tick goes '
+                  'until you take a new one. The selfie itself was not kept.',
+          },
         ),
       ),
     );
@@ -51,25 +85,28 @@ class VerifyFailure {
   const VerifyFailure({
     required this.title,
     required this.body,
+    this.route = VerifyRoute.digilocker,
     this.fixable = false,
   });
 
   final String title;
 
   /// The server's own words where it gave some, so the app never guesses at
-  /// what DigiLocker said.
+  /// what DigiLocker or the face check said.
   final String body;
 
-  /// DigiLocker answered and something on the profile did not agree, so the
-  /// way forward is to edit the profile, not to wait for DigiLocker.
+  final VerifyRoute route;
+
+  /// The check answered and something on the profile did not agree (a name,
+  /// a birth date, a photo), so the way forward is to edit the profile, not
+  /// to try the check again as it is.
   final bool fixable;
 }
 
-/// One error screen for DigiLocker.
+/// One error screen for both checks.
 ///
 /// Neither kind of failure is the person's fault, so neither is red. When the
-/// profile disagreed with Aadhaar the way out is editing it; when DigiLocker
-/// did not answer, it is trying again.
+/// profile disagreed the way out is editing it; otherwise it is trying again.
 class VerifyErrorPage extends ConsumerWidget {
   const VerifyErrorPage({this.failure, super.key});
 
@@ -83,10 +120,11 @@ class VerifyErrorPage extends ConsumerWidget {
           body: 'The site was unreachable, or the sign-in was cancelled '
               'before it finished.',
         );
+    final selfie = f.route == VerifyRoute.selfie;
 
     return AppScaffold(
       navBar: AppNavBar(
-        title: 'DigiLocker',
+        title: f.route.title,
         backLabel: 'Verify',
         onBack: () => context.pop(),
       ),
@@ -94,13 +132,15 @@ class VerifyErrorPage extends ConsumerWidget {
         children: [
           if (f.fixable)
             PrimaryButton(
-              label: 'Edit your profile',
+              label: selfie ? 'Edit your photos' : 'Edit your profile',
               onPressed: () => context.pushReplacement(Routes.editInfo),
             )
           else
             PrimaryButton(
               label: 'Try again',
-              onPressed: () => context.pushReplacement(Routes.digilocker),
+              onPressed: () => context.pushReplacement(
+                selfie ? Routes.selfie : Routes.digilocker,
+              ),
             ),
           const SizedBox(height: 8),
           SecondaryButton(
@@ -113,9 +153,12 @@ class VerifyErrorPage extends ConsumerWidget {
         mark: const ResultMark(icon: Icons.warning_amber_rounded, size: 76),
         title: f.title,
         body: f.body,
-        note: const NoteCard(
-          text: 'Nothing on your profile changed, nobody is told, and we kept '
-              'nothing DigiLocker sent.',
+        note: NoteCard(
+          text: selfie
+              ? 'Nothing on your profile changed, nobody is told, and the '
+                  'selfie was not kept.'
+              : 'Nothing on your profile changed, nobody is told, and we kept '
+                  'nothing DigiLocker sent.',
         ),
       ),
     );

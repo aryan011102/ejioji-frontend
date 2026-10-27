@@ -13,19 +13,50 @@ void main() {
       'verified': true,
       'verified_at': '2026-09-25T10:00:00+00:00',
       'available': true,
+      'selfie': {
+        'status': 'outdated',
+        'verified': false,
+        'verified_at': '2026-10-27T10:00:00+00:00',
+        'available': true,
+      },
+      'tier': 'blue',
     });
     expect(v.verified, isTrue);
-    expect(v.available, isTrue);
-    expect(v.verifiedAt, isNotNull);
+    expect(v.tier, VerificationTier.blue);
+    expect(v.digilocker.verified, isTrue);
+    expect(v.digilocker.available, isTrue);
+    expect(v.digilocker.verifiedAt, isNotNull);
+    expect(v.selfie.status, VerificationStatus.outdated);
+    expect(v.selfie.verified, isFalse);
+  });
 
-    final outdated = Verification.fromJson({
-      'status': 'outdated',
-      'verified': false,
+  test('both checks standing are gold', () {
+    final v = Verification.fromJson({
+      'status': 'verified',
+      'verified': true,
+      'verified_at': '2026-09-25T10:00:00+00:00',
+      'available': true,
+      'selfie': {
+        'status': 'verified',
+        'verified': true,
+        'verified_at': '2026-10-27T10:00:00+00:00',
+        'available': true,
+      },
+      'tier': 'gold',
+    });
+    expect(v.tier, VerificationTier.gold);
+  });
+
+  test('a server from before the selfie reads as DigiLocker alone', () {
+    final v = Verification.fromJson({
+      'status': 'verified',
+      'verified': true,
       'verified_at': '2026-09-25T10:00:00+00:00',
       'available': true,
     });
-    expect(outdated.status, VerificationStatus.outdated);
-    expect(outdated.verified, isFalse);
+    expect(v.tier, VerificationTier.blue);
+    expect(v.selfie.status, VerificationStatus.none);
+    expect(v.selfie.available, isFalse);
   });
 
   test('an unknown status is never read as verified', () {
@@ -35,8 +66,37 @@ void main() {
       'verified_at': null,
       'available': false,
     });
-    expect(v.status, VerificationStatus.none);
+    expect(v.digilocker.status, VerificationStatus.none);
     expect(v.verified, isFalse);
+  });
+
+  test('a selfie refusal names the photos and says whether photos fix it', () {
+    final r = SelfieResult.fromJson({
+      'outcome': 'photos_differ',
+      'verified': false,
+      'message': 'Some of your photos do not look like your selfie.',
+      'differing_photo_ids': ['m-2'],
+      'tier': 'none',
+    });
+    expect(r.verified, isFalse);
+    expect(r.differingPhotoIds, ['m-2']);
+    expect(r.aboutPhotos, isTrue);
+    final dark = SelfieResult.fromJson({
+      'outcome': 'no_face',
+      'verified': false,
+      'message': 'We could not see a face.',
+      'differing_photo_ids': <String>[],
+      'tier': 'none',
+    });
+    expect(dark.aboutPhotos, isFalse);
+    final done = SelfieResult.fromJson({
+      'outcome': 'verified',
+      'verified': true,
+      'message': 'You are verified.',
+      'differing_photo_ids': <String>[],
+      'tier': 'gold',
+    });
+    expect(done.tier, VerificationTier.gold);
   });
 
   test('a refusal carries the outcome and the server message', () {
@@ -79,10 +139,34 @@ void main() {
     );
   });
 
-  test('the consent purpose matches the backend name', () {
+  test('a card carries the tier, and an older card without one is blue', () {
+    Map<String, Object?> card(String? tier) => {
+      'user_id': 'u-1',
+      'first_name': 'Priya',
+      'age': 27,
+      'city': 'bengaluru',
+      'photos': <Object>[],
+      'tiles': <Object>[],
+      'verified': tier != 'none',
+      if (tier != null) 'verification_tier': tier,
+    };
+    expect(Candidate.fromJson(card('gold')).tier, VerificationTier.gold);
+    expect(Candidate.fromJson(card('none')).verified, isFalse);
+    expect(Candidate.fromJson(card(null)).tier, VerificationTier.blue);
+    expect(
+      Candidate.fromJson(card('gold')).withSocials(const []).tier,
+      VerificationTier.gold,
+    );
+  });
+
+  test('the consent purposes match the backend names', () {
     expect(
       ConsentPurpose.parse('identity_verification'),
       ConsentPurpose.identityVerification,
+    );
+    expect(
+      ConsentPurpose.parse('selfie_verification'),
+      ConsentPurpose.selfieVerification,
     );
   });
 }

@@ -7,13 +7,15 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/theme/typography.dart';
 import '../../../data/providers.dart';
 import '../../../data/verification_repository.dart';
+import '../../../shared/models/enums.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/states.dart';
 
-/// Verification: where it stands, and the way to it.
+/// Verification: where it stands, and the two ways to it.
 ///
-/// DigiLocker is live: a check of the profile's first name and date of birth
-/// against Aadhaar, which earns the blue tick. It is the only check for now.
+/// DigiLocker checks the profile's name and date of birth against Aadhaar; the
+/// selfie checks that the profile's photos are of the person holding the
+/// phone. Either earns the blue tick, both earn gold.
 ///
 /// The status comes from the server, which derives it from the profile on
 /// every read. The app never decides on its own that someone is verified.
@@ -36,94 +38,145 @@ class VerifyHubPage extends ConsumerWidget {
           error: e,
           onRetry: () => ref.invalidate(verificationProvider),
         ),
-        data: (v) => ListView(
-          padding: const EdgeInsets.fromLTRB(0, 22, 0, 40),
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: Insets.titleGutter,
+        data: (v) {
+          final gold = v.tier == VerificationTier.gold;
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(0, 22, 0, 40),
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: Insets.titleGutter,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    IconPlate(
+                      v.verified ? Icons.verified : Icons.verified_outlined,
+                      size: 52,
+                      radius: 16,
+                      background: gold ? AppColors.goldSoft : AppColors.blueSoft,
+                      foreground: gold ? AppColors.gold : AppColors.blue,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      _title(v),
+                      style: AppText.title1.copyWith(fontSize: 27, height: 33 / 27),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(_body(v), style: AppText.callout),
+                    const SizedBox(height: 26),
+                  ],
+                ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              SectionGroup(
                 children: [
-                  IconPlate(
-                    v.verified ? Icons.verified : Icons.verified_outlined,
-                    size: 52,
-                    radius: 16,
-                    background: AppColors.blueSoft,
-                    foreground: AppColors.blue,
+                  AppRow(
+                    label: 'DigiLocker',
+                    // Said here because this is where someone decides whether
+                    // to tap, and "do I have to download something" is what
+                    // stops them. It opens in the browser: there is no app.
+                    subtitle: _subtitle(
+                      v.digilocker,
+                      ready: 'No app needed. It opens in your browser.',
+                      outdated: 'Your name or date of birth changed. Verify again.',
+                    ),
+                    leading: const Icon(
+                      Icons.description_outlined,
+                      size: 18,
+                      color: AppColors.blue,
+                    ),
+                    onTap: _open(v.digilocker)
+                        ? () => context.push(Routes.digilocker)
+                        : null,
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    _title(v.status),
-                    style: AppText.title1.copyWith(fontSize: 27, height: 33 / 27),
+                  AppRow(
+                    label: 'Selfie',
+                    subtitle: _subtitle(
+                      v.selfie,
+                      ready: 'Checked against your profile photos.',
+                      outdated: 'Your photos changed. Take a new selfie.',
+                    ),
+                    leading: const Icon(
+                      Icons.face_retouching_natural_outlined,
+                      size: 18,
+                      color: AppColors.blue,
+                    ),
+                    last: true,
+                    onTap: _open(v.selfie) ? () => context.push(Routes.selfie) : null,
                   ),
-                  const SizedBox(height: 8),
-                  Text(_body(v.status), style: AppText.callout),
-                  const SizedBox(height: 26),
                 ],
               ),
-            ),
-            SectionGroup(
-              children: [
-                AppRow(
-                  label: 'DigiLocker',
-                  // Said here because this is where someone decides whether to
-                  // tap, and "do I have to download something" is what stops
-                  // them. It opens in the browser: there is no app to install.
-                  subtitle: v.verified
-                      ? null
-                      : v.available
-                          ? 'No app needed. It opens in your browser.'
-                          : 'Not available right now',
-                  leading: const Icon(
-                    Icons.description_outlined,
-                    size: 18,
-                    color: AppColors.blue,
-                  ),
-                  last: true,
-                  onTap: v.verified ||
-                          !v.available ||
-                          v.status == VerificationStatus.revoked
-                      ? null
-                      : () => context.push(Routes.digilocker),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: Insets.titleGutter),
+                child: NoteCard(
+                  icon: Icons.lock_outline,
+                  text: 'Others see only the tick, never your details or your '
+                      'selfie. Change your name or date of birth, or add a '
+                      'photo, and that check goes until you do it again.',
                 ),
-              ],
-            ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: Insets.titleGutter),
-              child: NoteCard(
-                icon: Icons.lock_outline,
-                text: 'Others see only the tick, never your details. Change '
-                    'the first name or date of birth on your profile and the '
-                    'tick goes until you verify again.',
               ),
-            ),
-          ],
-        ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  String _title(VerificationStatus status) => switch (status) {
-        VerificationStatus.verified => 'You are verified.',
-        VerificationStatus.outdated => 'Verify again.',
-        VerificationStatus.revoked => 'Verification removed.',
-        VerificationStatus.none => 'Show people you are real.',
-      };
+  /// A check can be started when it is switched on, not already standing,
+  /// and not taken away by our team.
+  static bool _open(Check c) =>
+      c.available && !c.verified && c.status != VerificationStatus.revoked;
 
-  String _body(VerificationStatus status) => switch (status) {
-        VerificationStatus.verified =>
-          'Your profile carries a blue tick. That means your name and age '
-              'match your Aadhaar.',
-        VerificationStatus.outdated =>
-          'Your first name or date of birth changed after you verified, so the '
-              'tick is off until DigiLocker agrees with the new one.',
-        VerificationStatus.revoked =>
-          'Our team removed your verification. Write to us from Settings if '
-              'you think that is a mistake.',
-        VerificationStatus.none =>
-          'A blue tick says your name and age are the ones on your Aadhaar. '
-              'It takes about a minute with DigiLocker.',
-      };
+  static String? _subtitle(
+    Check c, {
+    required String ready,
+    required String outdated,
+  }) {
+    if (c.verified) return 'Done';
+    if (c.status == VerificationStatus.revoked) return 'Removed by our team';
+    if (!c.available) return 'Not available right now';
+    if (c.status == VerificationStatus.outdated) return outdated;
+    return ready;
+  }
+
+  String _title(Verification v) {
+    if (v.tier == VerificationTier.gold) return 'You are verified twice.';
+    if (v.verified) return 'You are verified.';
+    if (v.digilocker.status == VerificationStatus.revoked ||
+        v.selfie.status == VerificationStatus.revoked) {
+      return 'Verification removed.';
+    }
+    if (v.digilocker.status == VerificationStatus.outdated ||
+        v.selfie.status == VerificationStatus.outdated) {
+      return 'Verify again.';
+    }
+    return 'Show people you are real.';
+  }
+
+  String _body(Verification v) {
+    if (v.tier == VerificationTier.gold) {
+      return 'Your profile carries the gold tick: your name and age match '
+          'your Aadhaar, and your photos match your selfie.';
+    }
+    if (v.digilocker.verified) {
+      return 'Your profile carries a blue tick: your name and age match your '
+          'Aadhaar. Take a selfie as well for the gold tick.';
+    }
+    if (v.selfie.verified) {
+      return 'Your profile carries a blue tick: your photos match your '
+          'selfie. Verify with DigiLocker as well for the gold tick.';
+    }
+    if (v.digilocker.status == VerificationStatus.revoked ||
+        v.selfie.status == VerificationStatus.revoked) {
+      return 'Our team removed your verification. Write to us from Settings '
+          'if you think that is a mistake.';
+    }
+    if (v.digilocker.status == VerificationStatus.outdated ||
+        v.selfie.status == VerificationStatus.outdated) {
+      return 'Something on your profile changed after you verified, so the '
+          'tick is off until you check it again.';
+    }
+    return 'Either check gives you a blue tick, and both give you gold. '
+        'DigiLocker takes about a minute; a selfie takes a few seconds.';
+  }
 }

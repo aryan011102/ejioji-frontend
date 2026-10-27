@@ -113,6 +113,7 @@ enum ConsentPurpose {
   matching('matching', 'Matching'),
   identityVerification('identity_verification', 'DigiLocker verification'),
   inCommon('in_common', 'In common stories'),
+  selfieVerification('selfie_verification', 'Selfie verification'),
   unknown('', '');
 
   const ConsentPurpose(this.wire, this.label);
@@ -124,6 +125,33 @@ enum ConsentPurpose {
         (v) => v.wire == raw,
         orElse: () => ConsentPurpose.unknown,
       );
+}
+
+/// Which checks stand, as the server works it out on every read.
+///
+/// Blue is one: DigiLocker (a name and an age) or a selfie (the photos are of
+/// this person). Gold is both. The shape never changes, only the fill: a tick
+/// that changes shape reads as a different promise, and this one is the same
+/// promise twice over.
+enum VerificationTier {
+  none('none'),
+  blue('blue'),
+  gold('gold');
+
+  const VerificationTier(this.wire);
+
+  final String wire;
+
+  bool get verified => this != none;
+
+  /// [verified] is the older field, for a server from before the selfie,
+  /// which sends no tier: its tick is DigiLocker's, so blue.
+  static VerificationTier parse(String? raw, {required bool verified}) {
+    for (final v in values) {
+      if (v.wire == raw) return v;
+    }
+    return verified ? blue : none;
+  }
 }
 
 enum SourceProvider {

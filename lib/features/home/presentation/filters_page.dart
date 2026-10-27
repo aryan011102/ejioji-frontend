@@ -11,6 +11,7 @@ import '../../../data/providers.dart';
 import '../../../shared/models/enums.dart';
 import '../../../shared/models/person.dart';
 import '../../../shared/models/profile.dart';
+import '../../../shared/models/tile.dart';
 import '../../../shared/widgets/buttons.dart';
 import '../../../shared/widgets/controls.dart';
 import '../../../shared/widgets/layout.dart';
@@ -61,15 +62,26 @@ class FiltersPage extends ConsumerWidget {
     final saved = preferences.valueOrNull;
     final lists = options.valueOrNull;
     if (saved == null || lists == null) return shell(const LoadingView());
-    return _FiltersForm(initial: saved, options: lists);
+    return _FiltersForm(
+      initial: saved,
+      options: lists,
+      // Unknown while the profile loads, which shows every country until it
+      // arrives rather than holding the screen back for it.
+      ownCity: ref.watch(myProfileProvider).valueOrNull?.profile?.city,
+    );
   }
 }
 
 class _FiltersForm extends ConsumerStatefulWidget {
-  const _FiltersForm({required this.initial, required this.options});
+  const _FiltersForm({
+    required this.initial,
+    required this.options,
+    this.ownCity,
+  });
 
   final MatchPreferences initial;
   final ProfileOptions options;
+  final City? ownCity;
 
   @override
   ConsumerState<_FiltersForm> createState() => _FiltersFormState();
@@ -110,11 +122,52 @@ class _FiltersFormState extends ConsumerState<_FiltersForm> {
   /// The chips to show, in the order the server gave them, dropping any value
   /// this build does not know. A list that grew server-side shows what it can
   /// rather than failing on the one entry it has never heard of.
-  List<(City, String)> get _cityChips => [
-        for (final o in widget.options.cities)
+  List<(City, String)> get _cityChips => _known(widget.options.cities);
+
+  List<(City, String)> _known(List<PromptOption> options) => [
+        for (final o in options)
           if (City.parse(o.key) case final c when c != City.unknown)
             (c, o.label),
       ];
+
+  /// The cities of the person's own country only: someone in London is not
+  /// asked about Surat (Aryan, 2026-10-28). A city picked earlier somewhere
+  /// else stays, so it can still be taken off. Without a known country (an
+  /// older server, the profile not loaded) every country, under its name.
+  Widget _cityGroups() {
+    Widget wrap(List<(City, String)> chips) => _chipWrap([
+          for (final (city, label) in chips)
+            (label, _cities.contains(city), () => _toggle(_cities, city)),
+        ]);
+
+    final countries = widget.options.countries;
+    if (countries.length <= 1) return wrap(_cityChips);
+    final own = countries
+        .where((c) => c.cities.any((o) => o.key == widget.ownCity?.wire))
+        .firstOrNull;
+    if (own != null) {
+      final home = _known(own.cities);
+      return wrap([
+        ...home,
+        for (final (city, label) in _cityChips)
+          if (_cities.contains(city) && !home.any((h) => h.$1 == city))
+            (city, label),
+      ]);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final (i, country) in countries.indexed)
+          if (_known(country.cities) case final chips when chips.isNotEmpty) ...[
+            Padding(
+              padding: EdgeInsets.fromLTRB(2, i == 0 ? 0 : 14, 2, 7),
+              child: Text(country.label, style: AppText.caption),
+            ),
+            wrap(chips),
+          ],
+      ],
+    );
+  }
 
   List<(Language, String)> get _languageChips => [
         for (final o in widget.options.languages)
@@ -276,10 +329,7 @@ class _FiltersFormState extends ConsumerState<_FiltersForm> {
           ),
           _group(
             'City',
-            _chipWrap([
-              for (final (city, label) in _cityChips)
-                (label, _cities.contains(city), () => _toggle(_cities, city)),
-            ]),
+            _cityGroups(),
             note: _cities.isEmpty
                 ? 'Left empty, you are shown people in your own city.'
                 : 'Your own city is always included.',

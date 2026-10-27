@@ -77,6 +77,14 @@ class Me {
       );
 }
 
+/// What `GET /auth/methods` says to do for one number. Apart from the call so
+/// it can be tested without a server.
+String? signInMethodFrom(Json methods, {required bool abroad}) {
+  final phone = methods.strOrNull('phone') ?? 'otp';
+  if (!abroad || phone == 'firebase') return phone;
+  return methods.strOrNull('abroad');
+}
+
 class AuthRepository {
   const AuthRepository(this._api, this._tokens, this._device);
 
@@ -136,12 +144,19 @@ class AuthRepository {
   /// Which sign-in the server wants: `otp` (our own code by SMS) or
   /// `firebase` (Google sends and checks the code). Asked on every sign-in, so
   /// the server can switch between them without a release.
-  Future<String> signInMethod() async {
+  ///
+  /// Our own codes reach Indian numbers only, so for a number from [abroad]
+  /// the server names another way (`abroad`, Firebase when it is set up), and
+  /// null means sign-in from abroad is not open yet.
+  Future<String?> signInMethod({bool abroad = false}) async {
     try {
-      return (await _api.getJson(Api.authMethods)).strOrNull('phone') ?? 'otp';
+      return signInMethodFrom(
+        await _api.getJson(Api.authMethods),
+        abroad: abroad,
+      );
     } on ApiException {
       // An older server has no such endpoint, and only ever did our own codes.
-      return 'otp';
+      return abroad ? null : 'otp';
     }
   }
 

@@ -11,6 +11,7 @@ import '../../../data/photo_controller.dart';
 import '../../../data/providers.dart';
 import '../../../shared/models/enums.dart';
 import '../../../shared/widgets/buttons.dart';
+import '../../../shared/widgets/city_picker.dart';
 import '../../../shared/widgets/entry.dart';
 import '../../../shared/widgets/identity.dart';
 import '../../../shared/widgets/layout.dart';
@@ -144,21 +145,12 @@ class _CreateProfilePageState extends ConsumerState<CreateProfilePage> {
   }
 
   Future<void> _pickCity() async {
-    // The list comes from the server, so adding a city does not need an app
-    // release. We launch one city at a time and the others are there for when
-    // that changes.
+    // The list comes from the server, grouped by country, so adding a city or
+    // a country does not need an app release.
     final options = ref.read(profileOptionsProvider).valueOrNull;
-    final cities = options?.cities ?? const [];
-    if (cities.isEmpty) return;
-
-    final choice = await showAppActionSheet(
-      context,
-      title: 'Where you live',
-      actions: [for (final c in cities) SheetAction(c.label)],
-    );
-    if (choice != null) {
-      setState(() => _city = City.parse(cities[choice].key));
-    }
+    if (options == null) return;
+    final city = await pickCity(context, options);
+    if (city != null && mounted) setState(() => _city = city);
   }
 
   Future<void> _save() async {

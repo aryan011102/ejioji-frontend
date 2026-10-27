@@ -221,6 +221,7 @@ class ProfileOptions {
   const ProfileOptions({
     required this.genders,
     required this.cities,
+    this.countries = const [],
     required this.languages,
     required this.educations,
     required this.pronouns,
@@ -230,6 +231,10 @@ class ProfileOptions {
 
   final List<PromptOption> genders;
   final List<PromptOption> cities;
+
+  /// The same cities grouped under their country, India first. Empty from a
+  /// server from before cities abroad, where [cities] is all there is.
+  final List<CountryOption> countries;
   final List<PromptOption> languages;
   final List<PromptOption> educations;
 
@@ -244,11 +249,34 @@ class ProfileOptions {
   static ProfileOptions fromJson(Json j) => ProfileOptions(
         genders: PromptOption.listFrom(j.objects('genders')),
         cities: PromptOption.listFrom(j.objects('cities')),
+        countries: [
+          for (final c in j.objects('countries')) CountryOption.fromJson(c),
+        ],
         languages: PromptOption.listFrom(j.objects('languages')),
         educations: PromptOption.listFrom(j.objects('educations')),
         pronouns: PromptOption.listFrom(j.objects('pronouns')),
         smoking: PromptOption.listFrom(j.objects('smoking')),
         drinking: PromptOption.listFrom(j.objects('drinking')),
+      );
+}
+
+/// A country theonebytwo is open in, and its cities in the order to show them.
+@immutable
+class CountryOption {
+  const CountryOption({
+    required this.key,
+    required this.label,
+    required this.cities,
+  });
+
+  final String key;
+  final String label;
+  final List<PromptOption> cities;
+
+  static CountryOption fromJson(Json j) => CountryOption(
+        key: j.str('key'),
+        label: j.str('label'),
+        cities: PromptOption.listFrom(j.objects('cities')),
       );
 }
 

@@ -61,11 +61,16 @@ class Verification {
     required this.digilocker,
     required this.selfie,
     required this.tier,
+    this.inIndia = true,
   });
 
   final Check digilocker;
   final Check selfie;
   final VerificationTier tier;
+
+  /// False when the profile's city is abroad: DigiLocker holds Indian
+  /// identities only, so it is not offered. True from an older server.
+  final bool inIndia;
 
   bool get verified => tier.verified;
 
@@ -81,6 +86,7 @@ class Verification {
         j.strOrNull('tier'),
         verified: digilocker.verified,
       ),
+      inIndia: j.flag('eligible', fallback: true),
     );
   }
 }

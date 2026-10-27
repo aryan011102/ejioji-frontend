@@ -28,11 +28,15 @@ class Country {
   final List<int> groups;
 }
 
+/// The countries whose mobile numbers can sign in, in the order onboarding
+/// lists them (the server's `core/phone.py` holds the same list).
 const _countries = [
   Country('🇮🇳', 'India', '+91', 10, [5, 5]),
-  Country('🇦🇪', 'UAE', '+971', 9, [2, 3, 4]),
-  Country('🇬🇧', 'United Kingdom', '+44', 10, [4, 6]),
   Country('🇺🇸', 'United States', '+1', 10, [3, 3, 4]),
+  Country('🇬🇧', 'United Kingdom', '+44', 10, [4, 6]),
+  Country('🇨🇦', 'Canada', '+1', 10, [3, 3, 4]),
+  Country('🇦🇪', 'UAE', '+971', 9, [2, 3, 4]),
+  Country('🇦🇺', 'Australia', '+61', 9, [3, 3, 3]),
   Country('🇸🇬', 'Singapore', '+65', 8, [4, 4]),
 ];
 
@@ -74,9 +78,20 @@ class _PhonePageState extends ConsumerState<PhonePage> {
     try {
       final auth = ref.read(authRepositoryProvider);
       // The server says who sends the code: us, or Firebase while our own SMS
-      // is not yet registered. Asked each time, so it can switch without a
-      // release.
-      if (await auth.signInMethod() == 'firebase') {
+      // is not yet registered, and always Firebase for a number from abroad,
+      // which our own SMS does not reach. Asked each time, so it can switch
+      // without a release.
+      final method = await auth.signInMethod(abroad: _c.dial != '+91');
+      if (method == null) {
+        if (mounted) {
+          showAppToast(
+            context,
+            'Signing in with a number from ${_c.name} opens soon.',
+          );
+        }
+        return;
+      }
+      if (method == 'firebase') {
         final verificationId = await FirebasePhone.send(_e164);
         if (!mounted) return;
         context.push(

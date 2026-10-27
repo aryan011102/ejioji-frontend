@@ -10,6 +10,7 @@ import '../../../data/photo_controller.dart';
 import '../../../data/providers.dart';
 import '../../../shared/models/enums.dart';
 import '../../../shared/models/social.dart';
+import '../../../shared/widgets/city_picker.dart';
 import '../../../shared/widgets/entry.dart';
 import '../../../shared/widgets/identity.dart';
 import '../../../shared/widgets/layout.dart';
@@ -313,16 +314,12 @@ class _EditInfoPageState extends ConsumerState<EditInfoPage> {
   }
 
   Future<void> _pickCity() async {
-    final cities = ref.read(profileOptionsProvider).valueOrNull?.cities ?? [];
-    if (cities.isEmpty) return;
-    final choice = await showAppActionSheet(
-      context,
-      title: 'Where you live',
-      actions: [for (final c in cities) SheetAction(c.label)],
-    );
-    if (choice != null) {
+    final options = ref.read(profileOptionsProvider).valueOrNull;
+    if (options == null) return;
+    final city = await pickCity(context, options);
+    if (city != null && mounted) {
       setState(() {
-        _city = City.parse(cities[choice].key);
+        _city = city;
         _dirty = true;
       });
     }

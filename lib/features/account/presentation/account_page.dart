@@ -80,9 +80,7 @@ class AccountPage extends ConsumerWidget {
                   : 'Get verified',
               body: switch (profile.valueOrNull?.tier) {
                 VerificationTier.gold => 'Your profile carries the gold tick.',
-                VerificationTier.blue =>
-                  'Your profile carries the blue tick. Add the other check '
-                      'for gold.',
+                VerificationTier.blue => 'Your profile carries the blue tick.',
                 _ => 'A minute with DigiLocker, or a quick selfie.',
               },
               onTap: () => context.push(Routes.verify),

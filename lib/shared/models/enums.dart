@@ -28,6 +28,8 @@ enum Gender {
   }
 }
 
+/// Where someone lives. The server holds the list and groups it by country
+/// (`/profile/options`); these are here so a stored value parses and reads.
 enum City {
   bengaluru('bengaluru', 'Bengaluru'),
   mumbai('mumbai', 'Mumbai'),
@@ -39,6 +41,30 @@ enum City {
   ahmedabad('ahmedabad', 'Ahmedabad'),
   jaipur('jaipur', 'Jaipur'),
   surat('surat', 'Surat'),
+  newYork('new_york', 'New York & New Jersey'),
+  bayArea('bay_area', 'San Francisco Bay Area'),
+  seattle('seattle', 'Seattle'),
+  chicago('chicago', 'Chicago'),
+  dallas('dallas', 'Dallas'),
+  houston('houston', 'Houston'),
+  boston('boston', 'Boston'),
+  washingtonDc('washington_dc', 'Washington DC'),
+  losAngeles('los_angeles', 'Los Angeles'),
+  atlanta('atlanta', 'Atlanta'),
+  london('london', 'London'),
+  birmingham('birmingham', 'Birmingham'),
+  manchester('manchester', 'Manchester'),
+  leicester('leicester', 'Leicester'),
+  toronto('toronto', 'Toronto'),
+  vancouver('vancouver', 'Vancouver'),
+  calgary('calgary', 'Calgary'),
+  dubai('dubai', 'Dubai'),
+  abuDhabi('abu_dhabi', 'Abu Dhabi'),
+  sydney('sydney', 'Sydney'),
+  melbourne('melbourne', 'Melbourne'),
+  brisbane('brisbane', 'Brisbane'),
+  perth('perth', 'Perth'),
+  singapore('singapore', 'Singapore'),
   unknown('', '');
 
   const City(this.wire, this.label);

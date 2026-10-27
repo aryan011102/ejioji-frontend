@@ -17,6 +17,9 @@ import '../../../shared/widgets/states.dart';
 /// selfie checks that the profile's photos are of the person holding the
 /// phone. Either earns the blue tick, both earn gold.
 ///
+/// DigiLocker holds Indian identities only, so for a profile in a city abroad
+/// it is shown greyed out and the selfie is the way (2026-10-28).
+///
 /// The status comes from the server, which derives it from the profile on
 /// every read. The app never decides on its own that someone is verified.
 class VerifyHubPage extends ConsumerWidget {
@@ -75,17 +78,20 @@ class VerifyHubPage extends ConsumerWidget {
                     // Said here because this is where someone decides whether
                     // to tap, and "do I have to download something" is what
                     // stops them. It opens in the browser: there is no app.
-                    subtitle: _subtitle(
-                      v.digilocker,
-                      ready: 'No app needed. It opens in your browser.',
-                      outdated: 'Your name or date of birth changed. Verify again.',
-                    ),
+                    subtitle: v.inIndia || v.digilocker.verified
+                        ? _subtitle(
+                            v.digilocker,
+                            ready: 'No app needed. It opens in your browser.',
+                            outdated:
+                                'Your name or date of birth changed. Verify again.',
+                          )
+                        : 'For people living in India',
                     leading: const Icon(
                       Icons.description_outlined,
                       size: 18,
                       color: AppColors.blue,
                     ),
-                    onTap: _open(v.digilocker)
+                    onTap: v.inIndia && _open(v.digilocker)
                         ? () => context.push(Routes.digilocker)
                         : null,
                   ),
@@ -163,8 +169,11 @@ class VerifyHubPage extends ConsumerWidget {
           'Aadhaar. Take a selfie as well for the gold tick.';
     }
     if (v.selfie.verified) {
-      return 'Your profile carries a blue tick: your photos match your '
-          'selfie. Verify with DigiLocker as well for the gold tick.';
+      return v.inIndia
+          ? 'Your profile carries a blue tick: your photos match your '
+              'selfie. Verify with DigiLocker as well for the gold tick.'
+          : 'Your profile carries a blue tick: your photos match your '
+              'selfie.';
     }
     if (v.digilocker.status == VerificationStatus.revoked ||
         v.selfie.status == VerificationStatus.revoked) {
@@ -175,6 +184,10 @@ class VerifyHubPage extends ConsumerWidget {
         v.selfie.status == VerificationStatus.outdated) {
       return 'Something on your profile changed after you verified, so the '
           'tick is off until you check it again.';
+    }
+    if (!v.inIndia) {
+      return 'A selfie gives you a blue tick. It takes a few seconds. '
+          'DigiLocker is only for people living in India.';
     }
     return 'Either check gives you a blue tick, and both give you gold. '
         'DigiLocker takes about a minute; a selfie takes a few seconds.';

@@ -34,6 +34,9 @@ class AccountPage extends ConsumerWidget {
     }
   }
 
+  static bool _gold(MyProfile? profile) =>
+      profile?.tier == VerificationTier.gold;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
@@ -66,14 +69,22 @@ class AccountPage extends ConsumerWidget {
             // The tick is the server's; this only says whether it is there.
             _Invitation(
               icon: Icons.check,
-              tint: AppColors.blueSoft,
-              iconColor: AppColors.blue,
+              tint: _gold(profile.valueOrNull)
+                  ? AppColors.goldSoft
+                  : AppColors.blueSoft,
+              iconColor: _gold(profile.valueOrNull)
+                  ? AppColors.gold
+                  : AppColors.blue,
               title: profile.valueOrNull?.verified ?? false
                   ? 'You are verified'
                   : 'Get verified',
-              body: profile.valueOrNull?.verified ?? false
-                  ? 'Your profile carries the blue tick.'
-                  : 'Take a minute to check your name and age with DigiLocker.',
+              body: switch (profile.valueOrNull?.tier) {
+                VerificationTier.gold => 'Your profile carries the gold tick.',
+                VerificationTier.blue =>
+                  'Your profile carries the blue tick. Add the other check '
+                      'for gold.',
+                _ => 'A minute with DigiLocker, or a quick selfie.',
+              },
               onTap: () => context.push(Routes.verify),
             ),
             _PremiumPromo(onTap: () => context.push(Routes.premium)),
@@ -156,12 +167,7 @@ class _ProfileCard extends StatelessWidget {
                           // date takes it off here too.
                           if (profile?.verified ?? false) ...[
                             const SizedBox(width: 5),
-                            const Icon(
-                              Icons.verified,
-                              size: 18,
-                              color: AppColors.blue,
-                              semanticLabel: 'Verified',
-                            ),
+                            VerifiedMark(tier: profile!.tier, size: 18),
                           ],
                         ],
                       ),

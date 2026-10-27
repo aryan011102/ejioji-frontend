@@ -174,7 +174,7 @@ class MyProfile {
     required this.tiles,
     required this.publish,
     this.profile,
-    this.verified = false,
+    this.tier = VerificationTier.none,
     this.archetype,
   });
 
@@ -189,9 +189,12 @@ class MyProfile {
   final List<ProfileTile> tiles;
   final PublishState publish;
 
-  /// The blue tick others see: DigiLocker agreed with this first name and
-  /// birth date. The server works it out on every read.
-  final bool verified;
+  /// The tick others see: blue when DigiLocker agreed with this first name
+  /// and birth date or a selfie with these photos, gold for both. The server
+  /// works it out on every read.
+  final VerificationTier tier;
+
+  bool get verified => tier.verified;
 
   bool get isComplete => profile != null;
 
@@ -202,7 +205,10 @@ class MyProfile {
       photos: MediaAsset.listFrom(j.objects('photos')),
       tiles: ProfileTile.listFrom(j.objects('tiles')),
       publish: PublishState.fromJson(j.object('publish')),
-      verified: j.flag('verified'),
+      tier: VerificationTier.parse(
+        j.strOrNull('verification_tier'),
+        verified: j.flag('verified'),
+      ),
       archetype: Archetype.maybe(j.objectOrNull('archetype')),
     );
   }

@@ -37,7 +37,7 @@ class Candidate {
     required this.photos,
     required this.tiles,
     this.socials = const [],
-    this.verified = false,
+    this.tier = VerificationTier.none,
     this.archetype,
   });
 
@@ -70,9 +70,12 @@ class Candidate {
   /// server hands these over only with a match, never on a card or a request.
   final List<SocialLink> socials;
 
-  /// DigiLocker agreed with their name and age. Only the tick, never what was
+  /// DigiLocker agreed with their name and age, or a selfie with their
+  /// photos: blue for one, gold for both. Only the tick, never what was
   /// checked.
-  final bool verified;
+  final VerificationTier tier;
+
+  bool get verified => tier.verified;
 
   /// The name that labels them: first and last when there is a last name.
   /// Sentences ("Chat with ...") use [firstName].
@@ -93,7 +96,7 @@ class Candidate {
         photos: photos,
         tiles: tiles,
         socials: socials,
-        verified: verified,
+        tier: tier,
         archetype: archetype,
       );
 
@@ -116,7 +119,10 @@ class Candidate {
         drinking: Habit.parse(j.strOrNull('drinking')),
         photos: MediaAsset.listFrom(j.objects('photos')),
         tiles: ProfileTile.listFrom(j.objects('tiles')),
-        verified: j.flag('verified'),
+        tier: VerificationTier.parse(
+          j.strOrNull('verification_tier'),
+          verified: j.flag('verified'),
+        ),
         archetype: Archetype.maybe(j.objectOrNull('archetype')),
       );
 

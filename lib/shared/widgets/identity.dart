@@ -4,14 +4,32 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/tokens.dart';
 import '../../core/theme/typography.dart';
+import '../models/enums.dart';
 import 'pressable.dart';
 
-/// Which check passed.
-///
-/// Blue is DigiLocker. Gold was meant for an ID plus a selfie check, which is
-/// parked, so nothing awards it today. The shape never changes, only the fill:
-/// a tick that changes shape reads as a different promise.
-enum VerificationTier { none, blue, gold }
+export '../models/enums.dart' show VerificationTier;
+
+/// The tick beside a name: blue for one check, gold for both, nothing for
+/// none. The server's, never the app's.
+class VerifiedMark extends StatelessWidget {
+  const VerifiedMark({required this.tier, this.size = 20, super.key});
+
+  final VerificationTier tier;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!tier.verified) return const SizedBox.shrink();
+    return Icon(
+      Icons.verified,
+      size: size,
+      color: tier == VerificationTier.gold ? AppColors.gold : AppColors.blue,
+      semanticLabel: tier == VerificationTier.gold
+          ? 'Verified with DigiLocker and a selfie'
+          : 'Verified',
+    );
+  }
+}
 
 class VerifiedTick extends StatelessWidget {
   const VerifiedTick({
@@ -54,7 +72,7 @@ class VerifiedTick extends StatelessWidget {
     if (onTap == null) {
       return Semantics(
         label: switch (tier) {
-          VerificationTier.gold => 'Verified with an ID and a photo',
+          VerificationTier.gold => 'Verified with DigiLocker and a selfie',
           VerificationTier.blue => 'Verified',
           VerificationTier.none => 'Not verified',
         },

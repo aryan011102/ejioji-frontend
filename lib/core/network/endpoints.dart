@@ -66,6 +66,7 @@ abstract final class Api {
       '$prefix/profile/verification/digilocker/authorize';
   static const digilockerComplete =
       '$prefix/profile/verification/digilocker/complete';
+  static const selfie = '$prefix/profile/verification/selfie';
   // Instagram, X and LinkedIn: handles for matches only, each with a switch.
   static const socials = '$prefix/profile/socials';
   static String social(String network) => '$prefix/profile/socials/$network';

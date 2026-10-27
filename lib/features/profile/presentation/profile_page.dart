@@ -234,7 +234,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         child: _wall(
           name: person.displayName,
           pronouns: person.pronouns,
-          verified: person.verified,
+          tier: person.tier,
           chips: [
             ...profileFacts(
               age: person.age,
@@ -279,7 +279,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         return _wall(
           name: details?.displayName ?? '',
           pronouns: details?.pronouns,
-          verified: profile.verified,
+          tier: profile.tier,
           chips: details == null
               ? const []
               : [
@@ -307,7 +307,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     required String name,
     required List<Fact> chips,
     Pronouns? pronouns,
-    bool verified = false,
+    VerificationTier tier = VerificationTier.none,
     required List<MediaAsset> photos,
     required List<api.ProfileTile> tiles,
     Candidate? person,
@@ -327,7 +327,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           ListView(
             padding: EdgeInsets.only(bottom: _viewer ? _actionsHeight : 24),
             children: [
-              _header(name, pronouns, chips, photos, verified: verified),
+              _header(name, pronouns, chips, photos, tier: tier),
               if (!_theirs) ...[
                 if (publish != null) _publishState(publish),
                 Padding(
@@ -625,7 +625,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     Pronouns? pronouns,
     List<Fact> chips,
     List<MediaAsset> photos, {
-    bool verified = false,
+    VerificationTier tier = VerificationTier.none,
   }) {
     // Their profile shows what they stated and nothing else. Your own offers the
     // way in, because a field nobody can find is a field nobody fills.
@@ -664,15 +664,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                             ),
                           ),
                           // The server's tick, never the app's: DigiLocker
-                          // agreed with this first name and age.
-                          if (verified) ...[
+                          // agreed with this first name and age, or a selfie
+                          // with these photos. Gold for both.
+                          if (tier.verified) ...[
                             const SizedBox(width: 6),
-                            const Icon(
-                              Icons.verified,
-                              size: 22,
-                              color: AppColors.blue,
-                              semanticLabel: 'Verified',
-                            ),
+                            VerifiedMark(tier: tier, size: 22),
                           ],
                         ],
                       ),

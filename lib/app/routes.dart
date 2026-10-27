@@ -92,6 +92,8 @@ abstract final class Routes {
   static const digilocker = '/verify/digilocker';
   static const digilockerHandoff = '/verify/digilocker/opening';
   static const digilockerDone = '/verify/digilocker/done';
+  static const selfie = '/verify/selfie';
+  static const selfieDone = '/verify/selfie/done';
   static const verifyFailed = '/verify/failed';
 
   // You

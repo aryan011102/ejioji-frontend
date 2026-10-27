@@ -128,6 +128,10 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
               'your insights, including ones off your profile. Only once you '
               'have both said yes.',
         ConsentPurpose.unknown => '',
+    ConsentPurpose.selfieVerification =>
+      'Checks that a selfie you take is the face in your profile photos, '
+          'for the verified tick. Compared by Amazon Rekognition in India; '
+          'the selfie is never kept.',
       };
 
   Future<void> _showNotice(ConsentNotice notice) async {

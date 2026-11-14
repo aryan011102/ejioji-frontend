@@ -37,8 +37,30 @@ class PremiumPage extends ConsumerStatefulWidget {
 }
 
 class _PremiumPageState extends ConsumerState<PremiumPage> {
-  String _plan = 'm3';
+  /// The plan tapped on this page; null until one is. See [_selected].
+  String? _plan;
   bool _starting = false;
+
+  /// The plan the page is on. Someone who already renews a plan starts on
+  /// theirs, so the button manages it; anyone else starts on three months.
+  ///
+  /// Every plan stays tappable and buyable while one is running: App Review
+  /// buys each product on one account, and a page that went dead after the
+  /// first purchase was rejected as "the purchase button is unresponsive"
+  /// (2.1(b), 12 Nov 2026).
+  String _selected(PremiumStatus? status) {
+    final tapped = _plan;
+    if (tapped != null) return tapped;
+    final current = status?.current;
+    if (status != null &&
+        status.active &&
+        status.fromStore &&
+        current != null &&
+        current.renews) {
+      return current.key;
+    }
+    return 'm3';
+  }
 
   /// Women only, so it is left off the list for everyone else.
   static const _stealth = (
@@ -93,7 +115,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
     setState(() => _starting = true);
     try {
       if (status.freeForNow) {
-        await ref.read(premiumRepositoryProvider).start(_plan);
+        await ref.read(premiumRepositoryProvider).start(_selected(status));
         _done('onebytwo plus is on.');
       } else {
         await _buy(status);
@@ -108,9 +130,17 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
   }
 
   Future<void> _buy(PremiumStatus status) async {
-    final plan = status.plans.where((p) => p.key == _plan).firstOrNull;
+    final key = _selected(status);
+    final plan = status.plans.where((p) => p.key == key).firstOrNull;
     final userId = ref.read(sessionProvider).userId;
-    if (plan == null || userId == null) return;
+    if (plan == null) {
+      if (mounted) showAppToast(context, "That plan isn't available right now.");
+      return;
+    }
+    if (userId == null) {
+      if (mounted) showAppToast(context, 'Sign in again to buy onebytwo plus.');
+      return;
+    }
     final outcome = await ref.read(storePurchasesProvider).buy(
           userId: userId,
           productId: plan.productId,
@@ -118,7 +148,9 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
         );
     if (outcome == BuyOutcome.cancelled) return;
     await _checkStore(
-      found: 'onebytwo plus is on.',
+      found: status.active
+          ? 'Done. The App Store has your new plan.'
+          : 'onebytwo plus is on.',
       notYet: 'Paid. onebytwo plus turns on in a minute or two.',
     );
   }
@@ -172,7 +204,12 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
     if (status == null) return '';
     final ends = status.endsAt;
     final current = status.current;
-    if (status.active && ends != null) {
+    final key = _selected(status);
+    final plan = status.plans.where((p) => p.key == key).firstOrNull;
+    final owned = current != null && current.key == key;
+    if (status.active &&
+        ends != null &&
+        (owned || status.freeForNow || plan == null)) {
       final day = dayLabel(ends.toLocal());
       if (!status.fromStore) {
         return 'Until $day. Nothing renews and nothing is charged.';
@@ -184,9 +221,17 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
     if (status.freeForNow) {
       return 'Free for now. Nothing renews and nothing is charged.';
     }
-    final plan = status.plans.where((p) => p.key == _plan).firstOrNull;
     if (plan == null) return '';
-    return plan.terms(prices[plan.productId] ?? plan.price);
+    final terms = plan.terms(prices[plan.productId] ?? plan.price);
+    if (!status.active) return terms;
+    if (!plan.renews) {
+      return '$terms It runs alongside the plan you have, not after it.';
+    }
+    if (status.fromStore && current != null && current.renews) {
+      return '$terms The App Store moves you over and credits any unused '
+          'time.';
+    }
+    return terms;
   }
 
   @override
@@ -197,6 +242,30 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
     final selling = status != null && !status.freeForNow;
     final renewing =
         status != null && status.fromStore && (status.current?.renews ?? false);
+    final current = active ? status?.current : null;
+    final selected = _selected(status);
+    final chosen = status?.plans.where((p) => p.key == selected).firstOrNull;
+    // On the plan they already have.
+    final owned = current != null && current.key == selected;
+    // Free plans cannot stack (the server refuses one while another runs);
+    // bought ones can: switching a subscription, or a pass on top.
+    final canBuy = status != null && (!active || (selling && !owned));
+    // On the subscription they renew: the button manages it in the App Store.
+    final manages = owned && renewing;
+    final String label;
+    if (!active) {
+      label = 'Start onebytwo plus';
+    } else if (manages) {
+      label = 'Manage subscription';
+    } else if (canBuy && chosen != null) {
+      label = !chosen.renews
+          ? 'Buy the ${chosen.count}-${chosen.unit} pass'
+          : renewing
+              ? 'Switch to ${chosen.title}'
+              : 'Get ${chosen.title}';
+    } else {
+      label = 'You have onebytwo plus';
+    }
     final prices = ref.watch(storePricesProvider).valueOrNull ?? const {};
     final isWoman = ref.watch(myProfileProvider).valueOrNull?.profile?.gender ==
         Gender.woman;
@@ -213,11 +282,15 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
       footer: Column(
         children: [
           PrimaryButton(
-            label: active ? 'You have onebytwo plus' : 'Start onebytwo plus',
+            label: label,
             busy: _starting,
-            onPressed: status == null || active || _starting
+            onPressed: status == null || _starting
                 ? null
-                : () => _start(status),
+                : manages
+                    ? () => _open(_manage)
+                    : canBuy
+                        ? () => _start(status)
+                        : null,
           ),
           const SizedBox(height: 9),
           Text(
@@ -225,7 +298,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
             textAlign: TextAlign.center,
             style: AppText.micro,
           ),
-          if (active && renewing)
+          if (renewing && !manages)
             TextActionButton(
               label: 'Manage subscription',
               onPressed: () => _open(_manage),
@@ -323,11 +396,13 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
                         plan,
                         freeForNow: status?.freeForNow ?? true,
                       ),
-                      badge: plan.key == 'm3' ? 'Most chosen' : null,
-                      selected: _plan == plan.key,
-                      onTap: active
-                          ? () {}
-                          : () => setState(() => _plan = plan.key),
+                      badge: current?.key == plan.key
+                          ? 'Your plan'
+                          : plan.key == 'm3'
+                              ? 'Most chosen'
+                              : null,
+                      selected: selected == plan.key,
+                      onTap: () => setState(() => _plan = plan.key),
                     ),
                   ),
               ],

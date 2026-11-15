@@ -19,8 +19,10 @@ import '../../../data/providers.dart';
 import '../../../shared/format.dart';
 import '../../../shared/models/chat.dart';
 import '../../../shared/models/enums.dart';
+import '../../../shared/models/game.dart';
 import '../../../shared/models/person.dart';
 import '../../../shared/models/tile.dart';
+import '../../../shared/widgets/buttons.dart';
 import '../../../shared/widgets/capture_shield.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/pressable.dart';
@@ -29,6 +31,8 @@ import '../../../shared/widgets/quoted_tile.dart';
 import '../../../shared/widgets/sheets.dart';
 import '../../../shared/widgets/states.dart';
 import 'chat_limit.dart';
+import 'games/game_bubble.dart';
+import 'games/game_sheets.dart';
 import 'in_common/in_common_flow.dart';
 import 'in_common/story_ring.dart';
 import 'photo_preview.dart';
@@ -74,6 +78,14 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
 
   final _messages = <Message>[];
   final _pending = <_Pending>[];
+
+  /// The newest copy of each game in this chat, by game id. Every move carries
+  /// the whole game, so a start card on screen updates when the answer comes.
+  /// Only ever moves forward: a late copy never undoes an answer.
+  final _games = <String, GameState>{};
+
+  /// A game is being dealt, started or answered.
+  bool _gameBusy = false;
 
   /// The tiles the conversation opens on, before any message.
   List<Opener> _openers = const [];
@@ -204,6 +216,8 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
         _messages
           ..clear()
           ..addAll(page.messages);
+        _games.clear();
+        _absorb(page.messages);
         _openers = page.openers;
         _hasMore = page.hasMore;
         _myRead = page.myReadSeq;
@@ -284,9 +298,16 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
   /// Adds messages not already held, keeps the list in sequence order, and
   /// drops the pending bubble each one answers.
   void _merge(Iterable<Message> incoming) {
+    final all = incoming.toList();
+    // Before the filter below: a message already held can still bring a newer
+    // copy of its game.
+    final moved = _absorb(all);
     final held = {for (final m in _messages) m.id};
-    final fresh = incoming.where((m) => !held.contains(m.id)).toList();
-    if (fresh.isEmpty) return;
+    final fresh = all.where((m) => !held.contains(m.id)).toList();
+    if (fresh.isEmpty) {
+      if (moved) setState(() {});
+      return;
+    }
     final answered = {for (final m in fresh) m.clientId};
     setState(() {
       _messages
@@ -294,6 +315,23 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
         ..sort((a, b) => a.seq.compareTo(b.seq));
       _pending.removeWhere((p) => answered.contains(p.clientId));
     });
+  }
+
+  /// Keeps the newest copy of each game these messages carry. True if any
+  /// game moved.
+  bool _absorb(Iterable<Message> messages) {
+    var moved = false;
+    for (final m in messages) {
+      final game = m.game;
+      if (game == null) continue;
+      final held = _games[game.id];
+      final next = held == null ? game : held.newer(game);
+      if (!identical(next, held)) {
+        _games[game.id] = next;
+        moved = true;
+      }
+    }
+    return moved;
   }
 
   Future<void> _markRead() async {
@@ -460,6 +498,115 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
       } else {
         showAppToast(context, e.message);
       }
+    }
+  }
+
+  // Games.
+
+  /// The + beside the keyboard: a photo, or a game. A founder conversation is
+  /// text and photos only, so there it goes straight to the photo.
+  Future<void> _attach() async {
+    if (_ended) return;
+    if (_founderLine) return _sendPhoto();
+    final choice = await showAppActionSheet(
+      context,
+      actions: const [
+        SheetAction('Photo', icon: Icons.photo_outlined),
+        SheetAction('Play a game', icon: Icons.casino_outlined),
+      ],
+    );
+    if (!mounted || choice == null) return;
+    if (choice == 0) return _sendPhoto();
+    await _playGame();
+  }
+
+  Future<void> _playGame() async {
+    if (_ended || _gameBusy) return;
+    if (_mustVerify) return _askToVerify();
+    final game = await showGamesSheet(context);
+    if (game == null || !mounted) return;
+    final repo = ref.read(chatRepositoryProvider);
+    final clientId = Ids.uuid();
+    setState(() => _gameBusy = true);
+    try {
+      Future<Message>? sending;
+      switch (game) {
+        case GameKind.wouldYouRather:
+        case GameKind.rapidFire:
+        case GameKind.neverHaveIEver:
+          final cards = await repo.dealGame(_matchId, game);
+          if (!mounted || cards.isEmpty) return;
+          final picks = await showCardsSheet(context, game: game, cards: cards);
+          if (picks == null || !mounted) return;
+          sending = repo.startGame(
+            _matchId,
+            game: game,
+            clientId: clientId,
+            cards: [for (final c in cards) c.key],
+            picks: picks,
+          );
+        case GameKind.twoTruths:
+          final written = await showTwoTruthsSheet(context);
+          if (written == null || !mounted) return;
+          sending = repo.startGame(
+            _matchId,
+            game: game,
+            clientId: clientId,
+            statements: written.$1,
+            lie: written.$2,
+          );
+        case GameKind.flames:
+          sending = repo.startGame(_matchId, game: game, clientId: clientId);
+      }
+      final message = await sending;
+      if (!mounted) return;
+      _merge([message]);
+      ref.invalidate(conversationsProvider);
+    } on ApiException catch (e) {
+      await _gameFailed(e);
+    } finally {
+      if (mounted) setState(() => _gameBusy = false);
+    }
+  }
+
+  Future<void> _answerGame(GameState game, {List<int>? picks, int? guess}) async {
+    if (_ended || _gameBusy) return;
+    if (_mustVerify) return _askToVerify();
+    setState(() => _gameBusy = true);
+    try {
+      final message = await ref.read(chatRepositoryProvider).answerGame(
+            _matchId,
+            game.id,
+            clientId: Ids.uuid(),
+            picks: picks,
+            guess: guess,
+          );
+      if (!mounted) return;
+      _merge([message]);
+      ref.invalidate(conversationsProvider);
+    } on ApiException catch (e) {
+      await _gameFailed(e);
+      // Answered from another phone, say: the page catches up to show it.
+      if (e.code == 'game_finished') unawaited(_catchUp());
+    } finally {
+      if (mounted) setState(() => _gameBusy = false);
+    }
+  }
+
+  Future<void> _gameFailed(ApiException e) async {
+    if (!mounted) return;
+    if (e is NotFoundFailure && e.code != 'game_not_found') {
+      setState(() => _ended = true);
+      return;
+    }
+    setState(() {
+      if (e.code == 'conversation_paused') _paused = true;
+      if (e.code == 'verification_required') _mustVerify = true;
+    });
+    if (e.code == 'verification_required') {
+      await _askToVerify();
+    } else {
+      showAppToast(context, e.message);
     }
   }
 
@@ -723,6 +870,25 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
     // Newest at the bottom, and the list starts there: reversed, so the
     // children below run newest first.
     final rows = <Widget>[
+      // Nothing said yet: a game is an easy first move.
+      if (_messages.isEmpty &&
+          _pending.isEmpty &&
+          !_ended &&
+          !_paused &&
+          !_mustVerify &&
+          !_founderLine)
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: MiniButton(
+              label: 'Play a game',
+              icon: const Icon(Icons.casino_outlined, size: 16, color: AppColors.accent),
+              tone: MiniTone.quiet,
+              busy: _gameBusy,
+              onPressed: () => unawaited(_playGame()),
+            ),
+          ),
+        ),
       if (_theyTyping)
         Padding(
           padding: const EdgeInsets.only(bottom: 8),
@@ -732,12 +898,24 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
     ];
     for (var i = _messages.length - 1; i >= 0; i--) {
       final m = _messages[i];
+      final game = m.game == null ? null : _games[m.game!.id] ?? m.game;
       rows.add(
-        _Bubble(
-          message: m,
-          mine: me != null && m.mine(me),
-          read: m.seq == myLatestRead,
-        ),
+        game != null && me != null
+            ? GameBubble(
+                key: ValueKey('game-${m.id}'),
+                message: m,
+                game: game,
+                me: me,
+                theirName: _person?.firstName ?? 'They',
+                busy: _gameBusy,
+                onPicks: (picks) => unawaited(_answerGame(game, picks: picks)),
+                onGuess: (guess) => unawaited(_answerGame(game, guess: guess)),
+              )
+            : _Bubble(
+                message: m,
+                mine: me != null && m.mine(me),
+                read: m.seq == myLatestRead,
+              ),
       );
       final older = i > 0 ? _messages[i - 1] : null;
       if (older == null ||
@@ -825,8 +1003,8 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Pressable(
-          onTap: _sendPhoto,
-          semanticLabel: 'Send a photo',
+          onTap: () => unawaited(_attach()),
+          semanticLabel: 'Send a photo or play a game',
           child: const Padding(
             padding: EdgeInsets.only(bottom: 8),
             child: Icon(Icons.add_circle_outline, color: AppColors.accent),

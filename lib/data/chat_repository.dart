@@ -3,6 +3,7 @@ import '../core/network/endpoints.dart';
 import '../core/network/json.dart';
 import '../core/util/ids.dart';
 import '../shared/models/chat.dart';
+import '../shared/models/game.dart';
 import '../shared/models/tile.dart';
 
 /// Conversations.
@@ -68,6 +69,61 @@ class ChatRepository {
         // server finds the story itself, so a phone cannot quote words of its
         // own in an "In common" frame.
         if (storyTitle != null) 'story': {'title': storyTitle},
+      },
+    );
+    return Message.fromJson(body);
+  }
+
+  /// Cards for a new game, ones the two have not had while there are enough.
+  /// Nothing is written until [startGame].
+  Future<List<GameCard>> dealGame(String matchId, GameKind game) async {
+    final body = await _api.getJson(
+      Api.gameDeal(matchId),
+      query: {'game': game.wire},
+    );
+    return body.objects('cards').map(GameCard.fromJson).toList(growable: false);
+  }
+
+  /// Starts a game with this person's own answer in it: a pick on each dealt
+  /// card, or three statements and which is the lie. FLAMES needs neither.
+  /// Idempotent on [clientId], like a message.
+  Future<Message> startGame(
+    String matchId, {
+    required GameKind game,
+    required String clientId,
+    List<String> cards = const [],
+    List<int>? picks,
+    List<String>? statements,
+    int? lie,
+  }) async {
+    final body = await _api.post(
+      Api.games(matchId),
+      body: {
+        'client_id': clientId,
+        'game': game.wire,
+        if (cards.isNotEmpty) 'cards': cards,
+        if (picks != null) 'picks': picks,
+        if (statements != null) 'statements': statements,
+        if (lie != null) 'lie': lie,
+      },
+    );
+    return Message.fromJson(body);
+  }
+
+  /// The other person's turn, which finishes the game.
+  Future<Message> answerGame(
+    String matchId,
+    String gameId, {
+    required String clientId,
+    List<int>? picks,
+    int? guess,
+  }) async {
+    final body = await _api.post(
+      Api.gameAnswer(matchId, gameId),
+      body: {
+        'client_id': clientId,
+        if (picks != null) 'picks': picks,
+        if (guess != null) 'guess': guess,
       },
     );
     return Message.fromJson(body);

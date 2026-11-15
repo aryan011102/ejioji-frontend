@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/network/json.dart';
 import 'enums.dart';
+import 'game.dart';
 import 'media.dart';
 import 'person.dart';
 import 'tile.dart';
@@ -25,6 +26,8 @@ class Message {
     this.media,
     this.tile,
     this.story,
+    this.game,
+    this.gameAnswer = false,
   });
 
   final String id;
@@ -48,10 +51,18 @@ class Message {
 
   final DateTime sentAt;
 
+  /// The game this message is a move in, as it stood when this copy was sent.
+  /// The page keeps the newest copy of each game; draw that one, not this.
+  final GameState? game;
+
+  /// This move answered the game (the other, the one that started it).
+  final bool gameAnswer;
+
   bool mine(String myUserId) => senderId == myUserId;
 
   static Message fromJson(Json j) {
     final media = j.objectOrNull('media');
+    final game = j.objectOrNull('game');
     return Message(
       id: j.str('id'),
       matchId: j.str('match_id'),
@@ -64,6 +75,8 @@ class Message {
       tile: TileQuote.maybe(j, 'tile'),
       story: StoryQuote.maybe(j.objectOrNull('story')),
       sentAt: j.time('sent_at'),
+      game: game == null ? null : GameState.fromJson(game),
+      gameAnswer: j.strOrNull('game_event') == 'answered',
     );
   }
 

@@ -28,6 +28,7 @@ class Message {
     this.story,
     this.game,
     this.gameAnswer = false,
+    this.gameMove = false,
   });
 
   final String id;
@@ -55,8 +56,12 @@ class Message {
   /// The page keeps the newest copy of each game; draw that one, not this.
   final GameState? game;
 
-  /// This move answered the game (the other, the one that started it).
+  /// This move answered the game (the other, the one that started it), or
+  /// for a board, ended it.
   final bool gameAnswer;
+
+  /// A move on a board in between its start and its end.
+  final bool gameMove;
 
   bool mine(String myUserId) => senderId == myUserId;
 
@@ -77,6 +82,7 @@ class Message {
       sentAt: j.time('sent_at'),
       game: game == null ? null : GameState.fromJson(game),
       gameAnswer: j.strOrNull('game_event') == 'answered',
+      gameMove: j.strOrNull('game_event') == 'moved',
     );
   }
 
@@ -213,7 +219,8 @@ class MessagePage {
         hasMore: j.flag('has_more'),
         myReadSeq: j.intOr('my_read_seq', 0),
         theirReadSeq: j.intOr('their_read_seq', 0),
-        openers: j.objects('openers').map(Opener.fromJson).toList(growable: false),
+        openers:
+            j.objects('openers').map(Opener.fromJson).toList(growable: false),
         paused: j.flag('paused'),
         verificationRequired: j.flag('verification_required'),
         streak: Streak.maybe(j, 'streak'),

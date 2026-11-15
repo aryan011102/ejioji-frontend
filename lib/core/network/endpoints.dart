@@ -110,6 +110,10 @@ abstract final class Api {
   static String messages(String matchId) => '$prefix/chat/$matchId/messages';
   static String markRead(String matchId) => '$prefix/chat/$matchId/read';
   static String chatUpload(String matchId) => '$prefix/chat/$matchId/uploads';
+  static String gameDeal(String matchId) => '$prefix/chat/$matchId/games/deal';
+  static String games(String matchId) => '$prefix/chat/$matchId/games';
+  static String gameAnswer(String matchId, String gameId) =>
+      '$prefix/chat/$matchId/games/$gameId/answer';
   static const chatSocket = '$prefix/chat/ws';
 
   // Notifications: the page, and push.

@@ -615,6 +615,8 @@ class _ConversationRow extends StatelessWidget {
       MessageKind.text => message.preview ?? '',
       MessageKind.photo => 'Photo',
       MessageKind.video => 'Video',
+      // What happened, written by the server ("Started Would you rather").
+      MessageKind.game => message.preview ?? 'Game',
     };
   }
 

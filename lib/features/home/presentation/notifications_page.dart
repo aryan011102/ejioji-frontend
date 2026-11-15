@@ -146,6 +146,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
         body: switch (item.messageKind) {
           MessageKind.photo => 'Sent a photo.',
           MessageKind.video => 'Sent a video.',
+          MessageKind.game => '${item.preview ?? 'Played a game'}.',
           _ => '“${item.preview ?? ''}”',
         },
       ),

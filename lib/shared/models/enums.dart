@@ -399,7 +399,10 @@ enum MediaKind {
 enum MessageKind {
   text('text'),
   photo('photo'),
-  video('video');
+  video('video'),
+
+  /// A move in a game: the start of one, or the answer that finishes it.
+  game('game');
 
   const MessageKind(this.wire);
 

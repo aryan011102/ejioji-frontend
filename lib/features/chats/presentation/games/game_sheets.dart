@@ -78,6 +78,9 @@ class GameIcon extends StatelessWidget {
         GameKind.neverHaveIEver => Icons.front_hand_rounded,
         GameKind.twoTruths => Icons.psychology_alt_rounded,
         GameKind.flames => Icons.local_fire_department_rounded,
+        GameKind.truth => Icons.chat_bubble_outline_rounded,
+        GameKind.guessMovie => Icons.movie_outlined,
+        GameKind.ticTacToe => Icons.grid_3x3_rounded,
         null => Icons.casino_rounded,
       };
 
@@ -207,8 +210,12 @@ class CardChoice extends StatelessWidget {
 }
 
 class ChoicePill extends StatelessWidget {
-  const ChoicePill(
-      {required this.label, required this.lit, this.onTap, super.key});
+  const ChoicePill({
+    required this.label,
+    required this.lit,
+    this.onTap,
+    super.key,
+  });
 
   final String label;
   final bool lit;
@@ -354,6 +361,245 @@ class _TwoTruthsState extends State<_TwoTruths> {
                   : null,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Truth: the question, and your answer in your own words. Null if they back
+/// out.
+Future<String?> showTruthSheet(
+  BuildContext context, {
+  required String question,
+}) {
+  return showAppSheet<String>(
+    context,
+    builder: (_) => _TruthAnswer(question: question),
+  );
+}
+
+class _TruthAnswer extends StatefulWidget {
+  const _TruthAnswer({required this.question});
+
+  final String question;
+
+  @override
+  State<_TruthAnswer> createState() => _TruthAnswerState();
+}
+
+class _TruthAnswerState extends State<_TruthAnswer> {
+  /// The server's limit.
+  static const _maxChars = 300;
+  final _field = TextEditingController();
+
+  @override
+  void dispose() {
+    _field.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(Radii.row),
+      borderSide: const BorderSide(color: AppColors.hairline),
+    );
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const GameIcon(game: GameKind.truth, size: 30),
+                const SizedBox(width: 10),
+                Text(GameKind.truth.title, style: AppText.title3),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(widget.question, style: AppText.body),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _field,
+              autofocus: true,
+              maxLength: _maxChars,
+              maxLines: 5,
+              minLines: 2,
+              style: AppText.body,
+              cursorColor: AppColors.accent,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                counterText: '',
+                hintText: 'Your answer',
+                hintStyle: AppText.body.copyWith(color: AppColors.label3),
+                filled: true,
+                fillColor: AppColors.menu,
+                contentPadding: const EdgeInsets.all(12),
+                border: border,
+                enabledBorder: border,
+                focusedBorder: border,
+              ),
+            ),
+            const SizedBox(height: 12),
+            PrimaryButton(
+              label: 'Send',
+              onPressed: _field.text.trim().isEmpty
+                  ? null
+                  : () => Navigator.of(context).pop(_field.text.trim()),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// What the starter decides about the film they were dealt.
+enum MovieChoice { send, another }
+
+/// Guess the movie, for the starter: the clue and the film it is, to send or
+/// swap for another. Null if they back out.
+Future<MovieChoice?> showMovieDealSheet(
+  BuildContext context, {
+  required GameCard card,
+}) {
+  return showAppSheet<MovieChoice>(
+    context,
+    builder: (sheetContext) => Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const GameIcon(game: GameKind.guessMovie, size: 30),
+            const SizedBox(width: 10),
+            Text(GameKind.guessMovie.title, style: AppText.title3),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Text(card.text, textAlign: TextAlign.center, style: AppText.largeTitle),
+        const SizedBox(height: 8),
+        Text(
+          card.options.isEmpty ? '' : card.options.first,
+          textAlign: TextAlign.center,
+          style: AppText.bodyStrong,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'They see the emoji and four films to pick from.',
+          textAlign: TextAlign.center,
+          style: AppText.footnote.copyWith(color: AppColors.label2),
+        ),
+        const SizedBox(height: 16),
+        PrimaryButton(
+          label: 'Send',
+          onPressed: () => Navigator.of(sheetContext).pop(MovieChoice.send),
+        ),
+        const SizedBox(height: 8),
+        SecondaryButton(
+          label: 'Another film',
+          onPressed: () => Navigator.of(sheetContext).pop(MovieChoice.another),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Tic tac toe, before it starts: tap the square for your first x.
+Future<int?> showBoardStartSheet(BuildContext context) {
+  return showAppSheet<int>(
+    context,
+    builder: (sheetContext) => Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const GameIcon(game: GameKind.ticTacToe, size: 30),
+            const SizedBox(width: 10),
+            Text(GameKind.ticTacToe.title, style: AppText.title3),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'You are X. Tap a square to make the first move.',
+          style: AppText.footnote.copyWith(color: AppColors.label2),
+        ),
+        const SizedBox(height: 14),
+        Center(
+          child: TicTacToeBoard(
+            board: '         ',
+            onTap: (cell) => Navigator.of(sheetContext).pop(cell),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// A tic tac toe board. [onTap] is called for an empty square, and only when
+/// set: on your turn. [line] lights the three that won.
+class TicTacToeBoard extends StatelessWidget {
+  const TicTacToeBoard({
+    required this.board,
+    this.onTap,
+    this.line,
+    this.size = 216,
+    super.key,
+  });
+
+  final String board;
+  final ValueChanged<int>? onTap;
+  final List<int>? line;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final cell = (size - 8) / 3;
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Wrap(
+        spacing: 4,
+        runSpacing: 4,
+        children: [
+          for (var i = 0; i < 9; i++) _square(i, cell),
+        ],
+      ),
+    );
+  }
+
+  Widget _square(int i, double side) {
+    final mark = i < board.length ? board[i] : ' ';
+    final lit = line?.contains(i) ?? false;
+    final open = mark == ' ' && onTap != null;
+    return Pressable(
+      onTap: open ? () => onTap!(i) : null,
+      semanticLabel: mark == ' '
+          ? 'Empty square ${i + 1}'
+          : '${mark.toUpperCase()} on square ${i + 1}',
+      child: Container(
+        width: side,
+        height: side,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: lit ? AppColors.fill : AppColors.fill2,
+          borderRadius: BorderRadius.circular(Radii.row),
+          border:
+              Border.all(color: open ? AppColors.accent : AppColors.hairline),
+        ),
+        child: Text(
+          mark == ' ' ? '' : mark.toUpperCase(),
+          style: AppText.title1.copyWith(
+            color: lit
+                ? AppColors.onAccent
+                : mark == 'x'
+                    ? AppColors.accent
+                    : AppColors.label,
+          ),
         ),
       ),
     );

@@ -14,6 +14,9 @@ import 'game_sheets.dart';
 /// copy on [message]: a start card on screen should know once it has been
 /// answered. The answer is its own full card, since the start may be on an
 /// older page that is not loaded; once answered, the start shrinks to a line.
+///
+/// Tic tac toe is one live board: the page draws only the newest message of a
+/// board, and this card is the board as it stands.
 class GameBubble extends StatefulWidget {
   const GameBubble({
     required this.message,
@@ -22,6 +25,8 @@ class GameBubble extends StatefulWidget {
     required this.theirName,
     required this.onPicks,
     required this.onGuess,
+    required this.onText,
+    required this.onMove,
     this.busy = false,
     super.key,
   });
@@ -35,8 +40,14 @@ class GameBubble extends StatefulWidget {
   /// Their game, my turn: my pick on each card.
   final ValueChanged<List<int>> onPicks;
 
-  /// Their two truths, my turn: which one I think is the lie.
+  /// Their two truths or their film, my turn: which one I think it is.
   final ValueChanged<int> onGuess;
+
+  /// Their truth, my turn: my answer.
+  final ValueChanged<String> onText;
+
+  /// A board, my turn: the square I take.
+  final ValueChanged<int> onMove;
 
   @override
   State<GameBubble> createState() => _GameBubbleState();
@@ -56,6 +67,8 @@ class _GameBubbleState extends State<GameBubble> {
     final Widget body;
     if (game.kind == GameKind.flames) {
       body = _flames(game);
+    } else if (game.kind == GameKind.ticTacToe) {
+      body = _board(game);
     } else if (widget.message.gameAnswer) {
       body = _result(game);
     } else if (game.done) {
@@ -78,7 +91,8 @@ class _GameBubbleState extends State<GameBubble> {
               color: AppColors.row,
               borderRadius: BorderRadius.circular(Radii.card),
               border: Border.all(
-                  color: _mine ? AppColors.fill : AppColors.bubbleThemEdge),
+                color: _mine ? AppColors.fill : AppColors.bubbleThemEdge,
+              ),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -124,13 +138,42 @@ class _GameBubbleState extends State<GameBubble> {
 
   Widget _note(String text) => Padding(
         padding: const EdgeInsets.only(top: 10),
-        child: Text(text,
-            style: AppText.footnote.copyWith(color: AppColors.label2)),
+        child: Text(
+          text,
+          style: AppText.footnote.copyWith(color: AppColors.label2),
+        ),
       );
 
   // Waiting for them.
 
   Widget _waiting(GameState game) {
+    if (game.kind == GameKind.truth) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _question(game),
+          _said('You', game.starterText),
+          _note('Your answer is hidden until ${widget.theirName} answers.'),
+        ],
+      );
+    }
+    if (game.kind == GameKind.guessMovie) {
+      final card = game.cards.isEmpty ? null : game.cards.first;
+      final answer = game.answer;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _clue(card),
+          if (card != null && answer != null && answer < card.options.length)
+            Text(
+              'You sent ${card.options[answer]}',
+              textAlign: TextAlign.center,
+              style: AppText.footnote.copyWith(color: AppColors.label2),
+            ),
+          _note('Waiting for ${widget.theirName} to guess.'),
+        ],
+      );
+    }
     if (game.kind == GameKind.twoTruths) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -162,6 +205,44 @@ class _GameBubbleState extends State<GameBubble> {
   // My turn.
 
   Widget _myTurn(GameState game) {
+    if (game.kind == GameKind.truth) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _question(game),
+          _note('${widget.theirName} has answered. Write yours to see theirs.'),
+          const SizedBox(height: 10),
+          MiniButton(
+            label: 'Answer',
+            busy: widget.busy,
+            onPressed: () async {
+              final question = game.cards.isEmpty ? '' : game.cards.first.text;
+              final text = await showTruthSheet(context, question: question);
+              if (text != null) widget.onText(text);
+            },
+          ),
+        ],
+      );
+    }
+    if (game.kind == GameKind.guessMovie) {
+      final card = game.cards.isEmpty ? null : game.cards.first;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _clue(card),
+          const SizedBox(height: 8),
+          for (var i = 0; i < (card?.options.length ?? 0); i++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: ChoicePill(
+                label: card!.options[i],
+                lit: false,
+                onTap: widget.busy ? null : () => widget.onGuess(i),
+              ),
+            ),
+        ],
+      );
+    }
     if (game.kind == GameKind.twoTruths) {
       final lines = game.statements ?? const <String>[];
       return Column(
@@ -223,6 +304,19 @@ class _GameBubbleState extends State<GameBubble> {
 
   Widget _result(GameState game) {
     if (game.kind == GameKind.twoTruths) return _truthsResult(game);
+    if (game.kind == GameKind.truth) {
+      final mine = _startedByMe ? game.starterText : game.replyText;
+      final theirs = _startedByMe ? game.replyText : game.starterText;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _question(game),
+          _said('You', mine),
+          _said(widget.theirName, theirs),
+        ],
+      );
+    }
+    if (game.kind == GameKind.guessMovie) return _movieResult(game);
     final mine = _startedByMe ? game.starterPicks : game.replyPicks;
     final theirs = _startedByMe ? game.replyPicks : game.starterPicks;
     var same = 0;
@@ -238,8 +332,10 @@ class _GameBubbleState extends State<GameBubble> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(headline,
-            style: AppText.callout.copyWith(color: AppColors.accent)),
+        Text(
+          headline,
+          style: AppText.callout.copyWith(color: AppColors.accent),
+        ),
         const SizedBox(height: 10),
         for (var i = 0; i < game.cards.length; i++)
           Padding(
@@ -308,8 +404,10 @@ class _GameBubbleState extends State<GameBubble> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(headline,
-            style: AppText.callout.copyWith(color: AppColors.accent)),
+        Text(
+          headline,
+          style: AppText.callout.copyWith(color: AppColors.accent),
+        ),
         const SizedBox(height: 10),
         for (var i = 0; i < lines.length; i++)
           _statement(lines[i], lie: game.lie == i, guessed: game.guess == i),
@@ -320,19 +418,28 @@ class _GameBubbleState extends State<GameBubble> {
   Widget _statement(String text, {required bool lie, bool guessed = false}) =>
       Padding(
         padding: const EdgeInsets.only(bottom: 8),
-        child: _statementBox(text,
-            lit: lie, tag: lie ? 'Lie' : null, guessed: guessed),
+        child: _statementBox(
+          text,
+          lit: lie,
+          tag: lie ? 'Lie' : null,
+          guessed: guessed,
+        ),
       );
 
-  Widget _statementBox(String text,
-          {required bool lit, String? tag, bool guessed = false}) =>
+  Widget _statementBox(
+    String text, {
+    required bool lit,
+    String? tag,
+    bool guessed = false,
+  }) =>
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: lit ? AppColors.fill : AppColors.fill2,
           borderRadius: BorderRadius.circular(Radii.row),
           border: Border.all(
-              color: guessed ? AppColors.accent : AppColors.hairline),
+            color: guessed ? AppColors.accent : AppColors.hairline,
+          ),
         ),
         child: Row(
           children: [
@@ -353,12 +460,126 @@ class _GameBubbleState extends State<GameBubble> {
             ],
             if (guessed) ...[
               const SizedBox(width: 6),
-              const Icon(Icons.touch_app_rounded,
-                  size: 16, color: AppColors.accent),
+              const Icon(
+                Icons.touch_app_rounded,
+                size: 16,
+                color: AppColors.accent,
+              ),
             ],
           ],
         ),
       );
+
+  // Truth and the film.
+
+  Widget _question(GameState game) => Text(
+        game.cards.isEmpty ? '' : game.cards.first.text,
+        style: AppText.body,
+      );
+
+  Widget _said(String who, String? text) => Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.fill2,
+            borderRadius: BorderRadius.circular(Radii.row),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(who, style: AppText.micro.copyWith(color: AppColors.label2)),
+              const SizedBox(height: 2),
+              Text(text ?? '', style: AppText.body),
+            ],
+          ),
+        ),
+      );
+
+  Widget _clue(GameCard? card) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Text(
+          card?.text ?? '',
+          textAlign: TextAlign.center,
+          style: AppText.largeTitle,
+        ),
+      );
+
+  Widget _movieResult(GameState game) {
+    final card = game.cards.isEmpty ? null : game.cards.first;
+    final right = game.guess != null && game.guess == game.answer;
+    final guesser = _startedByMe ? widget.theirName : 'You';
+    final film = card != null &&
+            game.answer != null &&
+            game.answer! < card.options.length
+        ? card.options[game.answer!]
+        : '';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _clue(card),
+        Text(
+          right
+              ? '$guesser got it: $film!'
+              : '$guesser guessed wrong. It was $film.',
+          textAlign: TextAlign.center,
+          style: AppText.callout.copyWith(color: AppColors.accent),
+        ),
+        const SizedBox(height: 10),
+        for (var i = 0; i < (card?.options.length ?? 0); i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: _statementBox(
+              card!.options[i],
+              lit: i == game.answer,
+              tag: i == game.answer ? 'The film' : null,
+              guessed: i == game.guess,
+            ),
+          ),
+      ],
+    );
+  }
+
+  // Tic tac toe.
+
+  Widget _board(GameState game) {
+    final mine = _startedByMe ? 'x' : 'o';
+    final myTurn = !game.done && game.turn == widget.me;
+    final String status;
+    if (!game.done) {
+      status = myTurn ? 'Your turn' : 'Waiting for ${widget.theirName}';
+    } else if (game.winner == null) {
+      status = 'A draw';
+    } else {
+      status = game.winner == mine ? 'You won!' : '${widget.theirName} won';
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          status,
+          textAlign: TextAlign.center,
+          style: AppText.callout.copyWith(
+            color: myTurn || game.done ? AppColors.accent : AppColors.label2,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Center(
+          child: TicTacToeBoard(
+            board: game.board ?? '         ',
+            line: game.line,
+            onTap: myTurn && !widget.busy ? widget.onMove : null,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'You are ${mine.toUpperCase()}',
+          textAlign: TextAlign.center,
+          style: AppText.micro,
+        ),
+      ],
+    );
+  }
 
   // FLAMES.
 

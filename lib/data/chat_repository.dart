@@ -95,6 +95,8 @@ class ChatRepository {
     List<int>? picks,
     List<String>? statements,
     int? lie,
+    String? text,
+    int? cell,
   }) async {
     final body = await _api.post(
       Api.games(matchId),
@@ -105,6 +107,8 @@ class ChatRepository {
         if (picks != null) 'picks': picks,
         if (statements != null) 'statements': statements,
         if (lie != null) 'lie': lie,
+        if (text != null) 'text': text,
+        if (cell != null) 'cell': cell,
       },
     );
     return Message.fromJson(body);
@@ -117,6 +121,7 @@ class ChatRepository {
     required String clientId,
     List<int>? picks,
     int? guess,
+    String? text,
   }) async {
     final body = await _api.post(
       Api.gameAnswer(matchId, gameId),
@@ -124,7 +129,22 @@ class ChatRepository {
         'client_id': clientId,
         if (picks != null) 'picks': picks,
         if (guess != null) 'guess': guess,
+        if (text != null) 'text': text,
       },
+    );
+    return Message.fromJson(body);
+  }
+
+  /// A square on a tic tac toe board, on this person's turn.
+  Future<Message> moveGame(
+    String matchId,
+    String gameId, {
+    required String clientId,
+    required int cell,
+  }) async {
+    final body = await _api.post(
+      Api.gameMove(matchId, gameId),
+      body: {'client_id': clientId, 'cell': cell},
     );
     return Message.fromJson(body);
   }

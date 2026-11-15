@@ -100,6 +100,8 @@ void main() {
         theirName: 'Priya',
         onPicks: (p) => sent = p,
         onGuess: (_) {},
+        onText: (_) {},
+        onMove: (_) {},
       ),
     );
     expect(find.textContaining('Pick yours to see theirs'), findsOneWidget);
@@ -121,6 +123,8 @@ void main() {
         theirName: 'Priya',
         onPicks: (_) => fail('the starter cannot answer'),
         onGuess: (_) {},
+        onText: (_) {},
+        onMove: (_) {},
       ),
     );
     expect(find.textContaining('hidden until Priya plays'), findsOneWidget);
@@ -139,6 +143,8 @@ void main() {
         theirName: 'Priya',
         onPicks: (_) {},
         onGuess: (_) {},
+        onText: (_) {},
+        onMove: (_) {},
       ),
     );
     expect(find.text('You both said the same!'), findsOneWidget);
@@ -157,6 +163,8 @@ void main() {
         theirName: 'Priya',
         onPicks: (_) {},
         onGuess: (_) {},
+        onText: (_) {},
+        onMove: (_) {},
       ),
     );
     expect(find.text('Priya started Would you rather'), findsOneWidget);
@@ -185,9 +193,147 @@ void main() {
         theirName: 'Meera',
         onPicks: (_) {},
         onGuess: (_) {},
+        onText: (_) {},
+        onMove: (_) {},
       ),
     );
     expect(find.text('Marriage'), findsOneWidget);
     expect(find.text('Arjun  +  Meera'), findsOneWidget);
+  });
+
+  // v2: truth, the film, tic tac toe.
+
+  Map<String, Object?> v2(Map<String, Object?> fields) => {
+        'id': 'g-2',
+        'title': 'Game',
+        'status': 'waiting',
+        'started_by': her,
+        'cards': <Object?>[],
+        ...fields,
+      };
+
+  Widget card(
+    Message m, {
+    ValueChanged<int>? onGuess,
+    ValueChanged<int>? onMove,
+  }) =>
+      GameBubble(
+        message: m,
+        game: m.game!,
+        me: me,
+        theirName: 'Priya',
+        onPicks: (_) {},
+        onGuess: onGuess ?? (_) {},
+        onText: (_) {},
+        onMove: onMove ?? (_) {},
+      );
+
+  test('a board copy with more marks wins, and done beats both', () {
+    final early =
+        GameState.fromJson(v2({'game': 'tic_tac_toe', 'board': 'x        '}));
+    final later =
+        GameState.fromJson(v2({'game': 'tic_tac_toe', 'board': 'x   o    '}));
+    final over = GameState.fromJson(
+      v2({
+        'game': 'tic_tac_toe',
+        'board': 'xxxoo    ',
+        'status': 'done',
+        'winner': 'x',
+      }),
+    );
+    expect(later.newer(early), same(later));
+    expect(early.newer(later), same(later));
+    expect(later.newer(over), same(over));
+    expect(over.newer(later), same(over));
+  });
+
+  testWidgets('my turn on a board: an empty square is a move', (tester) async {
+    final m = Message.fromJson(
+      message(v2({'game': 'tic_tac_toe', 'board': 'x        ', 'turn': me})),
+    );
+    int? cell;
+    await pump(tester, card(m, onMove: (c) => cell = c));
+    expect(find.text('Your turn'), findsOneWidget);
+    expect(find.text('You are O'), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Empty square 5'));
+    expect(cell, 4);
+  });
+
+  testWidgets('their turn on a board: nothing moves', (tester) async {
+    final m = Message.fromJson(
+      message(v2({'game': 'tic_tac_toe', 'board': 'x   o    ', 'turn': her})),
+    );
+    await pump(tester, card(m, onMove: (_) => fail('not my turn')));
+    expect(find.text('Waiting for Priya'), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Empty square 2'));
+  });
+
+  testWidgets('a board that is over says who won', (tester) async {
+    final m = Message.fromJson(
+      message(
+        v2({
+          'game': 'tic_tac_toe',
+          'board': 'xxxoo    ',
+          'status': 'done',
+          'winner': 'x',
+          'line': [0, 1, 2],
+        }),
+        event: 'answered',
+      ),
+    );
+    await pump(tester, card(m));
+    // She started, so she is x: she won.
+    expect(find.text('Priya won'), findsOneWidget);
+  });
+
+  testWidgets('their film, my guess: four titles to tap', (tester) async {
+    final m = Message.fromJson(
+      message(
+        v2({
+          'game': 'guess_movie',
+          'cards': [
+            {
+              'key': '',
+              'text': '🚂🌻💑',
+              'options': [
+                'Pardes',
+                'Dilwale Dulhania Le Jayenge',
+                'Mohabbatein',
+                'Taal',
+              ],
+            },
+          ],
+        }),
+      ),
+    );
+    int? guess;
+    await pump(tester, card(m, onGuess: (g) => guess = g));
+    await tester.tap(find.text('Dilwale Dulhania Le Jayenge'));
+    expect(guess, 1);
+  });
+
+  testWidgets('truth answered: both answers show', (tester) async {
+    final m = Message.fromJson(
+      message(
+        v2({
+          'game': 'truth',
+          'status': 'done',
+          'cards': [
+            {
+              'key': 'truth_best_meal',
+              'text': 'Best meal?',
+              'options': <Object?>[],
+            },
+          ],
+          'starter_text': 'Rajma chawal',
+          'reply_text': 'Maggi',
+        }),
+        sender: me,
+        event: 'answered',
+      ),
+    );
+    await pump(tester, card(m));
+    expect(find.text('Rajma chawal'), findsOneWidget);
+    expect(find.text('Maggi'), findsOneWidget);
   });
 }

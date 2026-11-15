@@ -21,7 +21,18 @@ enum GameKind {
     'Two truths and a lie',
     'Write three things about you. They spot the lie.',
   ),
-  flames('flames', 'FLAMES', 'The schoolyard classic, with your two names.');
+  flames('flames', 'FLAMES', 'The schoolyard classic, with your two names.'),
+  truth('truth', 'Truth', 'One question, both answer. No dares.'),
+  guessMovie(
+    'guess_movie',
+    'Guess the movie',
+    'Send a film in emoji. Can they get it?',
+  ),
+  ticTacToe(
+    'tic_tac_toe',
+    'Tic tac toe',
+    'Noughts and crosses, a move at a time.',
+  );
 
   const GameKind(this.wire, this.title, this.pitch);
 
@@ -43,8 +54,11 @@ enum GameKind {
 /// One card: a question and its two answers.
 @immutable
 class GameCard {
-  const GameCard(
-      {required this.key, required this.text, required this.options});
+  const GameCard({
+    required this.key,
+    required this.text,
+    required this.options,
+  });
 
   final String key;
   final String text;
@@ -100,6 +114,13 @@ class GameState {
     this.lie,
     this.guess,
     this.flames,
+    this.starterText,
+    this.replyText,
+    this.answer,
+    this.board,
+    this.turn,
+    this.winner,
+    this.line,
   });
 
   final String id;
@@ -119,11 +140,37 @@ class GameState {
   final int? guess;
   final FlamesResult? flames;
 
+  /// Truth: what each wrote. The starter's is null for the other person until
+  /// they have answered.
+  final String? starterText;
+  final String? replyText;
+
+  /// Guess the movie: which of the card's four options is the film. Null for
+  /// the guesser until they have guessed.
+  final int? answer;
+
+  /// Tic tac toe: nine of ' ', 'x', 'o', row by row; the starter is x.
+  final String? board;
+
+  /// Whose turn it is while the board is being played.
+  final String? turn;
+
+  /// Once over: 'x', 'o', or null for a draw; and the line that won.
+  final String? winner;
+  final List<int>? line;
+
   bool startedByMe(String me) => startedBy == me;
 
-  /// The newer of two copies of one game. A game only goes from waiting to
-  /// done, so a done copy is never replaced by a waiting one that arrived late.
-  GameState newer(GameState other) => done && !other.done ? this : other;
+  /// Marks on the board so far: a board only ever gains them.
+  int get marks => board == null ? 0 : board!.replaceAll(' ', '').length;
+
+  /// The newer of two copies of one game. A game only goes forward, from
+  /// waiting to done and, on a board, from fewer marks to more, so a copy that
+  /// arrived late never undoes a move.
+  GameState newer(GameState other) {
+    if (done != other.done) return done ? this : other;
+    return marks > other.marks ? this : other;
+  }
 
   static GameState fromJson(Json j) {
     final statements = j['statements'];
@@ -140,6 +187,13 @@ class GameState {
       lie: j.intOrNull('lie'),
       guess: j.intOrNull('guess'),
       flames: FlamesResult.maybe(j.objectOrNull('flames')),
+      starterText: j.strOrNull('starter_text'),
+      replyText: j.strOrNull('reply_text'),
+      answer: j.intOrNull('answer'),
+      board: j.strOrNull('board'),
+      turn: j.strOrNull('turn'),
+      winner: j.strOrNull('winner'),
+      line: j['line'] == null ? null : j.ints('line'),
     );
   }
 }

@@ -557,6 +557,44 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
           );
         case GameKind.flames:
           sending = repo.startGame(_matchId, game: game, clientId: clientId);
+        case GameKind.truth:
+          final cards = await repo.dealGame(_matchId, game);
+          if (!mounted || cards.isEmpty) return;
+          final text = await showTruthSheet(context, question: cards.first.text);
+          if (text == null || !mounted) return;
+          sending = repo.startGame(
+            _matchId,
+            game: game,
+            clientId: clientId,
+            cards: [cards.first.key],
+            text: text,
+          );
+        case GameKind.guessMovie:
+          // Deal until they send one or back out.
+          while (true) {
+            final cards = await repo.dealGame(_matchId, game);
+            if (!mounted || cards.isEmpty) return;
+            final choice = await showMovieDealSheet(context, card: cards.first);
+            if (choice == null || !mounted) return;
+            if (choice == MovieChoice.send) {
+              sending = repo.startGame(
+                _matchId,
+                game: game,
+                clientId: clientId,
+                cards: [cards.first.key],
+              );
+              break;
+            }
+          }
+        case GameKind.ticTacToe:
+          final cell = await showBoardStartSheet(context);
+          if (cell == null || !mounted) return;
+          sending = repo.startGame(
+            _matchId,
+            game: game,
+            clientId: clientId,
+            cell: cell,
+          );
       }
       final message = await sending;
       if (!mounted) return;
@@ -569,7 +607,12 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
     }
   }
 
-  Future<void> _answerGame(GameState game, {List<int>? picks, int? guess}) async {
+  Future<void> _answerGame(
+    GameState game, {
+    List<int>? picks,
+    int? guess,
+    String? text,
+  }) async {
     if (_ended || _gameBusy) return;
     if (_mustVerify) return _askToVerify();
     setState(() => _gameBusy = true);
@@ -580,6 +623,7 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
             clientId: Ids.uuid(),
             picks: picks,
             guess: guess,
+            text: text,
           );
       if (!mounted) return;
       _merge([message]);
@@ -588,6 +632,33 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
       await _gameFailed(e);
       // Answered from another phone, say: the page catches up to show it.
       if (e.code == 'game_finished') unawaited(_catchUp());
+    } finally {
+      if (mounted) setState(() => _gameBusy = false);
+    }
+  }
+
+  /// A square on a board. A board that moved on since it was drawn (the square
+  /// taken, not my turn any more) is refused by the server, and the page
+  /// catches up to show where it is.
+  Future<void> _moveGame(GameState game, int cell) async {
+    if (_ended || _gameBusy) return;
+    if (_mustVerify) return _askToVerify();
+    setState(() => _gameBusy = true);
+    try {
+      final message = await ref.read(chatRepositoryProvider).moveGame(
+            _matchId,
+            game.id,
+            clientId: Ids.uuid(),
+            cell: cell,
+          );
+      if (!mounted) return;
+      _merge([message]);
+      ref.invalidate(conversationsProvider);
+    } on ApiException catch (e) {
+      await _gameFailed(e);
+      if (const {'cell_taken', 'not_your_turn', 'game_finished'}.contains(e.code)) {
+        unawaited(_catchUp());
+      }
     } finally {
       if (mounted) setState(() => _gameBusy = false);
     }
@@ -896,9 +967,17 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
         ),
       for (final p in _pending.reversed) _PendingBubble(pending: p, onRetry: _deliver),
     ];
+    // A board is one live card, drawn where its newest message is.
+    final newestOfBoard = <String, int>{};
+    for (final m in _messages) {
+      final g = m.game;
+      if (g != null && g.kind == GameKind.ticTacToe) newestOfBoard[g.id] = m.seq;
+    }
     for (var i = _messages.length - 1; i >= 0; i--) {
       final m = _messages[i];
       final game = m.game == null ? null : _games[m.game!.id] ?? m.game;
+      final board = m.game?.kind == GameKind.ticTacToe;
+      if (board && newestOfBoard[m.game!.id] != m.seq) continue;
       rows.add(
         game != null && me != null
             ? GameBubble(
@@ -910,6 +989,8 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
                 busy: _gameBusy,
                 onPicks: (picks) => unawaited(_answerGame(game, picks: picks)),
                 onGuess: (guess) => unawaited(_answerGame(game, guess: guess)),
+                onText: (text) => unawaited(_answerGame(game, text: text)),
+                onMove: (cell) => unawaited(_moveGame(game, cell)),
               )
             : _Bubble(
                 message: m,

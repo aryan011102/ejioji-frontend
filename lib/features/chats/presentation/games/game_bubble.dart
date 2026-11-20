@@ -15,8 +15,8 @@ import 'game_sheets.dart';
 /// answered. The answer is its own full card, since the start may be on an
 /// older page that is not loaded; once answered, the start shrinks to a line.
 ///
-/// Tic tac toe is one live board: the page draws only the newest message of a
-/// board, and this card is the board as it stands.
+/// Tic tac toe and Worduel are one live card each: the page draws only the
+/// newest message of one, and this card is the game as it stands.
 class GameBubble extends StatefulWidget {
   const GameBubble({
     required this.message,
@@ -27,6 +27,7 @@ class GameBubble extends StatefulWidget {
     required this.onGuess,
     required this.onText,
     required this.onMove,
+    required this.onWord,
     this.busy = false,
     super.key,
   });
@@ -43,11 +44,14 @@ class GameBubble extends StatefulWidget {
   /// Their two truths or their film, my turn: which one I think it is.
   final ValueChanged<int> onGuess;
 
-  /// Their truth, my turn: my answer.
+  /// Their truth, my turn: my answer. Their own film: the name I type.
   final ValueChanged<String> onText;
 
   /// A board, my turn: the square I take.
   final ValueChanged<int> onMove;
+
+  /// Their Worduel, my turn: my guess.
+  final ValueChanged<String> onWord;
 
   @override
   State<GameBubble> createState() => _GameBubbleState();
@@ -56,6 +60,22 @@ class GameBubble extends StatefulWidget {
 class _GameBubbleState extends State<GameBubble> {
   /// My picks so far on their rapid fire, before Send.
   List<int?>? _picks;
+
+  /// What I am typing: a guess in their Worduel, or the name of their film.
+  final _typed = TextEditingController();
+
+  @override
+  void didUpdateWidget(GameBubble old) {
+    super.didUpdateWidget(old);
+    // A guess that went through is on the grid now: start the next one empty.
+    if (widget.game.guesses.length != old.game.guesses.length) _typed.clear();
+  }
+
+  @override
+  void dispose() {
+    _typed.dispose();
+    super.dispose();
+  }
 
   GameState get _game => widget.game;
   bool get _mine => widget.message.senderId == widget.me;
@@ -69,6 +89,8 @@ class _GameBubbleState extends State<GameBubble> {
       body = _flames(game);
     } else if (game.kind == GameKind.ticTacToe) {
       body = _board(game);
+    } else if (game.kind == GameKind.worduel) {
+      body = _worduel(game);
     } else if (widget.message.gameAnswer) {
       body = _result(game);
     } else if (game.done) {
@@ -164,6 +186,12 @@ class _GameBubbleState extends State<GameBubble> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _clue(card),
+          if (game.film != null)
+            Text(
+              'You sent ${game.film}',
+              textAlign: TextAlign.center,
+              style: AppText.footnote.copyWith(color: AppColors.label2),
+            ),
           if (card != null && answer != null && answer < card.options.length)
             Text(
               'You sent ${card.options[answer]}',
@@ -220,6 +248,23 @@ class _GameBubbleState extends State<GameBubble> {
               final text = await showTruthSheet(context, question: question);
               if (text != null) widget.onText(text);
             },
+          ),
+        ],
+      );
+    }
+    if (game.ownFilm) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _clue(game.cards.first),
+          _note('${widget.theirName} made this one. Type the film’s name.'),
+          const SizedBox(height: 10),
+          _typeIn(
+            hint: 'The film',
+            maxChars: 80,
+            label: 'Guess',
+            ready: _typed.text.trim().isNotEmpty,
+            onSend: () => widget.onText(_typed.text.trim()),
           ),
         ],
       );
@@ -506,6 +551,7 @@ class _GameBubbleState extends State<GameBubble> {
       );
 
   Widget _movieResult(GameState game) {
+    if (game.ownFilm) return _ownFilmResult(game);
     final card = game.cards.isEmpty ? null : game.cards.first;
     final right = game.guess != null && game.guess == game.answer;
     final guesser = _startedByMe ? widget.theirName : 'You';
@@ -536,6 +582,136 @@ class _GameBubbleState extends State<GameBubble> {
               guessed: i == game.guess,
             ),
           ),
+      ],
+    );
+  }
+
+  Widget _ownFilmResult(GameState game) {
+    final guesser = _startedByMe ? widget.theirName : 'You';
+    final film = game.film ?? '';
+    final said = game.replyText ?? '';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _clue(game.cards.first),
+        Text(
+          game.correct == true
+              ? '$guesser got it: $film!'
+              : '$guesser said $said. It was $film.',
+          textAlign: TextAlign.center,
+          style: AppText.callout.copyWith(color: AppColors.accent),
+        ),
+      ],
+    );
+  }
+
+  /// A box to type into, with its button: a Worduel guess or a film's name.
+  Widget _typeIn({
+    required String hint,
+    required int maxChars,
+    required String label,
+    required bool ready,
+    required VoidCallback onSend,
+    TextCapitalization capitals = TextCapitalization.words,
+  }) {
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(Radii.row),
+      borderSide: const BorderSide(color: AppColors.hairline),
+    );
+    return Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: _typed,
+            maxLength: maxChars,
+            textCapitalization: capitals,
+            style: AppText.body,
+            cursorColor: AppColors.accent,
+            onChanged: (_) => setState(() {}),
+            onSubmitted: (_) {
+              if (ready && !widget.busy) onSend();
+            },
+            decoration: InputDecoration(
+              counterText: '',
+              isDense: true,
+              hintText: hint,
+              hintStyle: AppText.body.copyWith(color: AppColors.label3),
+              filled: true,
+              fillColor: AppColors.menu,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              border: border,
+              enabledBorder: border,
+              focusedBorder: border,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        MiniButton(
+          label: label,
+          busy: widget.busy,
+          onPressed: ready ? onSend : null,
+        ),
+      ],
+    );
+  }
+
+  // Worduel.
+
+  Widget _worduel(GameState game) {
+    final myTurn = !game.done && game.turn == widget.me;
+    final tries = game.guesses.length;
+    final left = Worduel.tries - tries;
+    final guesser = _startedByMe ? widget.theirName : 'You';
+    final String status;
+    if (!game.done) {
+      status = _startedByMe
+          ? '${widget.theirName} is guessing your word'
+          : left == 1
+              ? 'Your turn. Last try!'
+              : 'Your turn. $left tries left';
+    } else if (game.correct == true) {
+      status = '$guesser got it in $tries!';
+    } else {
+      status = '$guesser ran out of tries.';
+    }
+    final word = game.word;
+    final typed = _typed.text.trim().toLowerCase();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          status,
+          textAlign: TextAlign.center,
+          style: AppText.callout.copyWith(
+            color: myTurn || game.done ? AppColors.accent : AppColors.label2,
+          ),
+        ),
+        if (word != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            game.done
+                ? 'The word was ${word.toUpperCase()}'
+                : 'Your word: ${word.toUpperCase()}',
+            textAlign: TextAlign.center,
+            style: AppText.footnote.copyWith(color: AppColors.label2),
+          ),
+        ],
+        const SizedBox(height: 10),
+        Center(
+          child: WorduelGrid(guesses: game.guesses, showEmpty: !game.done),
+        ),
+        if (myTurn) ...[
+          const SizedBox(height: 8),
+          _typeIn(
+            hint: 'Five letters',
+            maxChars: Worduel.letters,
+            label: 'Guess',
+            capitals: TextCapitalization.characters,
+            ready: worduelWordReady(typed),
+            onSend: () => widget.onWord(typed),
+          ),
+        ],
       ],
     );
   }

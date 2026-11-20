@@ -32,6 +32,11 @@ enum GameKind {
     'tic_tac_toe',
     'Tic tac toe',
     'Noughts and crosses, a move at a time.',
+  ),
+  worduel(
+    'worduel',
+    'Worduel',
+    'Set a five letter word. They get six tries.',
   );
 
   const GameKind(this.wire, this.title, this.pitch);
@@ -41,6 +46,9 @@ enum GameKind {
 
   /// One line under its name in the list.
   final String pitch;
+
+  /// Played a move at a time on one live card, drawn where its newest move is.
+  bool get live => this == ticTacToe || this == worduel;
 
   /// Null for a game this build does not know: it is drawn as its text line.
   static GameKind? parse(String? raw) {
@@ -58,17 +66,80 @@ class GameCard {
     required this.key,
     required this.text,
     required this.options,
+    this.own = false,
   });
 
   final String key;
   final String text;
   final List<String> options;
 
+  /// Written by the person who started the game, not dealt.
+  final bool own;
+
   static GameCard fromJson(Json j) => GameCard(
         key: j.str('key'),
         text: j.str('text'),
         options: j.strings('options'),
+        own: j['own'] == true,
       );
+}
+
+/// A card someone writes in place of one dealt. The server checks it as it
+/// checks a message, and makes it a card like any other.
+///
+/// [text] is the question, the line after "Never have I ever", the emoji
+/// clue, or Worduel's word; [options] the two answers, the two sides of a
+/// rapid fire card, or the film's title.
+@immutable
+class OwnCard {
+  const OwnCard({this.text, this.options = const []});
+
+  final String? text;
+  final List<String> options;
+
+  Map<String, Object?> toJson() => {
+        if (text != null) 'text': text,
+        if (options.isNotEmpty) 'options': options,
+      };
+
+  /// The card as the server will make it, to show before it is sent.
+  GameCard preview(GameKind game) => switch (game) {
+        GameKind.neverHaveIEver => GameCard(
+            key: 'own',
+            text: 'Never have I ever ${text ?? ''}.',
+            options: const ['I have', 'I haven’t'],
+            own: true,
+          ),
+        GameKind.rapidFire => GameCard(
+            key: 'own',
+            text: '${options.first} or ${options.last}?',
+            options: options,
+            own: true,
+          ),
+        _ =>
+          GameCard(key: 'own', text: text ?? '', options: options, own: true),
+      };
+}
+
+/// One guess in Worduel: the word, and a mark per letter.
+@immutable
+class WorduelGuess {
+  const WorduelGuess({required this.word, required this.marks});
+
+  final String word;
+
+  /// One per letter: 'c' in the right place, 'p' in the word elsewhere, 'a'
+  /// not in it.
+  final String marks;
+
+  static WorduelGuess fromJson(Json j) =>
+      WorduelGuess(word: j.str('word'), marks: j.str('marks'));
+}
+
+/// Worduel's rules, as the server has them.
+abstract final class Worduel {
+  static const letters = 5;
+  static const tries = 6;
 }
 
 /// FLAMES, worked out by the server from the two names.
@@ -121,6 +192,10 @@ class GameState {
     this.turn,
     this.winner,
     this.line,
+    this.film,
+    this.word,
+    this.guesses = const [],
+    this.correct,
   });
 
   final String id;
@@ -159,14 +234,35 @@ class GameState {
   final String? winner;
   final List<int>? line;
 
+  /// Guess the movie with the starter's own film (its card has no options):
+  /// the title, null for the guesser until they have typed theirs into
+  /// [replyText].
+  final String? film;
+
+  /// Worduel: the word, null for the guesser until it is over; and each guess
+  /// so far, oldest first. [turn] is the guesser while it goes on.
+  final String? word;
+  final List<WorduelGuess> guesses;
+
+  /// Their own film and Worduel, once over: whether they got it.
+  final bool? correct;
+
   bool startedByMe(String me) => startedBy == me;
 
-  /// Marks on the board so far: a board only ever gains them.
-  int get marks => board == null ? 0 : board!.replaceAll(' ', '').length;
+  /// Guess the movie with the starter's own film, which is typed, not picked.
+  bool get ownFilm =>
+      kind == GameKind.guessMovie &&
+      cards.isNotEmpty &&
+      cards.first.own &&
+      cards.first.options.isEmpty;
+
+  /// Moves so far on a board or in a Worduel: a game only ever gains them.
+  int get marks =>
+      (board == null ? 0 : board!.replaceAll(' ', '').length) + guesses.length;
 
   /// The newer of two copies of one game. A game only goes forward, from
-  /// waiting to done and, on a board, from fewer marks to more, so a copy that
-  /// arrived late never undoes a move.
+  /// waiting to done and, on a board or in a Worduel, from fewer moves to more,
+  /// so a copy that arrived late never undoes a move.
   GameState newer(GameState other) {
     if (done != other.done) return done ? this : other;
     return marks > other.marks ? this : other;
@@ -194,6 +290,15 @@ class GameState {
       turn: j.strOrNull('turn'),
       winner: j.strOrNull('winner'),
       line: j['line'] == null ? null : j.ints('line'),
+      film: j.strOrNull('film'),
+      word: j.strOrNull('word'),
+      guesses: j['guesses'] == null
+          ? const []
+          : j
+              .objects('guesses')
+              .map(WorduelGuess.fromJson)
+              .toList(growable: false),
+      correct: j['correct'] is bool ? j['correct'] as bool : null,
     );
   }
 }

@@ -86,12 +86,13 @@ class ChatRepository {
 
   /// Starts a game with this person's own answer in it: a pick on each dealt
   /// card, or three statements and which is the lie. FLAMES needs neither.
+  /// Each of [cards] is the key of a card dealt, or an [OwnCard] in its place.
   /// Idempotent on [clientId], like a message.
   Future<Message> startGame(
     String matchId, {
     required GameKind game,
     required String clientId,
-    List<String> cards = const [],
+    List<Object> cards = const [],
     List<int>? picks,
     List<String>? statements,
     int? lie,
@@ -103,7 +104,8 @@ class ChatRepository {
       body: {
         'client_id': clientId,
         'game': game.wire,
-        if (cards.isNotEmpty) 'cards': cards,
+        if (cards.isNotEmpty)
+          'cards': [for (final c in cards) c is OwnCard ? c.toJson() : c],
         if (picks != null) 'picks': picks,
         if (statements != null) 'statements': statements,
         if (lie != null) 'lie': lie,
@@ -135,16 +137,22 @@ class ChatRepository {
     return Message.fromJson(body);
   }
 
-  /// A square on a tic tac toe board, on this person's turn.
+  /// A square on a tic tac toe board, or a guess in Worduel, on this person's
+  /// turn.
   Future<Message> moveGame(
     String matchId,
     String gameId, {
     required String clientId,
-    required int cell,
+    int? cell,
+    String? word,
   }) async {
     final body = await _api.post(
       Api.gameMove(matchId, gameId),
-      body: {'client_id': clientId, 'cell': cell},
+      body: {
+        'client_id': clientId,
+        if (cell != null) 'cell': cell,
+        if (word != null) 'word': word,
+      },
     );
     return Message.fromJson(body);
   }

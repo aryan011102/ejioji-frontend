@@ -47,6 +47,12 @@ abstract final class AppColors {
   static const goldSoft = Color(0x29E3B341);
   static const warnSoft = Color(0x24FF453A);
 
+  // Worduel's letters, in the green, yellow and grey people already read as
+  // right place, elsewhere in the word, and not in it.
+  static const letterRight = Color(0xFF538D4E);
+  static const letterElsewhere = Color(0xFFB59F3B);
+  static const letterAbsent = Color(0xFF3A3A3C);
+
   // Chrome.
   static const glass = Color(0xC21C1C1E); // .76
   static const glassEdge = Color(0x24FFFFFF); // .14

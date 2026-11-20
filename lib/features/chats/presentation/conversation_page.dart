@@ -536,14 +536,15 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
         case GameKind.neverHaveIEver:
           final cards = await repo.dealGame(_matchId, game);
           if (!mounted || cards.isEmpty) return;
-          final picks = await showCardsSheet(context, game: game, cards: cards);
-          if (picks == null || !mounted) return;
+          final chosen =
+              await showCardsSheet(context, game: game, cards: cards);
+          if (chosen == null || !mounted) return;
           sending = repo.startGame(
             _matchId,
             game: game,
             clientId: clientId,
-            cards: [for (final c in cards) c.key],
-            picks: picks,
+            cards: chosen.$1,
+            picks: chosen.$2,
           );
         case GameKind.twoTruths:
           final written = await showTwoTruthsSheet(context);
@@ -560,14 +561,15 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
         case GameKind.truth:
           final cards = await repo.dealGame(_matchId, game);
           if (!mounted || cards.isEmpty) return;
-          final text = await showTruthSheet(context, question: cards.first.text);
-          if (text == null || !mounted) return;
+          final answered =
+              await showTruthStartSheet(context, question: cards.first.text);
+          if (answered == null || !mounted) return;
           sending = repo.startGame(
             _matchId,
             game: game,
             clientId: clientId,
-            cards: [cards.first.key],
-            text: text,
+            cards: [answered.$1 ?? cards.first.key],
+            text: answered.$2,
           );
         case GameKind.guessMovie:
           // Deal until they send one or back out.
@@ -576,14 +578,42 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
             if (!mounted || cards.isEmpty) return;
             final choice = await showMovieDealSheet(context, card: cards.first);
             if (choice == null || !mounted) return;
-            if (choice == MovieChoice.send) {
-              sending = repo.startGame(
+            if (choice == MovieChoice.another) continue;
+            final Object card;
+            if (choice == MovieChoice.own) {
+              final own = await showOwnCardSheet(context, game: game);
+              if (own == null || !mounted) return;
+              card = own;
+            } else {
+              card = cards.first.key;
+            }
+            sending = repo.startGame(
+              _matchId,
+              game: game,
+              clientId: clientId,
+              cards: [card],
+            );
+            break;
+          }
+        case GameKind.worduel:
+          final words = await repo.dealGame(_matchId, game);
+          // Ask again while their own word is not one the server knows.
+          while (true) {
+            if (!mounted) return;
+            final word = await showWorduelStartSheet(context, words: words);
+            if (word == null || !mounted) return;
+            try {
+              final message = await repo.startGame(
                 _matchId,
                 game: game,
                 clientId: clientId,
-                cards: [cards.first.key],
+                cards: [word],
               );
+              sending = Future.value(message);
               break;
+            } on ApiException catch (e) {
+              if (e.code != 'not_a_word') rethrow;
+              if (mounted) showAppToast(context, e.message);
             }
           }
         case GameKind.ticTacToe:
@@ -637,10 +667,10 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
     }
   }
 
-  /// A square on a board. A board that moved on since it was drawn (the square
-  /// taken, not my turn any more) is refused by the server, and the page
-  /// catches up to show where it is.
-  Future<void> _moveGame(GameState game, int cell) async {
+  /// A square on a board, or a guess in a Worduel. A game that moved on since
+  /// it was drawn (the square taken, not my turn any more) is refused by the
+  /// server, and the page catches up to show where it is.
+  Future<void> _moveGame(GameState game, {int? cell, String? word}) async {
     if (_ended || _gameBusy) return;
     if (_mustVerify) return _askToVerify();
     setState(() => _gameBusy = true);
@@ -650,6 +680,7 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
             game.id,
             clientId: Ids.uuid(),
             cell: cell,
+            word: word,
           );
       if (!mounted) return;
       _merge([message]);
@@ -967,17 +998,17 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
         ),
       for (final p in _pending.reversed) _PendingBubble(pending: p, onRetry: _deliver),
     ];
-    // A board is one live card, drawn where its newest message is.
-    final newestOfBoard = <String, int>{};
+    // A board or a Worduel is one live card, drawn where its newest message is.
+    final newestOfLive = <String, int>{};
     for (final m in _messages) {
       final g = m.game;
-      if (g != null && g.kind == GameKind.ticTacToe) newestOfBoard[g.id] = m.seq;
+      if (g != null && (g.kind?.live ?? false)) newestOfLive[g.id] = m.seq;
     }
     for (var i = _messages.length - 1; i >= 0; i--) {
       final m = _messages[i];
       final game = m.game == null ? null : _games[m.game!.id] ?? m.game;
-      final board = m.game?.kind == GameKind.ticTacToe;
-      if (board && newestOfBoard[m.game!.id] != m.seq) continue;
+      final live = m.game?.kind?.live ?? false;
+      if (live && newestOfLive[m.game!.id] != m.seq) continue;
       rows.add(
         game != null && me != null
             ? GameBubble(
@@ -990,7 +1021,8 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
                 onPicks: (picks) => unawaited(_answerGame(game, picks: picks)),
                 onGuess: (guess) => unawaited(_answerGame(game, guess: guess)),
                 onText: (text) => unawaited(_answerGame(game, text: text)),
-                onMove: (cell) => unawaited(_moveGame(game, cell)),
+                onMove: (cell) => unawaited(_moveGame(game, cell: cell)),
+                onWord: (word) => unawaited(_moveGame(game, word: word)),
               )
             : _Bubble(
                 message: m,

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -86,6 +87,14 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
 
   /// A game is being dealt, started or answered.
   bool _gameBusy = false;
+
+  /// The newest game waiting on me, as the list draws it: the key on its card,
+  /// and its name for the pill that takes me back to it when it is off screen.
+  final _turnKey = GlobalKey();
+  String? _turnTitle;
+  bool _turnInView = true;
+  final _list = ScrollController();
+  final _listKey = GlobalKey();
 
   /// The tiles the conversation opens on, before any message.
   List<Opener> _openers = const [];
@@ -203,6 +212,7 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
     unawaited(_events?.cancel());
     _typingClear?.cancel();
     _composer.dispose();
+    _list.dispose();
     super.dispose();
   }
 
@@ -1004,32 +1014,41 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
       final g = m.game;
       if (g != null && (g.kind?.live ?? false)) newestOfLive[g.id] = m.seq;
     }
+    String? turnTitle;
     for (var i = _messages.length - 1; i >= 0; i--) {
       final m = _messages[i];
       final game = m.game == null ? null : _games[m.game!.id] ?? m.game;
       final live = m.game?.kind?.live ?? false;
       if (live && newestOfLive[m.game!.id] != m.seq) continue;
-      rows.add(
-        game != null && me != null
-            ? GameBubble(
-                key: ValueKey('game-${m.id}'),
-                message: m,
-                game: game,
-                me: me,
-                theirName: _person?.firstName ?? 'They',
-                busy: _gameBusy,
-                onPicks: (picks) => unawaited(_answerGame(game, picks: picks)),
-                onGuess: (guess) => unawaited(_answerGame(game, guess: guess)),
-                onText: (text) => unawaited(_answerGame(game, text: text)),
-                onMove: (cell) => unawaited(_moveGame(game, cell: cell)),
-                onWord: (word) => unawaited(_moveGame(game, word: word)),
-              )
-            : _Bubble(
-                message: m,
-                mine: me != null && m.mine(me),
-                read: m.seq == myLatestRead,
-              ),
-      );
+      // The newest game waiting on me, where its card is: a live game's one
+      // card, or the start of one I answer.
+      final waitsOnMe = turnTitle == null &&
+          game != null &&
+          me != null &&
+          game.myTurn(me) &&
+          (live || !m.gameAnswer);
+      if (waitsOnMe) turnTitle = game.title;
+      Widget row = game != null && me != null
+          ? GameBubble(
+              key: ValueKey('game-${m.id}'),
+              message: m,
+              game: game,
+              me: me,
+              theirName: _person?.firstName ?? 'They',
+              busy: _gameBusy,
+              onPicks: (picks) => unawaited(_answerGame(game, picks: picks)),
+              onGuess: (guess) => unawaited(_answerGame(game, guess: guess)),
+              onText: (text) => unawaited(_answerGame(game, text: text)),
+              onMove: (cell) => unawaited(_moveGame(game, cell: cell)),
+              onWord: (word) => unawaited(_moveGame(game, word: word)),
+            )
+          : _Bubble(
+              message: m,
+              mine: me != null && m.mine(me),
+              read: m.seq == myLatestRead,
+            );
+      if (waitsOnMe) row = KeyedSubtree(key: _turnKey, child: row);
+      rows.add(row);
       final older = i > 0 ? _messages[i - 1] : null;
       if (older == null ||
           dayLabel(older.sentAt.toLocal()) != dayLabel(m.sentAt.toLocal())) {
@@ -1080,10 +1099,84 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
       ),
     );
 
-    return ListView(
-      reverse: true,
-      padding: const EdgeInsets.fromLTRB(Insets.gutter, 12, Insets.gutter, 16),
-      children: rows,
+    _turnTitle = turnTitle;
+    // Where the card is only shows once it is laid out.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkTurnInView());
+    return Stack(
+      children: [
+        NotificationListener<ScrollNotification>(
+          onNotification: (_) {
+            _checkTurnInView();
+            return false;
+          },
+          child: ListView(
+            key: _listKey,
+            controller: _list,
+            reverse: true,
+            padding:
+                const EdgeInsets.fromLTRB(Insets.gutter, 12, Insets.gutter, 16),
+            children: rows,
+          ),
+        ),
+        if (turnTitle != null && !_turnInView)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 12,
+            child: Center(
+              child: _TurnPill(
+                title: turnTitle,
+                onTap: () => unawaited(_goToTurn()),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// Whether the card of the game waiting on me is on screen. Off it, a pill
+  /// above the keyboard says so.
+  void _checkTurnInView() {
+    if (!mounted) return;
+    final inView = _turnTitle == null || _onScreen(_turnKey);
+    if (inView != _turnInView) setState(() => _turnInView = inView);
+  }
+
+  bool _onScreen(GlobalKey key) {
+    final card = key.currentContext?.findRenderObject();
+    final list = _listKey.currentContext?.findRenderObject();
+    if (card is! RenderBox || list is! RenderBox) return false;
+    if (!card.attached || !card.hasSize || !list.hasSize) return false;
+    final top = card.localToGlobal(Offset.zero, ancestor: list).dy;
+    final bottom = top + card.size.height;
+    // Most of it, not a sliver at an edge.
+    const margin = 32.0;
+    return bottom > margin && top < list.size.height - margin;
+  }
+
+  /// Scrolls to the game waiting on me. A card far away is not built yet, so
+  /// the list moves a screen at a time until it is, first towards the newest
+  /// messages and then towards the oldest.
+  Future<void> _goToTurn() async {
+    for (final older in [false, true]) {
+      for (var i = 0; i < 40; i++) {
+        if (_turnKey.currentContext != null || !_list.hasClients) break;
+        final p = _list.position;
+        final to = older
+            ? (p.pixels + p.viewportDimension).clamp(0.0, p.maxScrollExtent)
+            : (p.pixels - p.viewportDimension).clamp(0.0, p.maxScrollExtent);
+        if (to == p.pixels) break;
+        await _list.animateTo(to, duration: Motion.press, curve: Curves.linear);
+      }
+      if (_turnKey.currentContext != null) break;
+    }
+    final card = _turnKey.currentContext;
+    if (card == null || !card.mounted) return;
+    await Scrollable.ensureVisible(
+      card,
+      alignment: 0.5,
+      duration: Motion.page,
+      curve: Ease.emphasised,
     );
   }
 
@@ -1411,6 +1504,58 @@ class _PendingBubble extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// "Your turn in Worduel", frosted over the chat above the keyboard, while the
+/// game waiting on me is scrolled out of sight. A tap goes back to it.
+class _TurnPill extends StatelessWidget {
+  const _TurnPill({required this.title, required this.onTap});
+
+  final String title;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      semanticLabel: 'Your turn in $title. Go to it',
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(Radii.control),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.glass,
+              borderRadius: BorderRadius.circular(Radii.control),
+              border: Border.all(color: AppColors.glassEdge),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.casino_outlined,
+                  size: 16,
+                  color: AppColors.accent,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Your turn in $title',
+                  style: AppText.footnote.copyWith(color: AppColors.label),
+                ),
+                const SizedBox(width: 4),
+                const Icon(
+                  Icons.arrow_upward_rounded,
+                  size: 15,
+                  color: AppColors.label2,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

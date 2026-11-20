@@ -88,24 +88,39 @@ void main() {
         MaterialApp(home: Scaffold(body: SingleChildScrollView(child: child))),
       );
 
-  testWidgets('her game, my turn: one tap is my answer', (tester) async {
-    final m = Message.fromJson(message(game()));
-    List<int>? sent;
-    await pump(
-      tester,
+  Widget bubble(
+    Message m, {
+    String theirName = 'Priya',
+    bool expanded = false,
+    ValueChanged<List<int>>? onPicks,
+    ValueChanged<int>? onGuess,
+    ValueChanged<int>? onMove,
+    ValueChanged<String>? onText,
+    ValueChanged<String>? onWord,
+  }) =>
       GameBubble(
         message: m,
         game: m.game!,
         me: me,
-        theirName: 'Priya',
-        onPicks: (p) => sent = p,
-        onGuess: (_) {},
-        onText: (_) {},
-        onMove: (_) {},
-        onWord: (_) {},
-      ),
+        theirName: theirName,
+        expanded: expanded,
+        onPicks: onPicks ?? (_) {},
+        onGuess: onGuess ?? (_) {},
+        onText: onText ?? (_) {},
+        onMove: onMove ?? (_) {},
+        onWord: onWord ?? (_) {},
+      );
+
+  testWidgets('her game, my turn: the full question, and one tap answers',
+      (tester) async {
+    final m = Message.fromJson(message(game()));
+    List<int>? sent;
+    await pump(tester, bubble(m, onPicks: (p) => sent = p));
+    expect(find.text('Would you rather · your turn'), findsOneWidget);
+    expect(
+      find.text('A holiday in the hills or by the beach?'),
+      findsOneWidget,
     );
-    expect(find.textContaining('Pick yours to see theirs'), findsOneWidget);
     await tester.tap(find.text('Beach'));
     expect(sent, [1]);
   });
@@ -117,65 +132,37 @@ void main() {
     );
     await pump(
       tester,
-      GameBubble(
-        message: m,
-        game: m.game!,
-        me: me,
-        theirName: 'Priya',
-        onPicks: (_) => fail('the starter cannot answer'),
-        onGuess: (_) {},
-        onText: (_) {},
-        onMove: (_) {},
-        onWord: (_) {},
-      ),
+      bubble(m, onPicks: (_) => fail('the starter cannot answer')),
     );
-    expect(find.textContaining('hidden until Priya plays'), findsOneWidget);
+    expect(find.text('Would you rather · waiting for Priya'), findsOneWidget);
     await tester.tap(find.text('Beach'));
   });
 
-  testWidgets('answered: both picks, and whether they match', (tester) async {
+  testWidgets('answered: folds to one line, which opens the result',
+      (tester) async {
     final g = game(status: 'done', starterPicks: [1], replyPicks: [1]);
     final m = Message.fromJson(message(g, sender: me, event: 'answered'));
-    await pump(
-      tester,
-      GameBubble(
-        message: m,
-        game: m.game!,
-        me: me,
-        theirName: 'Priya',
-        onPicks: (_) {},
-        onGuess: (_) {},
-        onText: (_) {},
-        onMove: (_) {},
-        onWord: (_) {},
-      ),
+    await pump(tester, bubble(m));
+    expect(
+      find.text('Would you rather · you both said Beach'),
+      findsOneWidget,
     );
-    expect(find.text('You both said the same!'), findsOneWidget);
+    expect(find.text('Hills'), findsNothing);
+    await tester.tap(find.text('Would you rather · you both said Beach'));
+    await tester.pumpAndSettle();
     expect(find.text('Beach'), findsNWidgets(2));
+    expect(find.text('Priya'), findsOneWidget);
   });
 
-  testWidgets('once answered, the start is one line', (tester) async {
+  testWidgets('once answered, the start says nothing more', (tester) async {
     final g = game(status: 'done', starterPicks: [0], replyPicks: [1]);
     final m = Message.fromJson(message(g));
-    await pump(
-      tester,
-      GameBubble(
-        message: m,
-        game: m.game!,
-        me: me,
-        theirName: 'Priya',
-        onPicks: (_) {},
-        onGuess: (_) {},
-        onText: (_) {},
-        onMove: (_) {},
-        onWord: (_) {},
-      ),
-    );
-    expect(find.text('Priya started Would you rather'), findsOneWidget);
-    expect(find.text('Hills'), findsNothing);
+    await pump(tester, bubble(m));
+    expect(find.byType(Text), findsNothing);
   });
 
-  testWidgets('FLAMES shows the word the server sent', (tester) async {
+  testWidgets('FLAMES folds to its word, and opens to the names',
+      (tester) async {
     final g = game(
       kind: 'flames',
       status: 'done',
@@ -188,20 +175,9 @@ void main() {
       },
     );
     final m = Message.fromJson(message(g));
-    await pump(
-      tester,
-      GameBubble(
-        message: m,
-        game: m.game!,
-        me: me,
-        theirName: 'Meera',
-        onPicks: (_) {},
-        onGuess: (_) {},
-        onText: (_) {},
-        onMove: (_) {},
-        onWord: (_) {},
-      ),
-    );
+    await pump(tester, bubble(m, theirName: 'Meera'));
+    expect(find.text('Would you rather · Marriage'), findsOneWidget);
+    await pump(tester, bubble(m, theirName: 'Meera', expanded: true));
     expect(find.text('Marriage'), findsOneWidget);
     expect(find.text('Arjun  +  Meera'), findsOneWidget);
   });
@@ -216,25 +192,6 @@ void main() {
         'cards': <Object?>[],
         ...fields,
       };
-
-  Widget card(
-    Message m, {
-    ValueChanged<int>? onGuess,
-    ValueChanged<int>? onMove,
-    ValueChanged<String>? onText,
-    ValueChanged<String>? onWord,
-  }) =>
-      GameBubble(
-        message: m,
-        game: m.game!,
-        me: me,
-        theirName: 'Priya',
-        onPicks: (_) {},
-        onGuess: onGuess ?? (_) {},
-        onText: onText ?? (_) {},
-        onMove: onMove ?? (_) {},
-        onWord: onWord ?? (_) {},
-      );
 
   test('a board copy with more marks wins, and done beats both', () {
     final early =
@@ -255,14 +212,24 @@ void main() {
     expect(over.newer(later), same(over));
   });
 
+  test('whose turn it is: answering their game, or a move on mine', () {
+    final theirs = GameState.fromJson(v2({'game': 'truth'}));
+    expect(theirs.myTurn(me), isTrue);
+    expect(theirs.myTurn(her), isFalse);
+    final board = GameState.fromJson(v2({'game': 'tic_tac_toe', 'turn': her}));
+    expect(board.myTurn(me), isFalse);
+    expect(board.myTurn(her), isTrue);
+    final flames = GameState.fromJson(v2({'game': 'flames'}));
+    expect(flames.myTurn(me), isFalse);
+  });
+
   testWidgets('my turn on a board: an empty square is a move', (tester) async {
     final m = Message.fromJson(
       message(v2({'game': 'tic_tac_toe', 'board': 'x        ', 'turn': me})),
     );
     int? cell;
-    await pump(tester, card(m, onMove: (c) => cell = c));
-    expect(find.text('Your turn'), findsOneWidget);
-    expect(find.text('You are O'), findsOneWidget);
+    await pump(tester, bubble(m, onMove: (c) => cell = c));
+    expect(find.text('Game · your turn · you are O'), findsOneWidget);
     await tester.tap(find.bySemanticsLabel('Empty square 5'));
     expect(cell, 4);
   });
@@ -271,12 +238,15 @@ void main() {
     final m = Message.fromJson(
       message(v2({'game': 'tic_tac_toe', 'board': 'x   o    ', 'turn': her})),
     );
-    await pump(tester, card(m, onMove: (_) => fail('not my turn')));
-    expect(find.text('Waiting for Priya'), findsOneWidget);
+    await pump(tester, bubble(m, onMove: (_) => fail('not my turn')));
+    expect(
+      find.text('Game · waiting for Priya · you are O'),
+      findsOneWidget,
+    );
     await tester.tap(find.bySemanticsLabel('Empty square 2'));
   });
 
-  testWidgets('a board that is over says who won', (tester) async {
+  testWidgets('a board that is over folds to who won', (tester) async {
     final m = Message.fromJson(
       message(
         v2({
@@ -289,9 +259,9 @@ void main() {
         event: 'answered',
       ),
     );
-    await pump(tester, card(m));
+    await pump(tester, bubble(m));
     // She started, so she is x: she won.
-    expect(find.text('Priya won'), findsOneWidget);
+    expect(find.text('Game · Priya won'), findsOneWidget);
   });
 
   testWidgets('their film, my guess: four titles to tap', (tester) async {
@@ -315,12 +285,13 @@ void main() {
       ),
     );
     int? guess;
-    await pump(tester, card(m, onGuess: (g) => guess = g));
+    await pump(tester, bubble(m, onGuess: (g) => guess = g));
     await tester.tap(find.text('Dilwale Dulhania Le Jayenge'));
     expect(guess, 1);
   });
 
-  testWidgets('truth answered: both answers show', (tester) async {
+  testWidgets('truth answered: both answers show in the result',
+      (tester) async {
     final m = Message.fromJson(
       message(
         v2({
@@ -340,7 +311,9 @@ void main() {
         event: 'answered',
       ),
     );
-    await pump(tester, card(m));
+    await pump(tester, bubble(m));
+    expect(find.text('Game · both answered'), findsOneWidget);
+    await pump(tester, bubble(m, expanded: true));
     expect(find.text('Rajma chawal'), findsOneWidget);
     expect(find.text('Maggi'), findsOneWidget);
   });
@@ -354,8 +327,8 @@ void main() {
       'options': ['G', 'D'],
     });
     expect(const OwnCard(text: 'mango').toJson(), {'text': 'mango'});
-    final rapid =
-        const OwnCard(options: ['Jalebi', 'Rasgulla']).preview(GameKind.rapidFire);
+    final rapid = const OwnCard(options: ['Jalebi', 'Rasgulla'])
+        .preview(GameKind.rapidFire);
     expect(rapid.text, 'Jalebi or Rasgulla?');
     final never =
         const OwnCard(text: 'eaten pani puri').preview(GameKind.neverHaveIEver);
@@ -363,33 +336,26 @@ void main() {
     expect(never.own, isTrue);
   });
 
-  test('a card the server says is theirs reads as their own', () {
-    final g = GameState.fromJson(
-      v2({
+  Map<String, Object?> ownFilm(Map<String, Object?> fields) => v2({
         'game': 'guess_movie',
         'cards': [
           {'key': 'own_0', 'text': '🦁👑', 'options': <Object?>[], 'own': true},
         ],
-      }),
-    );
+        ...fields,
+      });
+
+  test('a card the server says is theirs reads as their own', () {
+    final g = GameState.fromJson(ownFilm({}));
     expect(g.cards.single.own, isTrue);
     expect(g.ownFilm, isTrue);
     expect(g.film, isNull);
   });
 
   testWidgets('their own film, my turn: I type its name', (tester) async {
-    final m = Message.fromJson(
-      message(
-        v2({
-          'game': 'guess_movie',
-          'cards': [
-            {'key': 'own_0', 'text': '🦁👑', 'options': <Object?>[], 'own': true},
-          ],
-        }),
-      ),
-    );
+    final m = Message.fromJson(message(ownFilm({})));
     String? typed;
-    await pump(tester, card(m, onText: (t) => typed = t));
+    await pump(tester, bubble(m, onText: (t) => typed = t));
+    expect(find.text('Game · Priya wrote this · your turn'), findsOneWidget);
     await tester.enterText(find.byType(TextField), '  The Lion King ');
     await tester.pump();
     await tester.tap(find.text('Guess'));
@@ -400,12 +366,8 @@ void main() {
       (tester) async {
     final m = Message.fromJson(
       message(
-        v2({
-          'game': 'guess_movie',
+        ownFilm({
           'status': 'done',
-          'cards': [
-            {'key': 'own_0', 'text': '🦁👑', 'options': <Object?>[], 'own': true},
-          ],
           'film': 'The Lion King',
           'reply_text': 'Jungle Book',
           'correct': false,
@@ -414,12 +376,18 @@ void main() {
         event: 'answered',
       ),
     );
-    await pump(tester, card(m));
-    expect(find.text('You said Jungle Book. It was The Lion King.'), findsOneWidget);
+    await pump(tester, bubble(m));
+    expect(find.text('Game · you missed the film'), findsOneWidget);
+    await pump(tester, bubble(m, expanded: true));
+    expect(
+      find.text('You said Jungle Book. It was The Lion King.'),
+      findsOneWidget,
+    );
   });
 
   Map<String, Object?> worduel(Map<String, Object?> fields) => v2({
         'game': 'worduel',
+        'title': 'Worduel',
         'guesses': [
           {'word': 'salty', 'marks': 'acaaa'},
         ],
@@ -427,18 +395,21 @@ void main() {
         ...fields,
       });
 
-  testWidgets('their Worduel, my turn: five letters make a guess',
+  testWidgets('their Worduel, my turn: letters go into the tiles',
       (tester) async {
     final m = Message.fromJson(message(worduel({})));
     String? sent;
-    await pump(tester, card(m, onWord: (w) => sent = w));
-    expect(find.text('Your turn. 5 tries left'), findsOneWidget);
+    await pump(tester, bubble(m, onWord: (w) => sent = w));
+    expect(find.text('Worduel · your turn'), findsOneWidget);
+    expect(find.text('●○○○○○'), findsOneWidget);
     expect(find.bySemanticsLabel('A, right place'), findsOneWidget);
     expect(find.bySemanticsLabel('S, not in it'), findsOneWidget);
+    expect(find.text('Tap the tiles to type'), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'mang');
     await tester.pump();
-    await tester.tap(find.text('Guess'));
-    expect(sent, isNull);
+    // The letters show in the row being typed, and there is no Guess yet.
+    expect(find.text('G'), findsOneWidget);
+    expect(find.text('Guess'), findsNothing);
     await tester.enterText(find.byType(TextField), 'MANGO');
     await tester.pump();
     await tester.tap(find.text('Guess'));
@@ -454,13 +425,19 @@ void main() {
         event: 'moved',
       ),
     );
-    await pump(tester, card(m, onWord: (_) => fail('the setter never guesses')));
-    expect(find.text('Priya is guessing your word'), findsOneWidget);
+    await pump(
+      tester,
+      bubble(m, onWord: (_) => fail('the setter never guesses')),
+    );
+    expect(
+      find.text('Worduel · Priya is guessing your word'),
+      findsOneWidget,
+    );
     expect(find.text('Your word: MANGO'), findsOneWidget);
     expect(find.byType(TextField), findsNothing);
   });
 
-  testWidgets('a Worduel that is over says how it went', (tester) async {
+  testWidgets('a Worduel that is over folds to how it went', (tester) async {
     final m = Message.fromJson(
       message(
         worduel({
@@ -477,8 +454,9 @@ void main() {
         event: 'answered',
       ),
     );
-    await pump(tester, card(m));
-    expect(find.text('You got it in 2!'), findsOneWidget);
+    await pump(tester, bubble(m));
+    expect(find.text('Worduel · you got it in 2'), findsOneWidget);
+    await pump(tester, bubble(m, expanded: true));
     expect(find.text('The word was MANGO'), findsOneWidget);
   });
 

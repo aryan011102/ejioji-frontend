@@ -249,6 +249,14 @@ class GameState {
 
   bool startedByMe(String me) => startedBy == me;
 
+  /// Waiting on [me]: their move on a board or in a Worduel, or their answer
+  /// to a game the other person started. Never FLAMES, which is not played.
+  bool myTurn(String me) {
+    final k = kind;
+    if (done || k == null || k == GameKind.flames) return false;
+    return k.live ? turn == me : startedBy != me;
+  }
+
   /// Guess the movie with the starter's own film, which is typed, not picked.
   bool get ownFilm =>
       kind == GameKind.guessMovie &&

@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/tokens.dart';
@@ -72,7 +74,10 @@ class GameIcon extends StatelessWidget {
   final GameKind? game;
   final double size;
 
-  IconData get _icon => switch (game) {
+  IconData get _icon => iconFor(game);
+
+  /// The bare mark, for the small line at the top of a game card.
+  static IconData iconFor(GameKind? game) => switch (game) {
         GameKind.wouldYouRather => Icons.alt_route_rounded,
         GameKind.rapidFire => Icons.bolt_rounded,
         GameKind.neverHaveIEver => Icons.front_hand_rounded,
@@ -217,6 +222,8 @@ class CardChoice extends StatelessWidget {
     required this.card,
     required this.picked,
     required this.onPick,
+    this.showText = true,
+    this.compact = false,
     super.key,
   });
 
@@ -224,21 +231,35 @@ class CardChoice extends StatelessWidget {
   final int? picked;
   final ValueChanged<int>? onPick;
 
+  /// False where the two answers already say it: rapid fire's "A or B?".
+  final bool showText;
+
+  /// On a card in the chat: smaller words, closer together.
+  final bool compact;
+
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(card.text, style: AppText.body),
-        const SizedBox(height: 8),
+        if (showText) ...[
+          Text(
+            card.text,
+            style: compact
+                ? AppText.callout.copyWith(color: AppColors.label)
+                : AppText.body,
+          ),
+          SizedBox(height: compact ? 6 : 8),
+        ],
         Row(
           children: [
             for (var o = 0; o < card.options.length; o++) ...[
-              if (o > 0) const SizedBox(width: 8),
+              if (o > 0) SizedBox(width: compact ? 6 : 8),
               Expanded(
                 child: ChoicePill(
                   label: card.options[o],
                   lit: picked == o,
+                  compact: compact,
                   onTap: onPick == null ? null : () => onPick!(o),
                 ),
               ),
@@ -255,6 +276,7 @@ class ChoicePill extends StatelessWidget {
     required this.label,
     required this.lit,
     this.onTap,
+    this.compact = false,
     super.key,
   });
 
@@ -262,13 +284,16 @@ class ChoicePill extends StatelessWidget {
   final bool lit;
   final VoidCallback? onTap;
 
+  /// On a card in the chat: a smaller word on a lower pill.
+  final bool compact;
+
   @override
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
       semanticLabel: label,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        padding: EdgeInsets.symmetric(horizontal: 10, vertical: compact ? 8 : 10),
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: lit ? AppColors.fill : AppColors.fill2,
@@ -278,7 +303,7 @@ class ChoicePill extends StatelessWidget {
         child: Text(
           label,
           textAlign: TextAlign.center,
-          style: AppText.callout.copyWith(
+          style: (compact ? AppText.footnote : AppText.callout).copyWith(
             color: lit ? AppColors.onAccent : AppColors.label,
           ),
         ),
@@ -976,32 +1001,51 @@ class _WorduelStartState extends State<_WorduelStart> {
 bool worduelWordReady(String word) =>
     word.length == Worduel.letters && RegExp(r'^[a-z]+$').hasMatch(word);
 
-/// A Worduel's guesses as rows of letter tiles, with an empty row for each
-/// try left. A letter in the right place is green; one in the word but
-/// elsewhere is yellow; one not in it is grey.
+/// A Worduel's guesses as rows of letter tiles. A letter in the right place is
+/// green; one in the word but elsewhere is yellow; one not in it is grey.
+///
+/// [typing] adds the row being typed, its letters so far outlined. With
+/// [showEmpty], an empty row stands for each try left; on a card in the chat
+/// only the rows played show, so a new game is one row, not six.
 class WorduelGrid extends StatelessWidget {
-  const WorduelGrid({required this.guesses, this.showEmpty = true, super.key});
+  const WorduelGrid({
+    required this.guesses,
+    this.showEmpty = true,
+    this.typing,
+    this.tile = 38,
+    super.key,
+  });
 
   final List<WorduelGuess> guesses;
   final bool showEmpty;
+  final String? typing;
+  final double tile;
 
-  static const _tile = 38.0;
+  double get _radius => tile * 0.2;
 
   @override
   Widget build(BuildContext context) {
-    final rows = showEmpty ? Worduel.tries : guesses.length;
+    final played = guesses.length;
+    final rows = showEmpty
+        ? Worduel.tries
+        : played + (typing != null && played < Worduel.tries ? 1 : 0);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         for (var r = 0; r < rows; r++)
           Padding(
-            padding: const EdgeInsets.only(bottom: 4),
+            padding: EdgeInsets.only(bottom: r == rows - 1 ? 0 : 4),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 for (var c = 0; c < Worduel.letters; c++) ...[
                   if (c > 0) const SizedBox(width: 4),
-                  r < guesses.length ? _letter(guesses[r], c) : _empty(),
+                  if (r < played)
+                    _letter(guesses[r], c)
+                  else if (r == played && typing != null)
+                    _typed(c < typing!.length ? typing![c] : null)
+                  else
+                    _empty(),
                 ],
               ],
             ),
@@ -1011,11 +1055,27 @@ class WorduelGrid extends StatelessWidget {
   }
 
   Widget _empty() => Container(
-        width: _tile,
-        height: _tile,
+        width: tile,
+        height: tile,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(Radii.chip),
+          borderRadius: BorderRadius.circular(_radius),
           border: Border.all(color: AppColors.hairline),
+        ),
+      );
+
+  Widget _typed(String? letter) => Container(
+        width: tile,
+        height: tile,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(_radius),
+          border: Border.all(
+            color: letter == null ? AppColors.label4 : AppColors.accent,
+          ),
+        ),
+        child: Text(
+          letter?.toUpperCase() ?? '',
+          style: AppText.bodyStrong.copyWith(color: AppColors.label),
         ),
       );
 
@@ -1031,12 +1091,12 @@ class WorduelGrid extends StatelessWidget {
       label: '$letter, $said',
       excludeSemantics: true,
       child: Container(
-        width: _tile,
-        height: _tile,
+        width: tile,
+        height: tile,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: bg,
-          borderRadius: BorderRadius.circular(Radii.chip),
+          borderRadius: BorderRadius.circular(_radius),
         ),
         child: Text(
           letter,
@@ -1126,13 +1186,13 @@ class TicTacToeBoard extends StatelessWidget {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: lit ? AppColors.fill : AppColors.fill2,
-          borderRadius: BorderRadius.circular(Radii.row),
+          borderRadius: BorderRadius.circular(size < 180 ? 8 : Radii.row),
           border:
               Border.all(color: open ? AppColors.accent : AppColors.hairline),
         ),
         child: Text(
           mark == ' ' ? '' : mark.toUpperCase(),
-          style: AppText.title1.copyWith(
+          style: (size < 180 ? AppText.title3 : AppText.title1).copyWith(
             color: lit
                 ? AppColors.onAccent
                 : mark == 'x'
@@ -1143,4 +1203,63 @@ class TicTacToeBoard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A finished game, opened from its line in the chat: frosted glass over the
+/// conversation, as the tab bar is, so it reads as a look at the result rather
+/// than a new screen. Swipe down to go back.
+Future<void> showGameResultSheet(
+  BuildContext context, {
+  required Widget child,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: const Color(0x00000000),
+    barrierColor: AppColors.scrimLight,
+    isScrollControlled: true,
+    builder: (sheetContext) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(Radii.card),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppColors.glass,
+                borderRadius: BorderRadius.circular(Radii.card),
+                border: Border.all(color: AppColors.glassEdge),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 36,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: AppColors.label4,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.7,
+                      ),
+                      child: SingleChildScrollView(child: child),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }

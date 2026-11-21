@@ -864,6 +864,13 @@ class _WorduelStartState extends State<_WorduelStart> {
   bool _dealing = false;
 
   @override
+  void initState() {
+    super.initState();
+    // What is typed decides Send and which suggestion is lit.
+    _typed.addListener(() => setState(() {}));
+  }
+
+  @override
   void dispose() {
     _typed.dispose();
     super.dispose();
@@ -913,39 +920,10 @@ class _WorduelStartState extends State<_WorduelStart> {
             ),
             const SizedBox(height: 14),
             Center(
-              child: Stack(
-                children: [
-                  WorduelGrid(
-                    guesses: const [],
-                    showEmpty: false,
-                    typing: _word,
-                    tile: 44,
-                  ),
-                  // The keyboard's field, unseen: what is typed shows in the
-                  // tiles.
-                  Positioned.fill(
-                    child: Opacity(
-                      opacity: 0,
-                      child: TextField(
-                        controller: _typed,
-                        autofocus: true,
-                        maxLength: Worduel.letters,
-                        autocorrect: false,
-                        enableSuggestions: false,
-                        showCursor: false,
-                        textCapitalization: TextCapitalization.characters,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp('[a-zA-Z]')),
-                        ],
-                        onChanged: (_) => setState(() {}),
-                        decoration: const InputDecoration(
-                          counterText: '',
-                          border: InputBorder.none,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+              child: WorduelTyping(
+                controller: _typed,
+                tile: 44,
+                autofocus: true,
               ),
             ),
             const SizedBox(height: 12),
@@ -1142,10 +1120,132 @@ class WorduelWord extends StatelessWidget {
 bool worduelWordReady(String word) =>
     word.length == Worduel.letters && RegExp(r'^[a-z]+$').hasMatch(word);
 
+/// Tiles a Worduel word is typed into: any [guesses] above, then the row being
+/// typed, its next tile marked like a cursor. A tap anywhere on them gives a
+/// light tap of haptics and brings up the keyboard; each letter typed gives
+/// another. The keyboard's own field is there but unseen.
+class WorduelTyping extends StatefulWidget {
+  const WorduelTyping({
+    required this.controller,
+    this.guesses = const [],
+    this.tile = 30,
+    this.autofocus = false,
+    this.onSubmitted,
+    super.key,
+  });
+
+  final TextEditingController controller;
+  final List<WorduelGuess> guesses;
+  final double tile;
+  final bool autofocus;
+  final ValueChanged<String>? onSubmitted;
+
+  @override
+  State<WorduelTyping> createState() => _WorduelTypingState();
+}
+
+class _WorduelTypingState extends State<WorduelTyping> {
+  final _focus = FocusNode();
+  late int _length = widget.controller.text.length;
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(_redraw);
+    widget.controller.addListener(_typed);
+    if (widget.autofocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focus.requestFocus();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_typed);
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _redraw() => setState(() {});
+
+  void _typed() {
+    final length = widget.controller.text.length;
+    if (length > _length) HapticFeedback.selectionClick();
+    _length = length;
+    _redraw();
+  }
+
+  void _open() {
+    HapticFeedback.lightImpact();
+    _focus.requestFocus();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final typed = widget.controller.text.trim().toLowerCase();
+    return Stack(
+      children: [
+        // Each tile reads out on its own.
+        WorduelGrid(
+          guesses: widget.guesses,
+          showEmpty: false,
+          typing: typed,
+          focused: _focus.hasFocus,
+          tile: widget.tile,
+        ),
+        // The keyboard's field, unseen: what is typed shows in the tiles.
+        Positioned.fill(
+          child: IgnorePointer(
+            child: Opacity(
+              opacity: 0,
+              child: TextField(
+                controller: widget.controller,
+                focusNode: _focus,
+                maxLength: Worduel.letters,
+                autocorrect: false,
+                enableSuggestions: false,
+                showCursor: false,
+                textCapitalization: TextCapitalization.characters,
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp('[a-zA-Z]')),
+                ],
+                onSubmitted: widget.onSubmitted,
+                decoration: const InputDecoration(
+                  counterText: '',
+                  border: InputBorder.none,
+                ),
+              ),
+            ),
+          ),
+        ),
+        // Over the tiles, a tap anywhere opens the keyboard. Its own node, so
+        // the tiles under it keep theirs.
+        Positioned.fill(
+          child: Semantics(
+            container: true,
+            button: true,
+            label: 'Type your word, ${typed.length} of '
+                '${Worduel.letters} letters',
+            onTap: _open,
+            excludeSemantics: true,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _open,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// A Worduel's guesses as rows of letter tiles. A letter in the right place is
 /// green; one in the word but elsewhere is yellow; one not in it is grey.
 ///
-/// [typing] adds the row being typed, its letters so far outlined. With
+/// [typing] adds the row being typed, its letters so far outlined, and the
+/// next tile to fill marked like a cursor so it reads as somewhere to type:
+/// outlined in pink, more strongly while the keyboard is up ([focused]). With
 /// [showEmpty], an empty row stands for each try left; on a card in the chat
 /// only the rows played show, so a new game is one row, not six.
 class WorduelGrid extends StatelessWidget {
@@ -1153,6 +1253,7 @@ class WorduelGrid extends StatelessWidget {
     required this.guesses,
     this.showEmpty = true,
     this.typing,
+    this.focused = false,
     this.tile = 38,
     super.key,
   });
@@ -1160,6 +1261,7 @@ class WorduelGrid extends StatelessWidget {
   final List<WorduelGuess> guesses;
   final bool showEmpty;
   final String? typing;
+  final bool focused;
   final double tile;
 
   double get _radius => tile * 0.2;
@@ -1184,7 +1286,10 @@ class WorduelGrid extends StatelessWidget {
                   if (r < played)
                     _letter(guesses[r], c)
                   else if (r == played && typing != null)
-                    _typed(c < typing!.length ? typing![c] : null)
+                    _typed(
+                      c < typing!.length ? typing![c] : null,
+                      next: c == typing!.length,
+                    )
                   else
                     _empty(),
                 ],
@@ -1204,14 +1309,17 @@ class WorduelGrid extends StatelessWidget {
         ),
       );
 
-  Widget _typed(String? letter) => Container(
+  Widget _typed(String? letter, {required bool next}) => AnimatedContainer(
+        duration: Motion.press,
         width: tile,
         height: tile,
         alignment: Alignment.center,
         decoration: BoxDecoration(
+          color: next && focused ? AppColors.fill2 : null,
           borderRadius: BorderRadius.circular(_radius),
           border: Border.all(
-            color: letter == null ? AppColors.label4 : AppColors.accent,
+            color: letter != null || next ? AppColors.accent : AppColors.label4,
+            width: next ? (focused ? 2.5 : 1.5) : 1,
           ),
         ),
         child: Text(

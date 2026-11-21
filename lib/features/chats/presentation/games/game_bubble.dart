@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../../core/theme/tokens.dart';
 import '../../../../core/theme/typography.dart';
@@ -104,6 +103,8 @@ class _GameBubbleState extends State<GameBubble>
   @override
   void initState() {
     super.initState();
+    // What is typed decides whether Guess shows.
+    _typed.addListener(() => setState(() {}));
     _maybeReveal();
   }
 
@@ -1120,12 +1121,6 @@ class _GameBubbleState extends State<GameBubble>
     if (game.done) return _worduelResult(game);
     final myTurn = _myMove(game);
     final typed = _typed.text.trim().toLowerCase();
-    final grid = WorduelGrid(
-      guesses: game.guesses,
-      showEmpty: false,
-      typing: myTurn ? typed : null,
-      tile: 30,
-    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1138,42 +1133,21 @@ class _GameBubbleState extends State<GameBubble>
         else
           Center(
             child: myTurn
-                ? Stack(
-                    children: [
-                      grid,
-                      // The keyboard's field, unseen: what is typed shows in
-                      // the tiles.
-                      Positioned.fill(
-                        child: Opacity(
-                          opacity: 0,
-                          child: TextField(
-                            controller: _typed,
-                            maxLength: Worduel.letters,
-                            autocorrect: false,
-                            enableSuggestions: false,
-                            showCursor: false,
-                            textCapitalization: TextCapitalization.characters,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.allow(
-                                RegExp('[a-zA-Z]'),
-                              ),
-                            ],
-                            onChanged: (_) => setState(() {}),
-                            onSubmitted: (_) {
-                              if (worduelWordReady(typed) && !widget.busy) {
-                                widget.onWord(typed);
-                              }
-                            },
-                            decoration: const InputDecoration(
-                              counterText: '',
-                              border: InputBorder.none,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                ? WorduelTyping(
+                    controller: _typed,
+                    guesses: game.guesses,
+                    onSubmitted: (_) {
+                      final word = _typed.text.trim().toLowerCase();
+                      if (worduelWordReady(word) && !widget.busy) {
+                        widget.onWord(word);
+                      }
+                    },
                   )
-                : grid,
+                : WorduelGrid(
+                    guesses: game.guesses,
+                    showEmpty: false,
+                    tile: 30,
+                  ),
           ),
         if (myTurn) ...[
           const SizedBox(height: 8),

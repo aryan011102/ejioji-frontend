@@ -618,6 +618,19 @@ void main() {
 
   // Results: open while nothing has been said after them, and a reveal.
 
+  testWidgets('their Worduel: a tap on the tiles brings up the keyboard',
+      (tester) async {
+    final m = Message.fromJson(message(worduel({})));
+    await pump(tester, bubble(m));
+    expect(tester.testTextInput.isVisible, isFalse);
+    await tester.tap(find.bySemanticsLabel(RegExp('^Type your word')));
+    await tester.pump();
+    expect(tester.testTextInput.isVisible, isTrue);
+    await tester.enterText(find.byType(TextField), 'ma');
+    await tester.pump();
+    expect(find.text('M'), findsOneWidget);
+  });
+
   test('FLAMES crosses out in the order the server counts', () {
     // The server's worked example (test_chat_games.py): a count of 5 crosses
     // out E, M, S, L, A and leaves F.

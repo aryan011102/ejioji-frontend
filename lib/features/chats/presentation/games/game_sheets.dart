@@ -1,6 +1,7 @@
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../core/theme/tokens.dart';
 import '../../../../core/theme/typography.dart';
@@ -824,45 +825,79 @@ class _OwnCardState extends State<_OwnCard> {
 
 // Worduel.
 
-/// Worduel, for the setter: one of the words dealt, or their own. Returns the
-/// word's key or an [OwnCard] holding their word. Null if they back out.
+/// Worduel, for the setter: the word is the tiles. Type one, any real word in
+/// English or Hinglish, or tap a suggestion to fill them; [more] deals other
+/// suggestions. Returns the suggestion's key, or an [OwnCard] holding a typed
+/// word. Null if they back out.
 Future<Object?> showWorduelStartSheet(
   BuildContext context, {
   required List<GameCard> words,
+  required String theirName,
+  Future<List<GameCard>> Function()? more,
 }) {
   return showAppSheet<Object>(
     context,
-    builder: (_) => _WorduelStart(words: words),
+    builder: (_) =>
+        _WorduelStart(words: words, theirName: theirName, more: more),
   );
 }
 
 class _WorduelStart extends StatefulWidget {
-  const _WorduelStart({required this.words});
+  const _WorduelStart({
+    required this.words,
+    required this.theirName,
+    this.more,
+  });
 
   final List<GameCard> words;
+  final String theirName;
+  final Future<List<GameCard>> Function()? more;
 
   @override
   State<_WorduelStart> createState() => _WorduelStartState();
 }
 
 class _WorduelStartState extends State<_WorduelStart> {
-  final _own = TextEditingController();
-
-  /// The word picked from those dealt, by key. Writing your own clears it.
-  String? _picked;
+  final _typed = TextEditingController();
+  late List<GameCard> _words = widget.words;
+  bool _dealing = false;
 
   @override
   void dispose() {
-    _own.dispose();
+    _typed.dispose();
     super.dispose();
   }
 
-  String get _word => _own.text.trim().toLowerCase();
-  bool get _ownReady => worduelWordReady(_word);
+  String get _word => _typed.text.trim().toLowerCase();
+
+  /// The suggestion the tiles hold, if they hold one exactly.
+  GameCard? get _suggested =>
+      _words.where((w) => w.text.toLowerCase() == _word).firstOrNull;
+
+  void _fill(GameCard word) {
+    final text = word.text.toUpperCase();
+    _typed.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+    setState(() {});
+  }
+
+  Future<void> _dealMore() async {
+    final more = widget.more;
+    if (more == null || _dealing) return;
+    setState(() => _dealing = true);
+    try {
+      final words = await more();
+      if (mounted && words.isNotEmpty) setState(() => _words = words);
+    } finally {
+      if (mounted) setState(() => _dealing = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final ready = _picked != null || _ownReady;
+    final ready = worduelWordReady(_word);
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: SingleChildScrollView(
@@ -870,68 +905,220 @@ class _WorduelStartState extends State<_WorduelStart> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                const GameIcon(game: GameKind.worduel, size: 30),
-                const SizedBox(width: 10),
-                Text(GameKind.worduel.title, style: AppText.title3),
-              ],
-            ),
-            const SizedBox(height: 4),
             Text(
-              'Pick a word for them to guess, or set your own. They get '
-              '${Worduel.tries} tries, and see which letters are right.',
-              style: AppText.footnote.copyWith(color: AppColors.label2),
+              'Set a word for ${widget.theirName}',
+              textAlign: TextAlign.center,
+              style: AppText.bodyStrong,
             ),
             const SizedBox(height: 14),
-            Row(
-              children: [
-                for (var i = 0; i < widget.words.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 8),
-                  Expanded(
-                    child: ChoicePill(
-                      label: widget.words[i].text.toUpperCase(),
-                      lit: _picked == widget.words[i].key,
-                      onTap: () => setState(() {
-                        _picked = widget.words[i].key;
-                        _own.clear();
-                      }),
+            Center(
+              child: Stack(
+                children: [
+                  WorduelGrid(
+                    guesses: const [],
+                    showEmpty: false,
+                    typing: _word,
+                    tile: 44,
+                  ),
+                  // The keyboard's field, unseen: what is typed shows in the
+                  // tiles.
+                  Positioned.fill(
+                    child: Opacity(
+                      opacity: 0,
+                      child: TextField(
+                        controller: _typed,
+                        autofocus: true,
+                        maxLength: Worduel.letters,
+                        autocorrect: false,
+                        enableSuggestions: false,
+                        showCursor: false,
+                        textCapitalization: TextCapitalization.characters,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp('[a-zA-Z]')),
+                        ],
+                        onChanged: (_) => setState(() {}),
+                        decoration: const InputDecoration(
+                          counterText: '',
+                          border: InputBorder.none,
+                        ),
+                      ),
                     ),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                Text('or', style: AppText.caption),
+                for (final w in _words)
+                  Pressable(
+                    onTap: () => _fill(w),
+                    semanticLabel: 'Use ${w.text}',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _suggested == w
+                            ? AppColors.fill
+                            : AppColors.fill2,
+                        borderRadius: BorderRadius.circular(Radii.chip),
+                        border: Border.all(color: AppColors.hairline),
+                      ),
+                      child: Text(
+                        w.text.toUpperCase(),
+                        style: AppText.footnote.copyWith(
+                          color: _suggested == w
+                              ? AppColors.onAccent
+                              : AppColors.accent,
+                        ),
+                      ),
+                    ),
+                  ),
+                if (widget.more != null)
+                  Pressable(
+                    onTap: _dealing ? null : _dealMore,
+                    semanticLabel: 'Other words',
+                    child: const Padding(
+                      padding: EdgeInsets.all(4),
+                      child: Icon(
+                        Icons.refresh_rounded,
+                        size: 18,
+                        color: AppColors.label2,
+                      ),
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 14),
-            Text(
-              'Or your own: any real word, English or Hinglish',
-              style: AppText.footnote,
-            ),
-            const SizedBox(height: 6),
-            _GameField(
-              controller: _own,
-              hint: 'Five letters',
-              maxChars: Worduel.letters,
-              capitals: TextCapitalization.characters,
-              onChanged: (_) => setState(() {
-                if (_own.text.isNotEmpty) _picked = null;
-              }),
-            ),
-            if (_word.isNotEmpty && !_ownReady)
-              Text(
-                'Use ${Worduel.letters} letters, A to Z.',
-                style: AppText.micro.copyWith(color: AppColors.label2),
-              ),
-            const SizedBox(height: 12),
             PrimaryButton(
               label: 'Send',
               onPressed: !ready
                   ? null
                   : () => Navigator.of(context).pop(
-                        _picked ?? OwnCard(text: _word),
+                        _suggested?.key ?? OwnCard(text: _word),
                       ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// A Worduel row as colour squares only, no letters: a guess as it reads in a
+/// shared result.
+class WorduelMarks extends StatelessWidget {
+  const WorduelMarks({required this.marks, this.size = 11, super.key});
+
+  final String marks;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < marks.length; i++) ...[
+          if (i > 0) SizedBox(width: size * 0.2),
+          Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              color: switch (marks[i]) {
+                'c' => AppColors.letterRight,
+                'p' => AppColors.letterElsewhere,
+                _ => AppColors.letterAbsent,
+              },
+              borderRadius: BorderRadius.circular(size * 0.2),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Every guess of a Worduel as colour squares, oldest first: how close they
+/// got, without the letters.
+class WorduelPath extends StatelessWidget {
+  const WorduelPath({required this.guesses, this.size = 11, super.key});
+
+  final List<WorduelGuess> guesses;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final right = [
+      for (final g in guesses) 'c'.allMatches(g.marks).length,
+    ];
+    return Semantics(
+      label: [
+        for (var i = 0; i < guesses.length; i++)
+          'Guess ${i + 1}: ${right[i]} in the right place',
+      ].join('. '),
+      excludeSemantics: true,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < guesses.length; i++) ...[
+            if (i > 0) SizedBox(height: size * 0.2),
+            WorduelMarks(marks: guesses[i].marks, size: size),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// A word in letter tiles, all one colour: the setter's word, or the answer.
+class WorduelWord extends StatelessWidget {
+  const WorduelWord({
+    required this.word,
+    this.tile = 18,
+    this.color = AppColors.letterAbsent,
+    super.key,
+  });
+
+  final String word;
+  final double tile;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'The word: ${word.toUpperCase()}',
+      excludeSemantics: true,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < word.length; i++) ...[
+            if (i > 0) SizedBox(width: tile * 0.15),
+            Container(
+              width: tile,
+              height: tile,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(tile * 0.2),
+              ),
+              child: Text(
+                word[i].toUpperCase(),
+                style: AppText.bodyStrong.copyWith(
+                  color: AppColors.onAccent,
+                  fontSize: tile * 0.5,
+                  height: 1,
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

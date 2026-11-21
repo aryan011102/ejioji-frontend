@@ -530,10 +530,12 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
     await _playGame();
   }
 
-  Future<void> _playGame() async {
+  /// Starts a game: the one picked from the games list, or [only] without the
+  /// list (a finished Worduel's "Send a new word").
+  Future<void> _playGame({GameKind? only}) async {
     if (_ended || _gameBusy) return;
     if (_mustVerify) return _askToVerify();
-    final game = await showGamesSheet(context);
+    final game = only ?? await showGamesSheet(context);
     if (game == null || !mounted) return;
     final repo = ref.read(chatRepositoryProvider);
     final clientId = Ids.uuid();
@@ -601,7 +603,12 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
           // Ask again while their own word is not one the server knows.
           while (true) {
             if (!mounted) return;
-            final word = await showWorduelStartSheet(context, words: words);
+            final word = await showWorduelStartSheet(
+              context,
+              words: words,
+              theirName: _person?.firstName ?? 'them',
+              more: () => repo.dealGame(_matchId, game),
+            );
             if (word == null || !mounted) return;
             try {
               final message = await repo.startGame(
@@ -1032,6 +1039,9 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
               onText: (text) => unawaited(_answerGame(game, text: text)),
               onMove: (cell) => unawaited(_moveGame(game, cell: cell)),
               onWord: (word) => unawaited(_moveGame(game, word: word)),
+              onNewWord: game.kind == GameKind.worduel
+                  ? () => unawaited(_playGame(only: GameKind.worduel))
+                  : null,
             )
           : _Bubble(
               message: m,

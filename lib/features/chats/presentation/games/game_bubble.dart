@@ -35,6 +35,7 @@ class GameBubble extends StatefulWidget {
     required this.onWord,
     this.busy = false,
     this.expanded = false,
+    this.onNewWord,
     super.key,
   });
 
@@ -47,6 +48,10 @@ class GameBubble extends StatefulWidget {
   /// In the result sheet: the whole game, never folded, and no card around it
   /// since the sheet is one.
   final bool expanded;
+
+  /// A finished Worduel: set a new word for the other person. The result
+  /// sheet offers it; null, it is not offered.
+  final VoidCallback? onNewWord;
 
   /// Their game, my turn: my pick on each card.
   final ValueChanged<List<int>> onPicks;
@@ -98,6 +103,12 @@ class _GameBubbleState extends State<GameBubble> {
   @override
   Widget build(BuildContext context) {
     final game = _game;
+    if (game.kind == GameKind.worduel &&
+        _startedByMe &&
+        !game.done &&
+        !widget.expanded) {
+      return _setterLine(game);
+    }
     if (game.done && !widget.expanded) {
       // The result folds to one line where it ended. The start above it has
       // nothing left to say.
@@ -245,6 +256,61 @@ class _GameBubbleState extends State<GameBubble> {
   static String _tries(int used) =>
       '${'●' * used}${'○' * (Worduel.tries - used)}';
 
+  /// My Worduel while they guess: one small line. My word in tiles until they
+  /// guess; then their guesses as colour squares, which show how close they
+  /// are without spelling out what they tried.
+  Widget _setterLine(GameState game) {
+    final tried = game.guesses.length;
+    final close =
+        tried > 0 && 'c'.allMatches(game.guesses.last.marks).length >= 3;
+    final word = (game.word ?? '').toUpperCase();
+    final headline = tried == 0
+        ? 'Worduel sent to $_name'
+        : close
+            ? '$_name is close'
+            : '$_name is guessing';
+    final sub = tried == 0
+        ? '${Worduel.tries} tries'
+        : '$tried of ${Worduel.tries} · $word';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Align(
+        alignment: _mine ? Alignment.centerRight : Alignment.centerLeft,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(10, 8, 12, 8),
+          decoration: BoxDecoration(
+            color: AppColors.row,
+            borderRadius: BorderRadius.circular(Radii.card),
+            border: Border.all(
+              color: _mine ? AppColors.fill : AppColors.bubbleThemEdge,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (tried == 0)
+                WorduelWord(word: word)
+              else
+                WorduelPath(guesses: game.guesses),
+              const SizedBox(width: 10),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    headline,
+                    style: AppText.footnote.copyWith(color: AppColors.label),
+                  ),
+                  Text(sub, style: AppText.caption),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// A finished game: one line, which opens the whole of it.
   Widget _folded(GameState game) {
     final line = '${game.title} · ${_summary(game)}';
@@ -261,6 +327,7 @@ class _GameBubbleState extends State<GameBubble> {
               me: widget.me,
               theirName: widget.theirName,
               expanded: true,
+              onNewWord: widget.onNewWord,
               onPicks: (_) {},
               onGuess: (_) {},
               onText: (_) {},
@@ -285,11 +352,15 @@ class _GameBubbleState extends State<GameBubble> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    GameIcon.iconFor(game.kind),
-                    size: 14,
-                    color: AppColors.accent,
-                  ),
+                  // A Worduel shows how its last guess went, as squares.
+                  if (game.kind == GameKind.worduel && game.guesses.isNotEmpty)
+                    WorduelMarks(marks: game.guesses.last.marks, size: 10)
+                  else
+                    Icon(
+                      GameIcon.iconFor(game.kind),
+                      size: 14,
+                      color: AppColors.accent,
+                    ),
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text(
@@ -794,10 +865,12 @@ class _GameBubbleState extends State<GameBubble> {
 
   /// The rows played so far and, on my turn, the row I am typing: the letters
   /// go straight into the tiles. Tapping the grid brings up the keyboard.
+  /// Once over (in the result sheet): the word, the path to it in colour, and
+  /// a new word to send back.
   Widget _worduel(GameState game) {
+    if (game.done) return _worduelResult(game);
     final myTurn = _myMove(game);
     final typed = _typed.text.trim().toLowerCase();
-    final word = game.word;
     final grid = WorduelGrid(
       guesses: game.guesses,
       showEmpty: false,
@@ -853,16 +926,6 @@ class _GameBubbleState extends State<GameBubble> {
                   )
                 : grid,
           ),
-        if (word != null) ...[
-          const SizedBox(height: 6),
-          Text(
-            game.done
-                ? 'The word was ${word.toUpperCase()}'
-                : 'Your word: ${word.toUpperCase()}',
-            textAlign: TextAlign.center,
-            style: AppText.caption.copyWith(color: AppColors.label2),
-          ),
-        ],
         if (myTurn) ...[
           const SizedBox(height: 8),
           if (worduelWordReady(typed))
@@ -881,6 +944,40 @@ class _GameBubbleState extends State<GameBubble> {
               textAlign: TextAlign.center,
               style: AppText.caption,
             ),
+        ],
+      ],
+    );
+  }
+
+  Widget _worduelResult(GameState game) {
+    final newWord = widget.onNewWord;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Center(
+          child: WorduelWord(
+            word: game.word ?? '',
+            tile: 30,
+            color: game.correct == true
+                ? AppColors.letterRight
+                : AppColors.letterAbsent,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Center(child: WorduelPath(guesses: game.guesses, size: 14)),
+        if (newWord != null) ...[
+          const SizedBox(height: 14),
+          Center(
+            child: IntrinsicWidth(
+              child: MiniButton(
+                label: 'Send a new word',
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  newWord();
+                },
+              ),
+            ),
+          ),
         ],
       ],
     );

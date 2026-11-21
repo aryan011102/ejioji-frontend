@@ -417,11 +417,37 @@ void main() {
     expect(sent, 'mango');
   });
 
-  testWidgets('my Worduel, their turn: my word shows and nothing is typed',
+  testWidgets('my Worduel, sent: one line with my word', (tester) async {
+    final m = Message.fromJson(
+      message(
+        worduel({
+          'started_by': me,
+          'turn': her,
+          'word': 'mango',
+          'guesses': <Object?>[],
+        }),
+        sender: me,
+      ),
+    );
+    await pump(tester, bubble(m));
+    expect(find.text('Worduel sent to Priya'), findsOneWidget);
+    expect(find.text('6 tries'), findsOneWidget);
+    expect(find.bySemanticsLabel('The word: MANGO'), findsOneWidget);
+  });
+
+  testWidgets('my Worduel, their turn: their rows as colour, nothing typed',
       (tester) async {
     final m = Message.fromJson(
       message(
-        worduel({'started_by': me, 'turn': her, 'word': 'mango'}),
+        worduel({
+          'started_by': me,
+          'turn': her,
+          'word': 'mango',
+          'guesses': [
+            {'word': 'salty', 'marks': 'acaaa'},
+            {'word': 'macro', 'marks': 'ccaac'},
+          ],
+        }),
         sender: her,
         event: 'moved',
       ),
@@ -430,35 +456,123 @@ void main() {
       tester,
       bubble(m, onWord: (_) => fail('the setter never guesses')),
     );
+    expect(find.text('Priya is close'), findsOneWidget);
+    expect(find.text('2 of 6 · MANGO'), findsOneWidget);
+    // Her guesses as colour only: their letters are not shown to me here.
+    expect(find.text('SALTY'), findsNothing);
+    expect(find.text('S'), findsNothing);
     expect(
-      find.text('Worduel · Priya is guessing your word'),
+      find.bySemanticsLabel(
+        'Guess 1: 1 in the right place. Guess 2: 3 in the right place',
+      ),
       findsOneWidget,
     );
-    expect(find.text('Your word: MANGO'), findsOneWidget);
     expect(find.byType(TextField), findsNothing);
   });
 
+  Message finished() => Message.fromJson(
+        message(
+          worduel({
+            'status': 'done',
+            'turn': null,
+            'word': 'mango',
+            'correct': true,
+            'guesses': [
+              {'word': 'salty', 'marks': 'acaaa'},
+              {'word': 'mango', 'marks': 'ccccc'},
+            ],
+          }),
+          sender: me,
+          event: 'answered',
+        ),
+      );
+
   testWidgets('a Worduel that is over folds to how it went', (tester) async {
-    final m = Message.fromJson(
-      message(
-        worduel({
-          'status': 'done',
-          'turn': null,
-          'word': 'mango',
-          'correct': true,
-          'guesses': [
-            {'word': 'salty', 'marks': 'acaaa'},
-            {'word': 'mango', 'marks': 'ccccc'},
-          ],
-        }),
-        sender: me,
-        event: 'answered',
+    await pump(tester, bubble(finished()));
+    expect(find.text('Worduel · you got it in 2'), findsOneWidget);
+    await pump(tester, bubble(finished(), expanded: true));
+    expect(find.bySemanticsLabel('The word: MANGO'), findsOneWidget);
+    // No way to send another unless the page offers one.
+    expect(find.text('Send a new word'), findsNothing);
+  });
+
+  testWidgets('a finished Worduel opens to send a new word', (tester) async {
+    var asked = 0;
+    final m = finished();
+    await pump(
+      tester,
+      GameBubble(
+        message: m,
+        game: m.game!,
+        me: me,
+        theirName: 'Priya',
+        onPicks: (_) {},
+        onGuess: (_) {},
+        onText: (_) {},
+        onMove: (_) {},
+        onWord: (_) {},
+        onNewWord: () => asked++,
       ),
     );
-    await pump(tester, bubble(m));
-    expect(find.text('Worduel · you got it in 2'), findsOneWidget);
-    await pump(tester, bubble(m, expanded: true));
-    expect(find.text('The word was MANGO'), findsOneWidget);
+    await tester.tap(find.text('Worduel · you got it in 2'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Send a new word'));
+    await tester.pumpAndSettle();
+    expect(asked, 1);
+    // The result sheet closed on the way.
+    expect(find.text('Send a new word'), findsNothing);
+  });
+
+  Future<Object?> setWord(
+    WidgetTester tester,
+    Future<void> Function() act,
+  ) async {
+    Object? sent;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () async => sent = await showWorduelStartSheet(
+                context,
+                words: const [
+                  GameCard(key: 'wd_chess', text: 'chess', options: []),
+                  GameCard(key: 'wd_pyaar', text: 'pyaar', options: []),
+                ],
+                theirName: 'Priya',
+              ),
+              child: const Text('Start'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Start'));
+    await tester.pumpAndSettle();
+    expect(find.text('Set a word for Priya'), findsOneWidget);
+    await act();
+    await tester.tap(find.text('Send'));
+    await tester.pumpAndSettle();
+    return sent;
+  }
+
+  testWidgets('setting a Worduel: a suggestion tapped fills the tiles',
+      (tester) async {
+    final sent = await setWord(tester, () async {
+      await tester.tap(find.text('PYAAR'));
+      await tester.pump();
+      expect(find.text('Y'), findsOneWidget);
+    });
+    expect(sent, 'wd_pyaar');
+  });
+
+  testWidgets('setting a Worduel: a typed word is my own', (tester) async {
+    final sent = await setWord(tester, () async {
+      await tester.enterText(find.byType(TextField), 'mango');
+      await tester.pump();
+    });
+    expect(sent, isA<OwnCard>());
+    expect((sent! as OwnCard).text, 'mango');
   });
 
   test('a Worduel copy with more guesses wins', () {

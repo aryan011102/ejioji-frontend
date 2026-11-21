@@ -5,8 +5,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/session/session.dart';
 import '../core/theme/tokens.dart';
 import '../data/blind_controller.dart';
+import '../data/feed_controller.dart';
 import '../data/live_events.dart';
 import '../data/providers.dart';
 import '../features/onboarding/presentation/ai_consent_sheet.dart';
@@ -55,6 +57,13 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   void _onEvent(LiveEvent event) {
     switch (event.type) {
+      // The team took this profile live while the app was open: read the new
+      // state, and Home asks for people again.
+      case 'account.approved':
+        unawaited(ref.read(sessionProvider.notifier).refreshProfile());
+        ref
+          ..invalidate(myProfileProvider)
+          ..read(feedProvider.notifier).refresh();
       case 'message.new' || 'messages.read' || 'conversation.ended':
         ref
           ..invalidate(conversationsProvider)

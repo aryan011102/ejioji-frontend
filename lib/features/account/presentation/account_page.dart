@@ -14,6 +14,7 @@ import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/not_yet.dart';
 import '../../../shared/widgets/pressable.dart';
 import '../../../shared/widgets/sheets.dart';
+import '../../home/presentation/waitlisted.dart';
 
 /// The third tab. Four jobs, in the order they matter: who you are, how
 /// believable you are, what you could become, and everything else.
@@ -51,7 +52,9 @@ class AccountPage extends ConsumerWidget {
           padding: const EdgeInsets.only(bottom: 150),
           children: [
             const LargeTitle('You'),
-            if (session.isUnderReview)
+            if (session.isWaitlisted)
+              const WaitlistedNote()
+            else if (session.isUnderReview)
               const NotYetNote(
                 text: 'Your profile is being looked at by a moderator, so it '
                     'is hidden for now. You cannot send new chat requests '

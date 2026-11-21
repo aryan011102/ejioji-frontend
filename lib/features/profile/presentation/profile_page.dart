@@ -33,6 +33,7 @@ import '../../../shared/widgets/social_mark.dart';
 import '../../../shared/widgets/states.dart';
 import '../../../shared/widgets/swipe_to_chat.dart';
 import '../../../shared/widgets/tiles.dart';
+import '../../home/presentation/waitlisted.dart';
 import 'arrange_wall.dart';
 import 'person_actions.dart';
 
@@ -701,6 +702,36 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   /// the person doing anything: withdrawing consent for a source empties the
   /// tiles it fed, and the wall can fall below the bar on its own.
   Widget _publishState(PublishState publish) {
+    // Waiting for the team. What is still missing comes under it: a fuller
+    // profile is the one thing worth doing meanwhile.
+    if (publish.waitlisted) {
+      const note = WaitlistedNote(
+        padding: EdgeInsets.fromLTRB(
+          Insets.titleGutter,
+          16,
+          Insets.titleGutter,
+          0,
+        ),
+      );
+      if (publish.blocking.isEmpty) return note;
+      return Column(
+        children: [
+          note,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              Insets.titleGutter,
+              8,
+              Insets.titleGutter,
+              0,
+            ),
+            child: NoteCard(
+              icon: Icons.visibility_off_outlined,
+              text: _blockingText(publish.blocking),
+            ),
+          ),
+        ],
+      );
+    }
     if (publish.underReview) {
       return const Padding(
         padding: EdgeInsets.fromLTRB(

@@ -67,6 +67,10 @@ class _EjiojiAppState extends ConsumerState<EjiojiApp> {
         final editing =
             ref.read(sessionProvider).stage == SessionStage.ready;
         router.push(Routes.upload(Routes.spotifyUpload, editing: editing));
+      // Taken off the waitlist: read the new state, and Home shows people.
+      case PushKind.approved:
+        unawaited(ref.read(sessionProvider.notifier).refreshProfile());
+        router.go(Routes.home);
     }
   }
 
@@ -82,7 +86,8 @@ class _EjiojiAppState extends ConsumerState<EjiojiApp> {
       PushKind.request ||
       PushKind.profileViews ||
       PushKind.spotifyUpload ||
-      PushKind.unmatched =>
+      PushKind.unmatched ||
+      PushKind.approved =>
         true,
     };
   }

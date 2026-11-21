@@ -142,7 +142,17 @@ abstract final class Push {
 
 /// What a tapped notification was about. Ids only, which is all the server
 /// sends and all the app needs to open the right screen.
-enum PushKind { message, request, match, profileViews, spotifyUpload, unmatched }
+enum PushKind {
+  message,
+  request,
+  match,
+  profileViews,
+  spotifyUpload,
+  unmatched,
+
+  /// Off the waitlist: the team took this profile live.
+  approved,
+}
 
 @immutable
 class PushOpen {
@@ -157,7 +167,7 @@ class PushOpen {
   /// something to crash over.
   final String? id;
 
-  /// Reads one of the six `data` payloads. Anything else is ignored: a
+  /// Reads one of the seven `data` payloads. Anything else is ignored: a
   /// newer server may push a kind this build has never heard of.
   static PushOpen? from(RemoteMessage? message) {
     if (message == null) return null;
@@ -176,6 +186,8 @@ class PushOpen {
         const PushOpen(kind: PushKind.spotifyUpload, id: null),
       // "<name> unmatched you": the chat is gone, so Chats.
       'unmatched' => const PushOpen(kind: PushKind.unmatched, id: null),
+      // "Your profile is live": Home, which now has people on it.
+      'approved' => const PushOpen(kind: PushKind.approved, id: null),
       _ => null,
     };
   }

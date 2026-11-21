@@ -59,6 +59,10 @@ class Session {
 
   bool get isUnderReview => publish?.underReview ?? false;
 
+  /// New and waiting for the team to take them live: they look around, but
+  /// see nobody and nobody sees them.
+  bool get isWaitlisted => publish?.waitlisted ?? false;
+
   /// Taking a break is unpublishing: someone who could be out there and has
   /// chosen not to be.
   ///
@@ -158,6 +162,17 @@ class SessionController extends Notifier<Session> {
 
   void onPublishChanged(PublishState publish) =>
       state = state.copyWith(publish: publish);
+
+  /// Reads the profile again after a change made elsewhere: the team taking
+  /// this person off the waitlist. Offline, nothing changes and the next read
+  /// catches up.
+  Future<void> refreshProfile() async {
+    try {
+      onProfileChanged(await ref.read(profileRepositoryProvider).load());
+    } on ApiException {
+      // Best effort: the next read of the profile catches up.
+    }
+  }
 
   /// The only correct response to a refused refresh. The client calls this;
   /// it does not navigate itself.

@@ -20,6 +20,7 @@ import '../../blind/presentation/blind_page.dart';
 import '../../profile/presentation/person_actions.dart';
 import '../../profile/presentation/profile_page.dart';
 import 'empty_feed_page.dart';
+import 'waitlisted.dart';
 
 /// Home, and Home turned over.
 ///
@@ -159,6 +160,18 @@ class _Deck extends ConsumerWidget {
           ),
         );
       }
+    }
+
+    // New and waiting for the team: nobody to show, and the steps above still
+    // come first, since they are worth taking while they wait. The server's
+    // refusal counts as well as the session, which may not have caught up.
+    if (session.isWaitlisted || isWaitlistedError(error)) {
+      return WaitlistedScreen(
+        onCompleteProfile: () => completeProfileWhileWaiting(context, ref),
+      );
+    }
+
+    if (error != null && feed.cards.isEmpty) {
       return AppScaffold(
         child: ErrorView(
           error: error,
@@ -208,6 +221,17 @@ class _Deck extends ConsumerWidget {
       candidate: person,
     );
   }
+}
+
+/// "Complete my profile" from the waitlist: the profile editor, then the
+/// state read again, in case the team took them live meanwhile.
+Future<void> completeProfileWhileWaiting(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  await context.push<Object?>(Routes.editProfile);
+  await ref.read(sessionProvider.notifier).refreshProfile();
+  ref.read(feedProvider.notifier).refresh();
 }
 
 /// The feed refuses three ways before anything is wrong: no matching consent,

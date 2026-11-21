@@ -4,43 +4,31 @@ import '../../core/network/json.dart';
 
 /// The games two matched people can play in a chat. The server decides what
 /// each game deals and who may see what; the phone only draws it.
+///
+/// In the order the games list shows them.
 enum GameKind {
-  wouldYouRather(
-    'would_you_rather',
-    'Would you rather',
-    'Two choices. Pick yours, then see theirs.',
-  ),
-  rapidFire('rapid_fire', 'Rapid fire', 'Five quick picks, side by side.'),
-  neverHaveIEver(
-    'never_have_i_ever',
-    'Never have I ever',
-    'Have you or haven’t you? Find out together.',
-  ),
-  twoTruths(
-    'two_truths',
-    'Two truths and a lie',
-    'Write three things about you. They spot the lie.',
-  ),
-  flames('flames', 'FLAMES', 'The schoolyard classic, with your two names.'),
-  truth('truth', 'Truth', 'One question, both answer. No dares.'),
-  guessMovie(
-    'guess_movie',
-    'Guess the movie',
-    'Send a film in emoji. Can they get it?',
-  ),
-  ticTacToe(
-    'tic_tac_toe',
-    'Tic tac toe',
-    'Noughts and crosses, a move at a time.',
-  );
+  wouldYouRather('would_you_rather', 'Would you rather'),
+  rapidFire('rapid_fire', 'Rapid fire'),
+  neverHaveIEver('never_have_i_ever', 'Never have I ever'),
+  truth('truth', 'Truth'),
+  twoTruths('two_truths', 'Two truths and a lie'),
+  guessMovie('guess_movie', 'Guess the movie'),
+  worduel('worduel', 'Worduel'),
+  ticTacToe('tic_tac_toe', 'Tic tac toe'),
+  flames('flames', 'FLAMES');
 
-  const GameKind(this.wire, this.title, this.pitch);
+  const GameKind(this.wire, this.title);
 
   final String wire;
   final String title;
 
-  /// One line under its name in the list.
-  final String pitch;
+  /// Played a move at a time on one live card, drawn where its newest move is.
+  bool get live => this == ticTacToe || this == worduel;
+
+  /// In the games list, to start. Truth is not (Aryan, 2026-11-21: it is a
+  /// question, which can be asked in the chat); its games already played
+  /// still draw and can still be answered.
+  bool get offered => this != truth;
 
   /// Null for a game this build does not know: it is drawn as its text line.
   static GameKind? parse(String? raw) {
@@ -58,17 +46,80 @@ class GameCard {
     required this.key,
     required this.text,
     required this.options,
+    this.own = false,
   });
 
   final String key;
   final String text;
   final List<String> options;
 
+  /// Written by the person who started the game, not dealt.
+  final bool own;
+
   static GameCard fromJson(Json j) => GameCard(
         key: j.str('key'),
         text: j.str('text'),
         options: j.strings('options'),
+        own: j['own'] == true,
       );
+}
+
+/// A card someone writes in place of one dealt. The server checks it as it
+/// checks a message, and makes it a card like any other.
+///
+/// [text] is the question, the line after "Never have I ever", the emoji
+/// clue, or Worduel's word; [options] the two answers, the two sides of a
+/// rapid fire card, or the film's title.
+@immutable
+class OwnCard {
+  const OwnCard({this.text, this.options = const []});
+
+  final String? text;
+  final List<String> options;
+
+  Map<String, Object?> toJson() => {
+        if (text != null) 'text': text,
+        if (options.isNotEmpty) 'options': options,
+      };
+
+  /// The card as the server will make it, to show before it is sent.
+  GameCard preview(GameKind game) => switch (game) {
+        GameKind.neverHaveIEver => GameCard(
+            key: 'own',
+            text: 'Never have I ever ${text ?? ''}.',
+            options: const ['I have', 'I haven’t'],
+            own: true,
+          ),
+        GameKind.rapidFire => GameCard(
+            key: 'own',
+            text: '${options.first} or ${options.last}?',
+            options: options,
+            own: true,
+          ),
+        _ =>
+          GameCard(key: 'own', text: text ?? '', options: options, own: true),
+      };
+}
+
+/// One guess in Worduel: the word, and a mark per letter.
+@immutable
+class WorduelGuess {
+  const WorduelGuess({required this.word, required this.marks});
+
+  final String word;
+
+  /// One per letter: 'c' in the right place, 'p' in the word elsewhere, 'a'
+  /// not in it.
+  final String marks;
+
+  static WorduelGuess fromJson(Json j) =>
+      WorduelGuess(word: j.str('word'), marks: j.str('marks'));
+}
+
+/// Worduel's rules, as the server has them.
+abstract final class Worduel {
+  static const letters = 5;
+  static const tries = 6;
 }
 
 /// FLAMES, worked out by the server from the two names.
@@ -79,12 +130,17 @@ class FlamesResult {
     required this.letter,
     required this.word,
     required this.line,
+    this.left = 0,
   });
 
   final List<String> names;
   final String letter;
   final String word;
   final String line;
+
+  /// How many letters were left after crossing out the shared ones: the count
+  /// round F-L-A-M-E-S.
+  final int left;
 
   static FlamesResult? maybe(Json? j) {
     if (j == null) return null;
@@ -93,8 +149,66 @@ class FlamesResult {
       letter: j.str('letter'),
       word: j.str('word'),
       line: j.str('line'),
+      left: j.intOr('left', 0),
     );
   }
+}
+
+/// The letters of FLAMES, by place, in the order a count of [left] crosses
+/// them out, as the server works it out (chat/games.py): count round that far,
+/// cross out where it lands, and count on from the next. Five go; the one not
+/// listed is the answer. Empty when there is no count to show.
+List<int> flamesOrder(int left) => [for (final r in flamesRounds(left)) r.gone];
+
+/// The count round FLAMES, a round at a time: the letters each count lands on,
+/// in order ([hops], [left] of them), and the one it crosses out ([gone]).
+List<({List<int> hops, int gone})> flamesRounds(int left) {
+  if (left <= 0) return const [];
+  final letters = [0, 1, 2, 3, 4, 5];
+  final rounds = <({List<int> hops, int gone})>[];
+  var at = 0;
+  while (letters.length > 1) {
+    final hops = [
+      for (var s = 0; s < left; s++) letters[(at + s) % letters.length],
+    ];
+    at = (at + left - 1) % letters.length;
+    rounds.add((hops: hops, gone: letters.removeAt(at)));
+  }
+  return rounds;
+}
+
+/// A name's letters as FLAMES counts them: a to z only, accents off, case
+/// folded, as the server does (chat/games.py `_letters`).
+List<String> flamesLetters(String name) {
+  const plain = {
+    'á': 'a', 'à': 'a', 'â': 'a', 'ä': 'a', 'ã': 'a', 'å': 'a', 'ā': 'a',
+    'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e', 'ē': 'e',
+    'í': 'i', 'ì': 'i', 'î': 'i', 'ï': 'i', 'ī': 'i',
+    'ó': 'o', 'ò': 'o', 'ô': 'o', 'ö': 'o', 'õ': 'o', 'ō': 'o',
+    'ú': 'u', 'ù': 'u', 'û': 'u', 'ü': 'u', 'ū': 'u',
+    'ñ': 'n', 'ç': 'c', 'ý': 'y', 'ÿ': 'y',
+  };
+  return [
+    for (final ch in name.toLowerCase().split(''))
+      if (RegExp('[a-z]').hasMatch(plain[ch] ?? ch)) plain[ch] ?? ch,
+  ];
+}
+
+/// The letters two names share, crossed out one for one: each pair is a place
+/// in the first name's letters and a place in the second's.
+List<(int, int)> flamesPairs(List<String> first, List<String> second) {
+  final used = <int>{};
+  final pairs = <(int, int)>[];
+  for (var i = 0; i < first.length; i++) {
+    for (var j = 0; j < second.length; j++) {
+      if (!used.contains(j) && second[j] == first[i]) {
+        used.add(j);
+        pairs.add((i, j));
+        break;
+      }
+    }
+  }
+  return pairs;
 }
 
 /// A game as it stands, as this person may see it. The other person's answers
@@ -121,6 +235,10 @@ class GameState {
     this.turn,
     this.winner,
     this.line,
+    this.film,
+    this.word,
+    this.guesses = const [],
+    this.correct,
   });
 
   final String id;
@@ -159,14 +277,43 @@ class GameState {
   final String? winner;
   final List<int>? line;
 
+  /// Guess the movie with the starter's own film (its card has no options):
+  /// the title, null for the guesser until they have typed theirs into
+  /// [replyText].
+  final String? film;
+
+  /// Worduel: the word, null for the guesser until it is over; and each guess
+  /// so far, oldest first. [turn] is the guesser while it goes on.
+  final String? word;
+  final List<WorduelGuess> guesses;
+
+  /// Their own film and Worduel, once over: whether they got it.
+  final bool? correct;
+
   bool startedByMe(String me) => startedBy == me;
 
-  /// Marks on the board so far: a board only ever gains them.
-  int get marks => board == null ? 0 : board!.replaceAll(' ', '').length;
+  /// Waiting on [me]: their move on a board or in a Worduel, or their answer
+  /// to a game the other person started. Never FLAMES, which is not played.
+  bool myTurn(String me) {
+    final k = kind;
+    if (done || k == null || k == GameKind.flames) return false;
+    return k.live ? turn == me : startedBy != me;
+  }
+
+  /// Guess the movie with the starter's own film, which is typed, not picked.
+  bool get ownFilm =>
+      kind == GameKind.guessMovie &&
+      cards.isNotEmpty &&
+      cards.first.own &&
+      cards.first.options.isEmpty;
+
+  /// Moves so far on a board or in a Worduel: a game only ever gains them.
+  int get marks =>
+      (board == null ? 0 : board!.replaceAll(' ', '').length) + guesses.length;
 
   /// The newer of two copies of one game. A game only goes forward, from
-  /// waiting to done and, on a board, from fewer marks to more, so a copy that
-  /// arrived late never undoes a move.
+  /// waiting to done and, on a board or in a Worduel, from fewer moves to more,
+  /// so a copy that arrived late never undoes a move.
   GameState newer(GameState other) {
     if (done != other.done) return done ? this : other;
     return marks > other.marks ? this : other;
@@ -194,6 +341,15 @@ class GameState {
       turn: j.strOrNull('turn'),
       winner: j.strOrNull('winner'),
       line: j['line'] == null ? null : j.ints('line'),
+      film: j.strOrNull('film'),
+      word: j.strOrNull('word'),
+      guesses: j['guesses'] == null
+          ? const []
+          : j
+              .objects('guesses')
+              .map(WorduelGuess.fromJson)
+              .toList(growable: false),
+      correct: j['correct'] is bool ? j['correct'] as bool : null,
     );
   }
 }

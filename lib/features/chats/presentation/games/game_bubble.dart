@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/tokens.dart';
@@ -12,11 +14,17 @@ import 'game_sheets.dart';
 ///
 /// Drawn from [game], the newest copy of the game the page holds, not from the
 /// copy on [message]: a start card on screen should know once it has been
-/// answered. The answer is its own full card, since the start may be on an
-/// older page that is not loaded; once answered, the start shrinks to a line.
+/// answered.
 ///
-/// Tic tac toe is one live board: the page draws only the newest message of a
-/// board, and this card is the board as it stands.
+/// A card is small: one line names the game and whose turn it is, then the
+/// question in full and its answers. A finished game shows its result where it
+/// ended while nothing has been said after it ([latest]), playing a short
+/// reveal if it ended while the chat was open ([reveal]). Once the chat moves
+/// on it folds to one line, which opens the whole result in a glass sheet; its
+/// start, further up, draws nothing.
+///
+/// Tic tac toe and Worduel are one live card each: the page draws only the
+/// newest message of one, and this card is the game as it stands.
 class GameBubble extends StatefulWidget {
   const GameBubble({
     required this.message,
@@ -27,7 +35,13 @@ class GameBubble extends StatefulWidget {
     required this.onGuess,
     required this.onText,
     required this.onMove,
+    required this.onWord,
     this.busy = false,
+    this.expanded = false,
+    this.latest = false,
+    this.reveal = false,
+    this.onRevealed,
+    this.onNewWord,
     super.key,
   });
 
@@ -37,56 +51,146 @@ class GameBubble extends StatefulWidget {
   final String theirName;
   final bool busy;
 
+  /// In the result sheet: the whole game, never folded, and no card around it
+  /// since the sheet is one.
+  final bool expanded;
+
+  /// Nothing has been said after this message: a game that ended here shows
+  /// its result instead of folding.
+  final bool latest;
+
+  /// The game ended while the chat was open: its result plays its reveal, once,
+  /// then [onRevealed] is called.
+  final bool reveal;
+  final VoidCallback? onRevealed;
+
+  /// A finished Worduel: set a new word for the other person. The result
+  /// sheet offers it; null, it is not offered.
+  final VoidCallback? onNewWord;
+
   /// Their game, my turn: my pick on each card.
   final ValueChanged<List<int>> onPicks;
 
   /// Their two truths or their film, my turn: which one I think it is.
   final ValueChanged<int> onGuess;
 
-  /// Their truth, my turn: my answer.
+  /// Their truth, my turn: my answer. Their own film: the name I type.
   final ValueChanged<String> onText;
 
   /// A board, my turn: the square I take.
   final ValueChanged<int> onMove;
 
+  /// Their Worduel, my turn: my guess.
+  final ValueChanged<String> onWord;
+
   @override
   State<GameBubble> createState() => _GameBubbleState();
 }
 
-class _GameBubbleState extends State<GameBubble> {
+class _GameBubbleState extends State<GameBubble>
+    with SingleTickerProviderStateMixin {
   /// My picks so far on their rapid fire, before Send.
   List<int?>? _picks;
+
+  /// What I am typing: a guess in their Worduel, or the name of their film.
+  final _typed = TextEditingController();
+
+  /// The reveal, while it plays. Without one, every result is drawn settled.
+  AnimationController? _reveal;
+
+  static const _revealFor = Duration(milliseconds: 1100);
+
+  /// FLAMES: the full working is playing here, the first time (its own
+  /// reveal) or because "See the working" was tapped.
+  bool _working = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // What is typed decides whether Guess shows.
+    _typed.addListener(() => setState(() {}));
+    _maybeReveal();
+  }
+
+  @override
+  void didUpdateWidget(GameBubble old) {
+    super.didUpdateWidget(old);
+    // A guess that went through is on the grid now: start the next one empty.
+    if (widget.game.guesses.length != old.game.guesses.length) _typed.clear();
+    _maybeReveal();
+  }
+
+  void _maybeReveal() {
+    if (!widget.reveal || !widget.game.done || _reveal != null) return;
+    if (widget.game.kind == GameKind.flames) {
+      // FLAMES' reveal is the whole working, which keeps its own time.
+      if (!_working && !widget.expanded) _working = true;
+      return;
+    }
+    _reveal = AnimationController(vsync: this, duration: _revealFor)
+      ..addListener(() => setState(() {}))
+      ..forward().whenComplete(() => widget.onRevealed?.call());
+  }
+
+  @override
+  void dispose() {
+    _reveal?.dispose();
+    _typed.dispose();
+    super.dispose();
+  }
+
+  /// How far the reveal has got, 0 to 1. A settled result is 1.
+  double get _t => _reveal?.value ?? 1;
+
+  /// The share of the reveal between [start] and [start] + [length], eased.
+  double _step(double start, double length) =>
+      Curves.easeOut.transform(((_t - start) / length).clamp(0.0, 1.0));
 
   GameState get _game => widget.game;
   bool get _mine => widget.message.senderId == widget.me;
   bool get _startedByMe => _game.startedByMe(widget.me);
+  String get _name => widget.theirName;
+
+  /// Whoever guesses or answers second, as the line names them.
+  String get _guesser => _startedByMe ? _name : 'you';
 
   @override
   Widget build(BuildContext context) {
     final game = _game;
-    final Widget body;
-    if (game.kind == GameKind.flames) {
-      body = _flames(game);
-    } else if (game.kind == GameKind.ticTacToe) {
-      body = _board(game);
-    } else if (widget.message.gameAnswer) {
-      body = _result(game);
-    } else if (game.done) {
-      return _startLine(game);
-    } else if (_startedByMe) {
-      body = _waiting(game);
-    } else {
-      body = _myTurn(game);
+    if (game.kind == GameKind.worduel &&
+        _startedByMe &&
+        !game.done &&
+        !widget.expanded) {
+      return _setterLine(game);
     }
+    if (game.done && !widget.expanded) {
+      // The start above where it ended has nothing left to say. Where it
+      // ended, the result shows until the chat moves on, then folds.
+      final ended = widget.message.gameAnswer ||
+          game.kind == GameKind.flames ||
+          (game.kind?.live ?? false);
+      if (!ended) return const SizedBox.shrink();
+      if (!widget.latest) return _folded(game);
+    }
+    final content = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _eyebrow(game),
+        SizedBox(height: widget.expanded ? 10 : 6),
+        _body(game),
+      ],
+    );
+    if (widget.expanded) return content;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Align(
         alignment: _mine ? Alignment.centerRight : Alignment.centerLeft,
         child: ConstrainedBox(
           constraints:
-              BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.82),
+              BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.78),
           child: Container(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+            padding: const EdgeInsets.fromLTRB(11, 9, 11, 11),
             decoration: BoxDecoration(
               color: AppColors.row,
               borderRadius: BorderRadius.circular(Radii.card),
@@ -94,55 +198,247 @@ class _GameBubbleState extends State<GameBubble> {
                 color: _mine ? AppColors.fill : AppColors.bubbleThemEdge,
               ),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _header(game),
-                const SizedBox(height: 10),
-                body,
-              ],
-            ),
+            child: content,
           ),
         ),
       ),
     );
   }
 
-  Widget _header(GameState game) => Row(
-        children: [
-          GameIcon(game: game.kind, size: 26),
-          const SizedBox(width: 8),
-          Expanded(child: Text(game.title, style: AppText.bodyStrong)),
-        ],
-      );
+  Widget _body(GameState game) {
+    if (game.kind == GameKind.flames) return _flames(game);
+    if (game.kind == GameKind.ticTacToe) return _board(game);
+    if (game.kind == GameKind.worduel) return _worduel(game);
+    if (game.done) return _result(game);
+    return _startedByMe ? _waiting(game) : _myTurn(game);
+  }
 
-  /// The start of a game that has been answered: the answer card below says
-  /// everything, so this is one line.
-  Widget _startLine(GameState game) {
-    final who = _startedByMe ? 'You' : widget.theirName;
+  // The line at the top, and the folded line.
+
+  /// Mine to play now: the line is lit.
+  bool _myMove(GameState game) => game.myTurn(widget.me);
+
+  /// What the line says after the game's name.
+  String _status(GameState game) {
+    if (game.done) return _summary(game);
+    final mine = _myMove(game);
+    switch (game.kind) {
+      case GameKind.ticTacToe:
+        final mark = _startedByMe ? 'X' : 'O';
+        return mine
+            ? 'your turn · you are $mark'
+            : 'waiting for $_name · you are $mark';
+      case GameKind.worduel:
+        return _startedByMe ? '$_name is guessing your word' : 'your turn';
+      default:
+        if (!mine) return 'waiting for $_name';
+        final own = game.cards.isNotEmpty && game.cards.first.own;
+        return own ? '$_name wrote this · your turn' : 'your turn';
+    }
+  }
+
+  /// How a finished game ended, in a few words.
+  String _summary(GameState game) {
+    switch (game.kind) {
+      case GameKind.flames:
+        return game.flames?.word ?? '';
+      case GameKind.ticTacToe:
+        if (game.winner == null) return 'a draw';
+        return game.winner == (_startedByMe ? 'x' : 'o')
+            ? 'you won'
+            : '$_name won';
+      case GameKind.worduel:
+        return game.correct == true
+            ? '$_guesser got it in ${game.guesses.length}'
+            : '$_guesser ran out of tries';
+      case GameKind.twoTruths:
+        return game.guess != null && game.guess == game.lie
+            ? '$_guesser spotted the lie'
+            : '$_guesser missed the lie';
+      case GameKind.guessMovie:
+        final right = game.ownFilm
+            ? game.correct == true
+            : game.guess != null && game.guess == game.answer;
+        return right ? '$_guesser got the film' : '$_guesser missed the film';
+      case GameKind.truth:
+        return 'both answered';
+      default:
+        final mine = _startedByMe ? game.starterPicks : game.replyPicks;
+        final theirs = _startedByMe ? game.replyPicks : game.starterPicks;
+        var same = 0;
+        for (var i = 0; i < game.cards.length; i++) {
+          if (_at(mine, i) != null && _at(mine, i) == _at(theirs, i)) same++;
+        }
+        if (game.cards.length != 1) {
+          return 'matched $same of ${game.cards.length}';
+        }
+        final card = game.cards.first;
+        final pick = _at(mine, 0);
+        return same == 1 && pick != null && pick < card.options.length
+            ? 'you both said ${card.options[pick]}'
+            : 'you differ';
+    }
+  }
+
+  Widget _eyebrow(GameState game) {
+    final lit = _myMove(game);
+    final status = _status(game);
+    final color = lit ? AppColors.accent : AppColors.label2;
+    return Row(
+      children: [
+        Icon(GameIcon.iconFor(game.kind), size: 14, color: color),
+        const SizedBox(width: 5),
+        Expanded(
+          child: Text(
+            status.isEmpty ? game.title : '${game.title} · $status',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppText.caption.copyWith(color: color),
+          ),
+        ),
+        if (game.kind == GameKind.worduel && !game.done)
+          Text(
+            _tries(game.guesses.length),
+            semanticsLabel:
+                '${Worduel.tries - game.guesses.length} tries left',
+            style: AppText.caption.copyWith(color: AppColors.label3),
+          ),
+      ],
+    );
+  }
+
+  /// Tries used and left, as dots.
+  static String _tries(int used) =>
+      '${'●' * used}${'○' * (Worduel.tries - used)}';
+
+  /// My Worduel while they guess: one small line. My word in tiles until they
+  /// guess; then their guesses as colour squares, which show how close they
+  /// are without spelling out what they tried.
+  Widget _setterLine(GameState game) {
+    final tried = game.guesses.length;
+    final close =
+        tried > 0 && 'c'.allMatches(game.guesses.last.marks).length >= 3;
+    final word = (game.word ?? '').toUpperCase();
+    final headline = tried == 0
+        ? 'Worduel sent to $_name'
+        : close
+            ? '$_name is close'
+            : '$_name is guessing';
+    final sub = tried == 0
+        ? '${Worduel.tries} tries'
+        : '$tried of ${Worduel.tries} · $word';
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Center(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            GameIcon(game: game.kind, size: 18),
-            const SizedBox(width: 6),
-            Text('$who started ${game.title}', style: AppText.micro),
-          ],
+      child: Align(
+        alignment: _mine ? Alignment.centerRight : Alignment.centerLeft,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(10, 8, 12, 8),
+          decoration: BoxDecoration(
+            color: AppColors.row,
+            borderRadius: BorderRadius.circular(Radii.card),
+            border: Border.all(
+              color: _mine ? AppColors.fill : AppColors.bubbleThemEdge,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (tried == 0)
+                WorduelWord(word: word)
+              else
+                WorduelPath(guesses: game.guesses),
+              const SizedBox(width: 10),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    headline,
+                    style: AppText.footnote.copyWith(color: AppColors.label),
+                  ),
+                  Text(sub, style: AppText.caption),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _note(String text) => Padding(
-        padding: const EdgeInsets.only(top: 10),
-        child: Text(
-          text,
-          style: AppText.footnote.copyWith(color: AppColors.label2),
+  /// A finished game: one line, which opens the whole of it.
+  Widget _folded(GameState game) {
+    final line = '${game.title} · ${_summary(game)}';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Align(
+        alignment: _mine ? Alignment.centerRight : Alignment.centerLeft,
+        child: Pressable(
+          onTap: () => showGameResultSheet(
+            context,
+            child: GameBubble(
+              message: widget.message,
+              game: game,
+              me: widget.me,
+              theirName: widget.theirName,
+              expanded: true,
+              onNewWord: widget.onNewWord,
+              onPicks: (_) {},
+              onGuess: (_) {},
+              onText: (_) {},
+              onMove: (_) {},
+              onWord: (_) {},
+            ),
+          ),
+          semanticLabel: '$line. Open',
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.sizeOf(context).width * 0.78,
+            ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+              decoration: BoxDecoration(
+                color: AppColors.row,
+                borderRadius: BorderRadius.circular(Radii.chip),
+                border: Border.all(
+                  color: _mine ? AppColors.fill : AppColors.bubbleThemEdge,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // A Worduel shows how its last guess went, as squares.
+                  if (game.kind == GameKind.worduel && game.guesses.isNotEmpty)
+                    WorduelMarks(marks: game.guesses.last.marks, size: 10)
+                  else
+                    Icon(
+                      GameIcon.iconFor(game.kind),
+                      size: 14,
+                      color: AppColors.accent,
+                    ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      line,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.caption.copyWith(color: AppColors.label),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 16,
+                    color: AppColors.label3,
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
-      );
+      ),
+    );
+  }
 
   // Waiting for them.
 
@@ -153,53 +449,40 @@ class _GameBubbleState extends State<GameBubble> {
         children: [
           _question(game),
           _said('You', game.starterText),
-          _note('Your answer is hidden until ${widget.theirName} answers.'),
         ],
       );
     }
     if (game.kind == GameKind.guessMovie) {
       final card = game.cards.isEmpty ? null : game.cards.first;
       final answer = game.answer;
+      final film = game.film ??
+          (card != null && answer != null && answer < card.options.length
+              ? card.options[answer]
+              : null);
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _clue(card),
-          if (card != null && answer != null && answer < card.options.length)
+          if (film != null)
             Text(
-              'You sent ${card.options[answer]}',
+              'You sent $film',
               textAlign: TextAlign.center,
-              style: AppText.footnote.copyWith(color: AppColors.label2),
+              style: AppText.caption.copyWith(color: AppColors.label2),
             ),
-          _note('Waiting for ${widget.theirName} to guess.'),
         ],
       );
     }
     if (game.kind == GameKind.twoTruths) {
+      final lines = game.statements ?? const <String>[];
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (var i = 0; i < (game.statements ?? const []).length; i++)
-            _statement(game.statements![i], lie: game.lie == i),
-          _note('Waiting for ${widget.theirName} to spot the lie.'),
+          for (var i = 0; i < lines.length; i++)
+            _statement(lines[i], lie: game.lie == i),
         ],
       );
     }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (var i = 0; i < game.cards.length; i++)
-          Padding(
-            padding:
-                EdgeInsets.only(bottom: i == game.cards.length - 1 ? 0 : 10),
-            child: CardChoice(
-              card: game.cards[i],
-              picked: _at(game.starterPicks, i),
-              onPick: null,
-            ),
-          ),
-        _note('Your answer is hidden until ${widget.theirName} plays.'),
-      ],
-    );
+    return _cards(game, picks: game.starterPicks, onPick: null);
   }
 
   // My turn.
@@ -210,34 +493,71 @@ class _GameBubbleState extends State<GameBubble> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _question(game),
-          _note('${widget.theirName} has answered. Write yours to see theirs.'),
-          const SizedBox(height: 10),
-          MiniButton(
-            label: 'Answer',
-            busy: widget.busy,
-            onPressed: () async {
-              final question = game.cards.isEmpty ? '' : game.cards.first.text;
-              final text = await showTruthSheet(context, question: question);
-              if (text != null) widget.onText(text);
-            },
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            // A button its own size: a MiniButton fills the width it is given.
+            child: IntrinsicWidth(
+              child: MiniButton(
+                label: 'Answer to see theirs',
+                busy: widget.busy,
+                onPressed: () async {
+                  final question =
+                      game.cards.isEmpty ? '' : game.cards.first.text;
+                  final text =
+                      await showTruthSheet(context, question: question);
+                  if (text != null) widget.onText(text);
+                },
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    if (game.ownFilm) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _clue(game.cards.first),
+          const SizedBox(height: 4),
+          _typeIn(
+            hint: 'Type the film',
+            maxChars: 80,
+            label: 'Guess',
+            ready: _typed.text.trim().isNotEmpty,
+            onSend: () => widget.onText(_typed.text.trim()),
           ),
         ],
       );
     }
     if (game.kind == GameKind.guessMovie) {
       final card = game.cards.isEmpty ? null : game.cards.first;
+      final options = card?.options ?? const <String>[];
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _clue(card),
-          const SizedBox(height: 8),
-          for (var i = 0; i < (card?.options.length ?? 0); i++)
+          const SizedBox(height: 4),
+          for (var r = 0; r < options.length; r += 2)
             Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: ChoicePill(
-                label: card!.options[i],
-                lit: false,
-                onTap: widget.busy ? null : () => widget.onGuess(i),
+              padding: EdgeInsets.only(bottom: r + 2 < options.length ? 6 : 0),
+              child: Row(
+                children: [
+                  for (var i = r; i < r + 2; i++) ...[
+                    if (i > r) const SizedBox(width: 6),
+                    Expanded(
+                      child: i < options.length
+                          ? ChoicePill(
+                              label: options[i],
+                              lit: false,
+                              compact: true,
+                              onTap:
+                                  widget.busy ? null : () => widget.onGuess(i),
+                            )
+                          : const SizedBox.shrink(),
+                    ),
+                  ],
+                ],
               ),
             ),
         ],
@@ -248,11 +568,9 @@ class _GameBubbleState extends State<GameBubble> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Which one is the lie?', style: AppText.footnote),
-          const SizedBox(height: 8),
           for (var i = 0; i < lines.length; i++)
             Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.only(bottom: 6),
               child: Pressable(
                 onTap: widget.busy ? null : () => widget.onGuess(i),
                 semanticLabel: lines[i],
@@ -264,16 +582,10 @@ class _GameBubbleState extends State<GameBubble> {
     }
     // One card: a tap is the answer. Several: pick each, then send.
     if (game.cards.length == 1) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          CardChoice(
-            card: game.cards.first,
-            picked: null,
-            onPick: widget.busy ? null : (p) => widget.onPicks([p]),
-          ),
-          _note('${widget.theirName} has answered. Pick yours to see theirs.'),
-        ],
+      return _cards(
+        game,
+        picks: null,
+        onPick: widget.busy ? null : (_, p) => widget.onPicks([p]),
       );
     }
     final picks = _picks ??= List<int?>.filled(game.cards.length, null);
@@ -281,26 +593,57 @@ class _GameBubbleState extends State<GameBubble> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (var i = 0; i < game.cards.length; i++)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: CardChoice(
-              card: game.cards[i],
-              picked: picks[i],
-              onPick: (p) => setState(() => picks[i] = p),
+        _cards(
+          game,
+          picks: picks,
+          onPick: (i, p) => setState(() => picks[i] = p),
+        ),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: IntrinsicWidth(
+            child: MiniButton(
+              label: 'Send picks',
+              busy: widget.busy,
+              onPressed: ready
+                  ? () => widget.onPicks([for (final p in picks) p!])
+                  : null,
             ),
           ),
-        MiniButton(
-          label: 'Send my picks',
-          busy: widget.busy,
-          onPressed:
-              ready ? () => widget.onPicks([for (final p in picks) p!]) : null,
         ),
       ],
     );
   }
 
-  // Both answered.
+  /// The cards with their answers as pills. Rapid fire's "A or B?" goes
+  /// unsaid: its two pills say it.
+  Widget _cards(
+    GameState game, {
+    required List<int?>? picks,
+    required void Function(int card, int pick)? onPick,
+  }) {
+    final rapid = game.kind == GameKind.rapidFire;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < game.cards.length; i++)
+          Padding(
+            padding: EdgeInsets.only(
+              bottom: i == game.cards.length - 1 ? 0 : (rapid ? 6 : 10),
+            ),
+            child: CardChoice(
+              card: game.cards[i],
+              picked: picks == null || i >= picks.length ? null : picks[i],
+              compact: true,
+              showText: !rapid,
+              onPick: onPick == null ? null : (p) => onPick(i, p),
+            ),
+          ),
+      ],
+    );
+  }
+
+  // Both answered: what the result sheet shows.
 
   Widget _result(GameState game) {
     if (game.kind == GameKind.twoTruths) return _truthsResult(game);
@@ -312,45 +655,41 @@ class _GameBubbleState extends State<GameBubble> {
         children: [
           _question(game),
           _said('You', mine),
-          _said(widget.theirName, theirs),
+          // Reveal: their answer fades in under mine.
+          Opacity(opacity: _step(0.2, 0.4), child: _said(_name, theirs)),
         ],
       );
     }
     if (game.kind == GameKind.guessMovie) return _movieResult(game);
     final mine = _startedByMe ? game.starterPicks : game.replyPicks;
     final theirs = _startedByMe ? game.replyPicks : game.starterPicks;
-    var same = 0;
-    for (var i = 0; i < game.cards.length; i++) {
-      if (_at(mine, i) != null && _at(mine, i) == _at(theirs, i)) same++;
+    if (game.cards.length == 1) {
+      final card = game.cards.first;
+      if (game.kind == GameKind.neverHaveIEver) {
+        return _hands(card, _at(mine, 0), _at(theirs, 0));
+      }
+      return _flipCards(card, _at(mine, 0), _at(theirs, 0));
     }
-    final name = widget.theirName;
-    final headline = game.cards.length == 1
-        ? (same == 1
-            ? 'You both said the same!'
-            : 'You and $name differ on this one.')
-        : 'You matched on $same of ${game.cards.length}.';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          headline,
-          style: AppText.callout.copyWith(color: AppColors.accent),
-        ),
-        const SizedBox(height: 10),
         for (var i = 0; i < game.cards.length; i++)
           Padding(
             padding:
                 EdgeInsets.only(bottom: i == game.cards.length - 1 ? 0 : 12),
-            child: _both(game.cards[i], _at(mine, i), _at(theirs, i), name),
+            child: _both(game.cards[i], _at(mine, i), _at(theirs, i), i),
           ),
       ],
     );
   }
 
-  Widget _both(GameCard card, int? mine, int? theirs, String name) {
+  /// A card of rapid fire, both answers. Reveal: theirs fade in a row at a
+  /// time, then the ones that match light up.
+  Widget _both(GameCard card, int? mine, int? theirs, int row) {
     String said(int? pick) =>
         pick != null && pick < card.options.length ? card.options[pick] : '?';
-    final same = mine != null && mine == theirs;
+    final shown = _step(0.05 + row * 0.12, 0.25);
+    final same = mine != null && mine == theirs && _t >= 0.65 + row * 0.04;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -360,15 +699,154 @@ class _GameBubbleState extends State<GameBubble> {
           children: [
             Expanded(child: _answerChip('You', said(mine), same)),
             const SizedBox(width: 8),
-            Expanded(child: _answerChip(name, said(theirs), same)),
+            Expanded(
+              child: Opacity(
+                opacity: shown,
+                child: Transform.translate(
+                  offset: Offset(0, (1 - shown) * 4),
+                  child: _answerChip(_name, said(theirs), same),
+                ),
+              ),
+            ),
           ],
         ),
       ],
     );
   }
 
+  /// Would you rather: a card each, face down, which flip to the answers; the
+  /// same answer lights both.
+  Widget _flipCards(GameCard card, int? mine, int? theirs) {
+    String said(int? pick) =>
+        pick != null && pick < card.options.length ? card.options[pick] : '?';
+    final same = mine != null && mine == theirs;
+    final settled = _t >= 0.75;
+    Widget face(String who, String answer, double flip) {
+      // Edge on halfway through: the answer is on the far side.
+      final turned = flip >= 0.5;
+      final lit = same && settled;
+      return Transform(
+        alignment: Alignment.center,
+        transform: Matrix4.identity()
+          ..setEntry(3, 2, 0.002)
+          ..rotateY(math.sin(flip * math.pi) * math.pi / 2),
+        child: Container(
+          height: 54,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: lit ? AppColors.fill : AppColors.fill2,
+            borderRadius: BorderRadius.circular(Radii.panel),
+            border: Border.all(color: lit ? AppColors.fill : AppColors.hairline),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                who,
+                style: AppText.micro.copyWith(
+                  color: lit ? AppColors.onAccent : AppColors.label2,
+                ),
+              ),
+              Text(
+                turned ? answer : '?',
+                textAlign: TextAlign.center,
+                style: AppText.footnote.copyWith(
+                  color: lit ? AppColors.onAccent : AppColors.label,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(card.text, style: AppText.footnote),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(child: face('You', said(mine), _step(0.1, 0.35))),
+            const SizedBox(width: 8),
+            Expanded(child: face(_name, said(theirs), _step(0.25, 0.35))),
+          ],
+        ),
+        _verdict(
+          same ? 'You both said ${said(mine)}' : 'You two differ',
+          lit: same,
+        ),
+      ],
+    );
+  }
+
+  /// Never have I ever: a hand each, raised and lit in that person's colour
+  /// only if they have; grey and down if they haven't.
+  Widget _hands(GameCard card, int? mine, int? theirs) {
+    // The first answer is always "I have".
+    final iHave = mine == 0;
+    final theyHave = theirs == 0;
+    Widget hand(String who, bool have, Color color, double up) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Opacity(
+              opacity: 0.3 + 0.7 * up,
+              child: Transform.translate(
+                offset: Offset(0, have ? (1 - up) * 10 : 6),
+                child: Icon(
+                  Icons.front_hand_rounded,
+                  size: 32,
+                  color: have ? color : AppColors.label4,
+                  semanticLabel: '$who ${have ? 'have' : 'haven’t'}',
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(who, style: AppText.micro.copyWith(color: AppColors.label2)),
+          ],
+        );
+    final String verdict;
+    if (iHave && theyHave) {
+      verdict = 'You both have';
+    } else if (!iHave && !theyHave) {
+      verdict = 'Neither of you has';
+    } else {
+      verdict = iHave ? 'Only you have' : 'Only $_name has';
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(card.text, style: AppText.footnote),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            hand('You', iHave, AppColors.fill, _step(0.1, 0.3)),
+            hand(_name, theyHave, AppColors.accent, _step(0.35, 0.3)),
+          ],
+        ),
+        _verdict(verdict, lit: iHave && theyHave),
+      ],
+    );
+  }
+
+  /// The line under a reveal, once it has played.
+  Widget _verdict(String text, {required bool lit}) => Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Opacity(
+          opacity: _step(0.7, 0.3),
+          child: Text(
+            text,
+            textAlign: TextAlign.center,
+            style: AppText.footnote.copyWith(
+              color: lit ? AppColors.accent : AppColors.label2,
+            ),
+          ),
+        ),
+      );
+
   Widget _answerChip(String who, String answer, bool same) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         decoration: BoxDecoration(
           color: same ? AppColors.fill : AppColors.fill2,
           borderRadius: BorderRadius.circular(Radii.chip),
@@ -386,7 +864,7 @@ class _GameBubbleState extends State<GameBubble> {
             ),
             Text(
               answer,
-              style: AppText.callout.copyWith(
+              style: AppText.footnote.copyWith(
                 color: same ? AppColors.onAccent : AppColors.label,
               ),
             ),
@@ -394,30 +872,35 @@ class _GameBubbleState extends State<GameBubble> {
         ),
       );
 
+  /// Reveal: the lie flips over and turns.
   Widget _truthsResult(GameState game) {
     final lines = game.statements ?? const <String>[];
-    final right = game.guess != null && game.guess == game.lie;
-    final guesser = _startedByMe ? widget.theirName : 'You';
-    final headline = right
-        ? '$guesser spotted the lie!'
-        : '$guesser guessed wrong. The lie was number ${(game.lie ?? 0) + 1}.';
+    final flip = _step(0.2, 0.45);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          headline,
-          style: AppText.callout.copyWith(color: AppColors.accent),
-        ),
-        const SizedBox(height: 10),
         for (var i = 0; i < lines.length; i++)
-          _statement(lines[i], lie: game.lie == i, guessed: game.guess == i),
+          if (game.lie == i)
+            Transform(
+              alignment: Alignment.center,
+              transform: Matrix4.identity()
+                ..setEntry(3, 2, 0.002)
+                ..rotateX(math.sin(flip * math.pi) * math.pi / 2),
+              child: _statement(
+                lines[i],
+                lie: flip >= 0.5,
+                guessed: game.guess == i,
+              ),
+            )
+          else
+            _statement(lines[i], lie: false, guessed: game.guess == i),
       ],
     );
   }
 
   Widget _statement(String text, {required bool lie, bool guessed = false}) =>
       Padding(
-        padding: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.only(bottom: 6),
         child: _statementBox(
           text,
           lit: lie,
@@ -433,10 +916,10 @@ class _GameBubbleState extends State<GameBubble> {
     bool guessed = false,
   }) =>
       Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: lit ? AppColors.fill : AppColors.fill2,
-          borderRadius: BorderRadius.circular(Radii.row),
+          borderRadius: BorderRadius.circular(Radii.panel),
           border: Border.all(
             color: guessed ? AppColors.accent : AppColors.hairline,
           ),
@@ -446,7 +929,7 @@ class _GameBubbleState extends State<GameBubble> {
             Expanded(
               child: Text(
                 text,
-                style: AppText.body.copyWith(
+                style: AppText.footnote.copyWith(
                   color: lit ? AppColors.onAccent : AppColors.label,
                 ),
               ),
@@ -462,7 +945,7 @@ class _GameBubbleState extends State<GameBubble> {
               const SizedBox(width: 6),
               const Icon(
                 Icons.touch_app_rounded,
-                size: 16,
+                size: 14,
                 color: AppColors.accent,
               ),
             ],
@@ -474,68 +957,263 @@ class _GameBubbleState extends State<GameBubble> {
 
   Widget _question(GameState game) => Text(
         game.cards.isEmpty ? '' : game.cards.first.text,
-        style: AppText.body,
+        style: AppText.callout.copyWith(color: AppColors.label),
       );
 
   Widget _said(String who, String? text) => Padding(
-        padding: const EdgeInsets.only(top: 10),
+        padding: const EdgeInsets.only(top: 8),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
             color: AppColors.fill2,
-            borderRadius: BorderRadius.circular(Radii.row),
+            borderRadius: BorderRadius.circular(Radii.panel),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(who, style: AppText.micro.copyWith(color: AppColors.label2)),
               const SizedBox(height: 2),
-              Text(text ?? '', style: AppText.body),
+              Text(
+                text ?? '',
+                style: AppText.footnote.copyWith(color: AppColors.label),
+              ),
             ],
           ),
         ),
       );
 
   Widget _clue(GameCard? card) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.symmetric(vertical: 4),
         child: Text(
           card?.text ?? '',
           textAlign: TextAlign.center,
-          style: AppText.largeTitle,
+          style: AppText.title2,
         ),
       );
 
   Widget _movieResult(GameState game) {
     final card = game.cards.isEmpty ? null : game.cards.first;
-    final right = game.guess != null && game.guess == game.answer;
-    final guesser = _startedByMe ? widget.theirName : 'You';
-    final film = card != null &&
-            game.answer != null &&
-            game.answer! < card.options.length
-        ? card.options[game.answer!]
-        : '';
+    if (game.ownFilm) {
+      // Reveal: their guess types itself out, a tick or a cross, the title.
+      final said = game.replyText ?? '';
+      final typed = said.substring(0, (said.length * _step(0, 0.45)).round());
+      final right = game.correct == true;
+      final mark = _step(0.5, 0.2);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _clue(card),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Flexible(
+                child: Text(
+                  '${_capital(_guesser)}: $typed',
+                  style: AppText.callout.copyWith(color: AppColors.label),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Transform.scale(
+                scale: mark,
+                child: Icon(
+                  right ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                  size: 18,
+                  color: right ? AppColors.letterRight : AppColors.label3,
+                ),
+              ),
+            ],
+          ),
+          Opacity(
+            opacity: _step(0.65, 0.3),
+            child: Text(
+              right
+                  ? 'It was ${game.film ?? ''}'
+                  : '${_capital(_guesser)} said $said. It was '
+                      '${game.film ?? ''}.',
+              textAlign: TextAlign.center,
+              style: AppText.footnote.copyWith(color: AppColors.label2),
+            ),
+          ),
+        ],
+      );
+    }
+    // Reveal: a wrong pick shakes, then the film lights up.
+    final shake = _step(0, 0.35);
+    final lit = _t >= 0.5;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _clue(card),
-        Text(
-          right
-              ? '$guesser got it: $film!'
-              : '$guesser guessed wrong. It was $film.',
-          textAlign: TextAlign.center,
-          style: AppText.callout.copyWith(color: AppColors.accent),
-        ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 4),
         for (var i = 0; i < (card?.options.length ?? 0); i++)
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
-            child: _statementBox(
-              card!.options[i],
-              lit: i == game.answer,
-              tag: i == game.answer ? 'The film' : null,
-              guessed: i == game.guess,
+            child: Transform.translate(
+              offset: Offset(
+                i == game.guess && i != game.answer
+                    ? math.sin(shake * math.pi * 4) * 5 * (1 - shake)
+                    : 0,
+                0,
+              ),
+              child: _statementBox(
+                card!.options[i],
+                lit: lit && i == game.answer,
+                tag: lit && i == game.answer ? 'The film' : null,
+                guessed: i == game.guess,
+              ),
             ),
           ),
+      ],
+    );
+  }
+
+  static String _capital(String s) =>
+      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+
+  /// A box to type into, with its button: the name of their film.
+  Widget _typeIn({
+    required String hint,
+    required int maxChars,
+    required String label,
+    required bool ready,
+    required VoidCallback onSend,
+  }) {
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(Radii.panel),
+      borderSide: const BorderSide(color: AppColors.hairline),
+    );
+    return Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: _typed,
+            maxLength: maxChars,
+            textCapitalization: TextCapitalization.words,
+            style: AppText.footnote.copyWith(color: AppColors.label),
+            cursorColor: AppColors.accent,
+            onChanged: (_) => setState(() {}),
+            onSubmitted: (_) {
+              if (ready && !widget.busy) onSend();
+            },
+            decoration: InputDecoration(
+              counterText: '',
+              isDense: true,
+              hintText: hint,
+              hintStyle: AppText.footnote.copyWith(color: AppColors.label3),
+              filled: true,
+              fillColor: AppColors.menu,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+              border: border,
+              enabledBorder: border,
+              focusedBorder: border,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        MiniButton(
+          label: label,
+          busy: widget.busy,
+          onPressed: ready ? onSend : null,
+        ),
+      ],
+    );
+  }
+
+  // Worduel.
+
+  /// The rows played so far and, on my turn, the row I am typing: the letters
+  /// go straight into the tiles. Tapping the grid brings up the keyboard.
+  /// Once over (in the result sheet): the word, the path to it in colour, and
+  /// a new word to send back.
+  Widget _worduel(GameState game) {
+    if (game.done) return _worduelResult(game);
+    final myTurn = _myMove(game);
+    final typed = _typed.text.trim().toLowerCase();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (game.guesses.isEmpty && !myTurn)
+          Text(
+            'No guesses yet',
+            textAlign: TextAlign.center,
+            style: AppText.caption,
+          )
+        else
+          Center(
+            child: myTurn
+                ? WorduelTyping(
+                    controller: _typed,
+                    guesses: game.guesses,
+                    onSubmitted: (_) {
+                      final word = _typed.text.trim().toLowerCase();
+                      if (worduelWordReady(word) && !widget.busy) {
+                        widget.onWord(word);
+                      }
+                    },
+                  )
+                : WorduelGrid(
+                    guesses: game.guesses,
+                    showEmpty: false,
+                    tile: 30,
+                  ),
+          ),
+        if (myTurn) ...[
+          const SizedBox(height: 8),
+          if (worduelWordReady(typed))
+            Center(
+              child: IntrinsicWidth(
+                child: MiniButton(
+                  label: 'Guess',
+                  busy: widget.busy,
+                  onPressed: () => widget.onWord(typed),
+                ),
+              ),
+            )
+          else
+            Text(
+              'Tap the tiles to type',
+              textAlign: TextAlign.center,
+              style: AppText.caption,
+            ),
+        ],
+      ],
+    );
+  }
+
+  Widget _worduelResult(GameState game) {
+    final newWord = widget.onNewWord;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Reveal: the word's tiles flip over one at a time.
+        Center(
+          child: WorduelWord(
+            word: game.word ?? '',
+            tile: 30,
+            flipped: _t,
+            color: game.correct == true
+                ? AppColors.letterRight
+                : AppColors.letterAbsent,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Center(child: WorduelPath(guesses: game.guesses, size: 14)),
+        if (newWord != null) ...[
+          const SizedBox(height: 14),
+          Center(
+            child: IntrinsicWidth(
+              child: MiniButton(
+                label: 'Send a new word',
+                onPressed: () {
+                  // From the result sheet, close it first.
+                  if (widget.expanded) Navigator.of(context).pop();
+                  newWord();
+                },
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -543,49 +1221,38 @@ class _GameBubbleState extends State<GameBubble> {
   // Tic tac toe.
 
   Widget _board(GameState game) {
-    final mine = _startedByMe ? 'x' : 'o';
-    final myTurn = !game.done && game.turn == widget.me;
-    final String status;
-    if (!game.done) {
-      status = myTurn ? 'Your turn' : 'Waiting for ${widget.theirName}';
-    } else if (game.winner == null) {
-      status = 'A draw';
-    } else {
-      status = game.winner == mine ? 'You won!' : '${widget.theirName} won';
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          status,
-          textAlign: TextAlign.center,
-          style: AppText.callout.copyWith(
-            color: myTurn || game.done ? AppColors.accent : AppColors.label2,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Center(
-          child: TicTacToeBoard(
-            board: game.board ?? '         ',
-            line: game.line,
-            onTap: myTurn && !widget.busy ? widget.onMove : null,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'You are ${mine.toUpperCase()}',
-          textAlign: TextAlign.center,
-          style: AppText.micro,
-        ),
-      ],
+    final myTurn = _myMove(game);
+    return Center(
+      child: TicTacToeBoard(
+        board: game.board ?? '         ',
+        line: game.line,
+        // Reveal: the winning line draws across.
+        drawn: _step(0.15, 0.5),
+        size: widget.expanded ? 180 : 132,
+        onTap: myTurn && !widget.busy ? widget.onMove : null,
+      ),
     );
   }
 
   // FLAMES.
 
+  /// The first time, live: the whole working, as it was done at school
+  /// (FlamesWorking), with a Skip. After that, the letters with the crossed
+  /// ones dimmed, the word, and "See the working" to play it again.
   Widget _flames(GameState game) {
     final result = game.flames;
     if (result == null) return const SizedBox.shrink();
+    if (_working) {
+      return FlamesWorking(
+        result: result,
+        autoplay: true,
+        onDone: () {
+          if (mounted) setState(() => _working = false);
+          widget.onRevealed?.call();
+        },
+      );
+    }
+    final out = flamesOrder(result.left);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -598,37 +1265,63 @@ class _GameBubbleState extends State<GameBubble> {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            for (final letter in 'FLAMES'.split(''))
-              Container(
-                width: 30,
-                height: 30,
-                margin: const EdgeInsets.symmetric(horizontal: 2),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: letter == result.letter
-                      ? AppColors.fill
-                      : AppColors.fill2,
-                  shape: BoxShape.circle,
-                ),
-                child: Text(
-                  letter,
-                  style: AppText.bodyStrong.copyWith(
-                    color: letter == result.letter
-                        ? AppColors.onAccent
-                        : AppColors.label3,
-                  ),
-                ),
+            for (final (i, letter) in 'FLAMES'.split('').indexed)
+              Builder(
+                builder: (_) {
+                  final step = out.indexOf(i);
+                  final gone = step < 0 ? 0.0 : _step(0.08 + step * 0.11, 0.1);
+                  final kept = letter == result.letter && _t >= 0.68;
+                  return Opacity(
+                    opacity: 1 - gone * 0.75,
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      margin: const EdgeInsets.symmetric(horizontal: 2),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: kept ? AppColors.fill : AppColors.fill2,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        letter,
+                        style: AppText.bodyStrong.copyWith(
+                          color: kept ? AppColors.onAccent : AppColors.label3,
+                          decoration:
+                              gone > 0.5 ? TextDecoration.lineThrough : null,
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
           ],
         ),
-        const SizedBox(height: 12),
-        Text(result.word, textAlign: TextAlign.center, style: AppText.title2),
-        const SizedBox(height: 2),
-        Text(
-          result.line,
-          textAlign: TextAlign.center,
-          style: AppText.footnote.copyWith(color: AppColors.label2),
+        const SizedBox(height: 10),
+        Opacity(
+          opacity: _step(0.72, 0.28),
+          child: Column(
+            children: [
+              Text(
+                result.word,
+                textAlign: TextAlign.center,
+                style: AppText.title2,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                result.line,
+                textAlign: TextAlign.center,
+                style: AppText.footnote.copyWith(color: AppColors.label2),
+              ),
+            ],
+          ),
         ),
+        if (result.left > 0)
+          Center(
+            child: TextActionButton(
+              label: 'See the working',
+              onPressed: () => setState(() => _working = true),
+            ),
+          ),
       ],
     );
   }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -86,6 +87,18 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
 
   /// A game is being dealt, started or answered.
   bool _gameBusy = false;
+
+  /// Games that ended while this chat was open, by id: their result plays its
+  /// reveal once, then the id goes.
+  final _reveal = <String>{};
+
+  /// The newest game waiting on me, as the list draws it: the key on its card,
+  /// and its name for the pill that takes me back to it when it is off screen.
+  final _turnKey = GlobalKey();
+  String? _turnTitle;
+  bool _turnInView = true;
+  final _list = ScrollController();
+  final _listKey = GlobalKey();
 
   /// The tiles the conversation opens on, before any message.
   List<Opener> _openers = const [];
@@ -203,6 +216,7 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
     unawaited(_events?.cancel());
     _typingClear?.cancel();
     _composer.dispose();
+    _list.dispose();
     super.dispose();
   }
 
@@ -299,6 +313,17 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
   /// drops the pending bubble each one answers.
   void _merge(Iterable<Message> incoming) {
     final all = incoming.toList();
+    // A game that ends in a message newer than any held ended while this chat
+    // was open: its card plays its reveal, once. An older page loaded never
+    // does.
+    final newest = _messages.isEmpty ? null : _messages.last.seq;
+    for (final m in all) {
+      final game = m.game;
+      if (game == null || !game.done || newest == null || m.seq <= newest) {
+        continue;
+      }
+      if (!(_games[game.id]?.done ?? false)) _reveal.add(game.id);
+    }
     // Before the filter below: a message already held can still bring a newer
     // copy of its game.
     final moved = _absorb(all);
@@ -520,12 +545,33 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
     await _playGame();
   }
 
-  Future<void> _playGame() async {
+  /// The games list, told first how many already wait on them so it can say so
+  /// before a pick. Unknown, it shows no count and the server still has its
+  /// say.
+  Future<GameKind?> _pickGame() async {
+    ({int waiting, int cap})? load;
+    try {
+      load = await ref.read(chatRepositoryProvider).gamesWaiting(_matchId);
+    } on ApiException {
+      load = null;
+    }
+    if (!mounted) return null;
+    return showGamesSheet(
+      context,
+      waiting: load?.waiting ?? 0,
+      cap: load?.cap ?? 5,
+      theirName: _person?.firstName ?? 'them',
+    );
+  }
+
+  /// Starts a game: the one picked from the games list, or [only] without the
+  /// list (a finished Worduel's "Send a new word").
+  Future<void> _playGame({GameKind? only}) async {
     if (_ended || _gameBusy) return;
     if (_mustVerify) return _askToVerify();
-    final game = await showGamesSheet(context);
-    if (game == null || !mounted) return;
     final repo = ref.read(chatRepositoryProvider);
+    final game = only ?? await _pickGame();
+    if (game == null || !mounted) return;
     final clientId = Ids.uuid();
     setState(() => _gameBusy = true);
     try {
@@ -536,14 +582,15 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
         case GameKind.neverHaveIEver:
           final cards = await repo.dealGame(_matchId, game);
           if (!mounted || cards.isEmpty) return;
-          final picks = await showCardsSheet(context, game: game, cards: cards);
-          if (picks == null || !mounted) return;
+          final chosen =
+              await showCardsSheet(context, game: game, cards: cards);
+          if (chosen == null || !mounted) return;
           sending = repo.startGame(
             _matchId,
             game: game,
             clientId: clientId,
-            cards: [for (final c in cards) c.key],
-            picks: picks,
+            cards: chosen.$1,
+            picks: chosen.$2,
           );
         case GameKind.twoTruths:
           final written = await showTwoTruthsSheet(context);
@@ -558,17 +605,9 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
         case GameKind.flames:
           sending = repo.startGame(_matchId, game: game, clientId: clientId);
         case GameKind.truth:
-          final cards = await repo.dealGame(_matchId, game);
-          if (!mounted || cards.isEmpty) return;
-          final text = await showTruthSheet(context, question: cards.first.text);
-          if (text == null || !mounted) return;
-          sending = repo.startGame(
-            _matchId,
-            game: game,
-            clientId: clientId,
-            cards: [cards.first.key],
-            text: text,
-          );
+          // Not in the list any more (GameKind.offered): a question is asked
+          // in the chat. Truth games already sent are still answered.
+          return;
         case GameKind.guessMovie:
           // Deal until they send one or back out.
           while (true) {
@@ -576,14 +615,47 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
             if (!mounted || cards.isEmpty) return;
             final choice = await showMovieDealSheet(context, card: cards.first);
             if (choice == null || !mounted) return;
-            if (choice == MovieChoice.send) {
-              sending = repo.startGame(
+            if (choice == MovieChoice.another) continue;
+            final Object card;
+            if (choice == MovieChoice.own) {
+              final own = await showOwnCardSheet(context, game: game);
+              if (own == null || !mounted) return;
+              card = own;
+            } else {
+              card = cards.first.key;
+            }
+            sending = repo.startGame(
+              _matchId,
+              game: game,
+              clientId: clientId,
+              cards: [card],
+            );
+            break;
+          }
+        case GameKind.worduel:
+          final words = await repo.dealGame(_matchId, game);
+          // Ask again while their own word is not one the server knows.
+          while (true) {
+            if (!mounted) return;
+            final word = await showWorduelStartSheet(
+              context,
+              words: words,
+              theirName: _person?.firstName ?? 'them',
+              more: () => repo.dealGame(_matchId, game),
+            );
+            if (word == null || !mounted) return;
+            try {
+              final message = await repo.startGame(
                 _matchId,
                 game: game,
                 clientId: clientId,
-                cards: [cards.first.key],
+                cards: [word],
               );
+              sending = Future.value(message);
               break;
+            } on ApiException catch (e) {
+              if (e.code != 'not_a_word') rethrow;
+              if (mounted) showAppToast(context, e.message);
             }
           }
         case GameKind.ticTacToe:
@@ -637,10 +709,10 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
     }
   }
 
-  /// A square on a board. A board that moved on since it was drawn (the square
-  /// taken, not my turn any more) is refused by the server, and the page
-  /// catches up to show where it is.
-  Future<void> _moveGame(GameState game, int cell) async {
+  /// A square on a board, or a guess in a Worduel. A game that moved on since
+  /// it was drawn (the square taken, not my turn any more) is refused by the
+  /// server, and the page catches up to show where it is.
+  Future<void> _moveGame(GameState game, {int? cell, String? word}) async {
     if (_ended || _gameBusy) return;
     if (_mustVerify) return _askToVerify();
     setState(() => _gameBusy = true);
@@ -650,6 +722,7 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
             game.id,
             clientId: Ids.uuid(),
             cell: cell,
+            word: word,
           );
       if (!mounted) return;
       _merge([message]);
@@ -967,37 +1040,58 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
         ),
       for (final p in _pending.reversed) _PendingBubble(pending: p, onRetry: _deliver),
     ];
-    // A board is one live card, drawn where its newest message is.
-    final newestOfBoard = <String, int>{};
+    // A board or a Worduel is one live card, drawn where its newest message is.
+    final newestOfLive = <String, int>{};
     for (final m in _messages) {
       final g = m.game;
-      if (g != null && g.kind == GameKind.ticTacToe) newestOfBoard[g.id] = m.seq;
+      if (g != null && (g.kind?.live ?? false)) newestOfLive[g.id] = m.seq;
     }
+    String? turnTitle;
+    // A finished game stays open while nothing has been said after it; the
+    // next message, even one still sending, folds it.
+    final newestSeq = _pending.isEmpty && _messages.isNotEmpty
+        ? _messages.last.seq
+        : null;
     for (var i = _messages.length - 1; i >= 0; i--) {
       final m = _messages[i];
       final game = m.game == null ? null : _games[m.game!.id] ?? m.game;
-      final board = m.game?.kind == GameKind.ticTacToe;
-      if (board && newestOfBoard[m.game!.id] != m.seq) continue;
-      rows.add(
-        game != null && me != null
-            ? GameBubble(
-                key: ValueKey('game-${m.id}'),
-                message: m,
-                game: game,
-                me: me,
-                theirName: _person?.firstName ?? 'They',
-                busy: _gameBusy,
-                onPicks: (picks) => unawaited(_answerGame(game, picks: picks)),
-                onGuess: (guess) => unawaited(_answerGame(game, guess: guess)),
-                onText: (text) => unawaited(_answerGame(game, text: text)),
-                onMove: (cell) => unawaited(_moveGame(game, cell)),
-              )
-            : _Bubble(
-                message: m,
-                mine: me != null && m.mine(me),
-                read: m.seq == myLatestRead,
-              ),
-      );
+      final live = m.game?.kind?.live ?? false;
+      if (live && newestOfLive[m.game!.id] != m.seq) continue;
+      // The newest game waiting on me, where its card is: a live game's one
+      // card, or the start of one I answer.
+      final waitsOnMe = turnTitle == null &&
+          game != null &&
+          me != null &&
+          game.myTurn(me) &&
+          (live || !m.gameAnswer);
+      if (waitsOnMe) turnTitle = game.title;
+      Widget row = game != null && me != null
+          ? GameBubble(
+              key: ValueKey('game-${m.id}'),
+              message: m,
+              game: game,
+              me: me,
+              theirName: _person?.firstName ?? 'They',
+              busy: _gameBusy,
+              onPicks: (picks) => unawaited(_answerGame(game, picks: picks)),
+              onGuess: (guess) => unawaited(_answerGame(game, guess: guess)),
+              onText: (text) => unawaited(_answerGame(game, text: text)),
+              onMove: (cell) => unawaited(_moveGame(game, cell: cell)),
+              onWord: (word) => unawaited(_moveGame(game, word: word)),
+              onNewWord: game.kind == GameKind.worduel
+                  ? () => unawaited(_playGame(only: GameKind.worduel))
+                  : null,
+              latest: m.seq == newestSeq,
+              reveal: _reveal.contains(game.id),
+              onRevealed: () => _reveal.remove(game.id),
+            )
+          : _Bubble(
+              message: m,
+              mine: me != null && m.mine(me),
+              read: m.seq == myLatestRead,
+            );
+      if (waitsOnMe) row = KeyedSubtree(key: _turnKey, child: row);
+      rows.add(row);
       final older = i > 0 ? _messages[i - 1] : null;
       if (older == null ||
           dayLabel(older.sentAt.toLocal()) != dayLabel(m.sentAt.toLocal())) {
@@ -1048,10 +1142,84 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
       ),
     );
 
-    return ListView(
-      reverse: true,
-      padding: const EdgeInsets.fromLTRB(Insets.gutter, 12, Insets.gutter, 16),
-      children: rows,
+    _turnTitle = turnTitle;
+    // Where the card is only shows once it is laid out.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkTurnInView());
+    return Stack(
+      children: [
+        NotificationListener<ScrollNotification>(
+          onNotification: (_) {
+            _checkTurnInView();
+            return false;
+          },
+          child: ListView(
+            key: _listKey,
+            controller: _list,
+            reverse: true,
+            padding:
+                const EdgeInsets.fromLTRB(Insets.gutter, 12, Insets.gutter, 16),
+            children: rows,
+          ),
+        ),
+        if (turnTitle != null && !_turnInView)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 12,
+            child: Center(
+              child: _TurnPill(
+                title: turnTitle,
+                onTap: () => unawaited(_goToTurn()),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// Whether the card of the game waiting on me is on screen. Off it, a pill
+  /// above the keyboard says so.
+  void _checkTurnInView() {
+    if (!mounted) return;
+    final inView = _turnTitle == null || _onScreen(_turnKey);
+    if (inView != _turnInView) setState(() => _turnInView = inView);
+  }
+
+  bool _onScreen(GlobalKey key) {
+    final card = key.currentContext?.findRenderObject();
+    final list = _listKey.currentContext?.findRenderObject();
+    if (card is! RenderBox || list is! RenderBox) return false;
+    if (!card.attached || !card.hasSize || !list.hasSize) return false;
+    final top = card.localToGlobal(Offset.zero, ancestor: list).dy;
+    final bottom = top + card.size.height;
+    // Most of it, not a sliver at an edge.
+    const margin = 32.0;
+    return bottom > margin && top < list.size.height - margin;
+  }
+
+  /// Scrolls to the game waiting on me. A card far away is not built yet, so
+  /// the list moves a screen at a time until it is, first towards the newest
+  /// messages and then towards the oldest.
+  Future<void> _goToTurn() async {
+    for (final older in [false, true]) {
+      for (var i = 0; i < 40; i++) {
+        if (_turnKey.currentContext != null || !_list.hasClients) break;
+        final p = _list.position;
+        final to = older
+            ? (p.pixels + p.viewportDimension).clamp(0.0, p.maxScrollExtent)
+            : (p.pixels - p.viewportDimension).clamp(0.0, p.maxScrollExtent);
+        if (to == p.pixels) break;
+        await _list.animateTo(to, duration: Motion.press, curve: Curves.linear);
+      }
+      if (_turnKey.currentContext != null) break;
+    }
+    final card = _turnKey.currentContext;
+    if (card == null || !card.mounted) return;
+    await Scrollable.ensureVisible(
+      card,
+      alignment: 0.5,
+      duration: Motion.page,
+      curve: Ease.emphasised,
     );
   }
 
@@ -1379,6 +1547,58 @@ class _PendingBubble extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// "Your turn in Worduel", frosted over the chat above the keyboard, while the
+/// game waiting on me is scrolled out of sight. A tap goes back to it.
+class _TurnPill extends StatelessWidget {
+  const _TurnPill({required this.title, required this.onTap});
+
+  final String title;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      semanticLabel: 'Your turn in $title. Go to it',
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(Radii.control),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.glass,
+              borderRadius: BorderRadius.circular(Radii.control),
+              border: Border.all(color: AppColors.glassEdge),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.casino_outlined,
+                  size: 16,
+                  color: AppColors.accent,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Your turn in $title',
+                  style: AppText.footnote.copyWith(color: AppColors.label),
+                ),
+                const SizedBox(width: 4),
+                const Icon(
+                  Icons.arrow_upward_rounded,
+                  size: 15,
+                  color: AppColors.label2,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

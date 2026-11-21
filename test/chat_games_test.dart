@@ -697,6 +697,73 @@ void main() {
     // out E, M, S, L, A and leaves F.
     expect(flamesOrder(5), [4, 3, 5, 1, 2]);
     expect(flamesOrder(0), isEmpty);
+    // Each round counts 5 from where the last stopped.
+    expect(flamesRounds(5).first.hops, [0, 1, 2, 3, 4]);
+  });
+
+  test('FLAMES crosses out shared letters one for one, as the server does', () {
+    final arjun = flamesLetters('Arjun');
+    final priya = flamesLetters('Priya');
+    expect(arjun, ['a', 'r', 'j', 'u', 'n']);
+    expect(flamesPairs(arjun, priya), [(0, 4), (1, 1)]);
+    // Accents off, case folded, anything else dropped.
+    expect(flamesLetters('Zoë-Ann'), ['z', 'o', 'e', 'a', 'n', 'n']);
+    // One for one: two a's against one cross out one pair.
+    expect(flamesPairs(flamesLetters('Aara'), flamesLetters('Ram')).length, 2);
+  });
+
+  testWidgets('FLAMES, live: the whole working plays, then the result',
+      (tester) async {
+    var revealed = 0;
+    final m = Message.fromJson(
+      message(
+        {
+          ...game(kind: 'flames', status: 'done'),
+          'title': 'FLAMES',
+          'flames': {
+            'names': ['Arjun', 'Priya'],
+            'letter': 'M',
+            'word': 'Marriage',
+            'line': 'The cards have spoken.',
+            'left': 6,
+          },
+        },
+      ),
+    );
+    await pump(
+      tester,
+      GameBubble(
+        message: m,
+        game: m.game!,
+        me: me,
+        theirName: 'Priya',
+        latest: true,
+        reveal: true,
+        onRevealed: () => revealed++,
+        onPicks: (_) {},
+        onGuess: (_) {},
+        onText: (_) {},
+        onMove: (_) {},
+        onWord: (_) {},
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(
+      find.text('Cross out the letters both names share, one for one.'),
+      findsOneWidget,
+    );
+    expect(find.text('Skip'), findsOneWidget);
+    await tester.tap(find.text('Skip'));
+    await tester.pumpAndSettle();
+    expect(revealed, 1);
+    // Settled: the short result, and the working on a tap.
+    expect(find.text('Marriage'), findsOneWidget);
+    expect(find.text('Skip'), findsNothing);
+    await tester.tap(find.text('See the working'));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('Skip'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.text('See the working'), findsOneWidget);
   });
 
   Message answered(Map<String, Object?> g) =>

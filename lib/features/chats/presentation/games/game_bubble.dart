@@ -100,6 +100,10 @@ class _GameBubbleState extends State<GameBubble>
 
   static const _revealFor = Duration(milliseconds: 1100);
 
+  /// FLAMES: the full working is playing here, the first time (its own
+  /// reveal) or because "See the working" was tapped.
+  bool _working = false;
+
   @override
   void initState() {
     super.initState();
@@ -118,6 +122,11 @@ class _GameBubbleState extends State<GameBubble>
 
   void _maybeReveal() {
     if (!widget.reveal || !widget.game.done || _reveal != null) return;
+    if (widget.game.kind == GameKind.flames) {
+      // FLAMES' reveal is the whole working, which keeps its own time.
+      if (!_working && !widget.expanded) _working = true;
+      return;
+    }
     _reveal = AnimationController(vsync: this, duration: _revealFor)
       ..addListener(() => setState(() {}))
       ..forward().whenComplete(() => widget.onRevealed?.call());
@@ -1227,11 +1236,22 @@ class _GameBubbleState extends State<GameBubble>
 
   // FLAMES.
 
-  /// Reveal: the letters cross out in the order the count lands on them, the
-  /// last one lights, then its word.
+  /// The first time, live: the whole working, as it was done at school
+  /// (FlamesWorking), with a Skip. After that, the letters with the crossed
+  /// ones dimmed, the word, and "See the working" to play it again.
   Widget _flames(GameState game) {
     final result = game.flames;
     if (result == null) return const SizedBox.shrink();
+    if (_working) {
+      return FlamesWorking(
+        result: result,
+        autoplay: true,
+        onDone: () {
+          if (mounted) setState(() => _working = false);
+          widget.onRevealed?.call();
+        },
+      );
+    }
     final out = flamesOrder(result.left);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1295,6 +1315,13 @@ class _GameBubbleState extends State<GameBubble>
             ],
           ),
         ),
+        if (result.left > 0)
+          Center(
+            child: TextActionButton(
+              label: 'See the working',
+              onPressed: () => setState(() => _working = true),
+            ),
+          ),
       ],
     );
   }

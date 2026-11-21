@@ -1594,3 +1594,267 @@ Future<T?> _showGlassSheet<T>(
     ),
   );
 }
+
+/// FLAMES worked out in full, as it was done by hand at school: the letters
+/// the two names share cross out in pairs, what is left is counted, and the
+/// count goes round F-L-A-M-E-S crossing out where it lands until one letter
+/// is left. Plays from the start with [autoplay], with a Skip; otherwise drawn
+/// worked. [onDone] once it has played or been skipped.
+///
+/// The count is the server's ([FlamesResult.left]); the letters crossed out
+/// are worked out here the same way, and if this phone folds a name's letters
+/// differently they are not shown crossed, never with a wrong count.
+class FlamesWorking extends StatefulWidget {
+  const FlamesWorking({
+    required this.result,
+    this.autoplay = false,
+    this.onDone,
+    super.key,
+  });
+
+  final FlamesResult result;
+  final bool autoplay;
+  final VoidCallback? onDone;
+
+  @override
+  State<FlamesWorking> createState() => _FlamesWorkingState();
+}
+
+class _FlamesWorkingState extends State<FlamesWorking>
+    with SingleTickerProviderStateMixin {
+  late final List<String> _first;
+  late final List<String> _second;
+  late final List<(int, int)> _pairs;
+  late final List<({List<int> hops, int gone})> _rounds;
+  late final int _left;
+
+  // When each step happens, in seconds from the start.
+  static const _start = 0.3;
+  static const _perPair = 0.6;
+  static const _perHop = 0.16;
+  late final double _leftAt;
+  late final List<double> _roundAt;
+  late final double _winAt;
+  late final double _total;
+
+  late final AnimationController _play;
+
+  @override
+  void initState() {
+    super.initState();
+    final names = widget.result.names;
+    _first = flamesLetters(names.isNotEmpty ? names.first : '');
+    _second = flamesLetters(names.length > 1 ? names[1] : '');
+    _left = widget.result.left;
+    final pairs = flamesPairs(_first, _second);
+    // Shown crossed only when this phone's count agrees with the server's.
+    _pairs = _first.length + _second.length - 2 * pairs.length == _left
+        ? pairs
+        : const [];
+    _rounds = flamesRounds(_left);
+    _leftAt = _start + _pairs.length * _perPair + 0.2;
+    var at = _leftAt + 0.8;
+    _roundAt = [];
+    for (final r in _rounds) {
+      _roundAt.add(at);
+      at += r.hops.length * _perHop + 0.35;
+    }
+    _winAt = at;
+    _total = _winAt + 0.9;
+    _play = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: (_total * 1000).round()),
+    )..addListener(() => setState(() {}));
+    if (widget.autoplay) {
+      _play.forward().whenComplete(() => widget.onDone?.call());
+    } else {
+      _play.value = 1;
+    }
+  }
+
+  @override
+  void dispose() {
+    _play.dispose();
+    super.dispose();
+  }
+
+  double get _s => _play.value * _total;
+
+  /// Jumps to the end. Stopping the play this way never completes it, so this
+  /// says it is done itself.
+  void _skip() {
+    _play.value = 1;
+    widget.onDone?.call();
+  }
+
+  /// Where the count is: the letter it is on and the number it has reached,
+  /// or null between rounds.
+  (int, int)? get _hop {
+    for (var r = 0; r < _rounds.length; r++) {
+      final into = _s - _roundAt[r];
+      final hops = _rounds[r].hops;
+      if (into >= 0 && into < hops.length * _perHop) {
+        final k = (into / _perHop).floor();
+        return (hops[k], k + 1);
+      }
+    }
+    return null;
+  }
+
+  bool _gone(int letter) {
+    for (var r = 0; r < _rounds.length; r++) {
+      if (_rounds[r].gone == letter) {
+        return _s >= _roundAt[r] + _rounds[r].hops.length * _perHop;
+      }
+    }
+    return false;
+  }
+
+  String get _caption {
+    if (_s >= _winAt) return 'One letter left: ${widget.result.letter}';
+    if (_s >= _leftAt) {
+      return '$_left letters left. Count $_left round FLAMES, and cross out '
+          'where you land.';
+    }
+    if (_pairs.isEmpty) return '';
+    return 'Cross out the letters both names share, one for one.';
+  }
+
+  Widget _name(List<String> letters, String name, {required bool first}) {
+    final crossedAt = <int, double>{
+      for (final (k, p) in _pairs.indexed)
+        first ? p.$1 : p.$2: _start + k * _perPair,
+    };
+    return Column(
+      children: [
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 4,
+          runSpacing: 4,
+          children: [
+            for (final (i, l) in letters.indexed)
+              _letter(l, crossedAt[i]),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(name, style: AppText.micro.copyWith(color: AppColors.label2)),
+      ],
+    );
+  }
+
+  Widget _letter(String l, double? at) {
+    final pairing = at != null && _s >= at && _s < at + 0.3;
+    final crossed = at != null && _s >= at + 0.3;
+    final counted = !crossed && _s >= _leftAt;
+    return Opacity(
+      opacity: crossed ? 0.35 : 1,
+      child: Container(
+        width: 24,
+        height: 28,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: counted
+              ? AppColors.fill
+              : pairing
+                  ? AppColors.glow
+                  : AppColors.fill2,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          l.toUpperCase(),
+          style: AppText.footnote.copyWith(
+            color: AppColors.label,
+            decoration: crossed ? TextDecoration.lineThrough : null,
+            decorationColor: AppColors.accent,
+            decorationThickness: 2,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _flame(int i, String letter, (int, int)? hop, {required bool won}) {
+    final on = hop != null && hop.$1 == i;
+    final gone = _gone(i);
+    final kept = won && letter == widget.result.letter;
+    return Container(
+      width: 30,
+      height: 30,
+      margin: const EdgeInsets.symmetric(horizontal: 2),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: kept
+            ? AppColors.fill
+            : on
+                ? AppColors.glow
+                : AppColors.fill2,
+        shape: BoxShape.circle,
+      ),
+      child: Text(
+        on ? '${hop.$2}' : letter,
+        style: AppText.bodyStrong.copyWith(
+          color: kept
+              ? AppColors.onAccent
+              : on
+                  ? AppColors.accent
+                  : gone
+                      ? AppColors.label4
+                      : AppColors.label,
+          decoration: gone && !on ? TextDecoration.lineThrough : null,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final names = widget.result.names;
+    final hop = _hop;
+    final won = _s >= _winAt;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _name(_first, names.isNotEmpty ? names.first : '', first: true),
+        const SizedBox(height: 6),
+        _name(_second, names.length > 1 ? names[1] : '', first: false),
+        const SizedBox(height: 10),
+        Text(
+          _caption,
+          textAlign: TextAlign.center,
+          style: AppText.caption.copyWith(color: AppColors.label2),
+        ),
+        const SizedBox(height: 14),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (final (i, letter) in 'FLAMES'.split('').indexed)
+              _flame(i, letter, hop, won: won),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Opacity(
+          opacity: ((_s - _winAt - 0.2) / 0.5).clamp(0.0, 1.0),
+          child: Column(
+            children: [
+              Text(
+                widget.result.word,
+                textAlign: TextAlign.center,
+                style: AppText.title2,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                widget.result.line,
+                textAlign: TextAlign.center,
+                style: AppText.footnote.copyWith(color: AppColors.label2),
+              ),
+            ],
+          ),
+        ),
+        if (_play.isAnimating)
+          Center(
+            child: TextActionButton(label: 'Skip', onPressed: _skip, dim: true),
+          ),
+      ],
+    );
+  }
+}

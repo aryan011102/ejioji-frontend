@@ -158,16 +158,57 @@ class FlamesResult {
 /// them out, as the server works it out (chat/games.py): count round that far,
 /// cross out where it lands, and count on from the next. Five go; the one not
 /// listed is the answer. Empty when there is no count to show.
-List<int> flamesOrder(int left) {
+List<int> flamesOrder(int left) => [for (final r in flamesRounds(left)) r.gone];
+
+/// The count round FLAMES, a round at a time: the letters each count lands on,
+/// in order ([hops], [left] of them), and the one it crosses out ([gone]).
+List<({List<int> hops, int gone})> flamesRounds(int left) {
   if (left <= 0) return const [];
   final letters = [0, 1, 2, 3, 4, 5];
-  final out = <int>[];
+  final rounds = <({List<int> hops, int gone})>[];
   var at = 0;
   while (letters.length > 1) {
+    final hops = [
+      for (var s = 0; s < left; s++) letters[(at + s) % letters.length],
+    ];
     at = (at + left - 1) % letters.length;
-    out.add(letters.removeAt(at));
+    rounds.add((hops: hops, gone: letters.removeAt(at)));
   }
-  return out;
+  return rounds;
+}
+
+/// A name's letters as FLAMES counts them: a to z only, accents off, case
+/// folded, as the server does (chat/games.py `_letters`).
+List<String> flamesLetters(String name) {
+  const plain = {
+    'á': 'a', 'à': 'a', 'â': 'a', 'ä': 'a', 'ã': 'a', 'å': 'a', 'ā': 'a',
+    'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e', 'ē': 'e',
+    'í': 'i', 'ì': 'i', 'î': 'i', 'ï': 'i', 'ī': 'i',
+    'ó': 'o', 'ò': 'o', 'ô': 'o', 'ö': 'o', 'õ': 'o', 'ō': 'o',
+    'ú': 'u', 'ù': 'u', 'û': 'u', 'ü': 'u', 'ū': 'u',
+    'ñ': 'n', 'ç': 'c', 'ý': 'y', 'ÿ': 'y',
+  };
+  return [
+    for (final ch in name.toLowerCase().split(''))
+      if (RegExp('[a-z]').hasMatch(plain[ch] ?? ch)) plain[ch] ?? ch,
+  ];
+}
+
+/// The letters two names share, crossed out one for one: each pair is a place
+/// in the first name's letters and a place in the second's.
+List<(int, int)> flamesPairs(List<String> first, List<String> second) {
+  final used = <int>{};
+  final pairs = <(int, int)>[];
+  for (var i = 0; i < first.length; i++) {
+    for (var j = 0; j < second.length; j++) {
+      if (!used.contains(j) && second[j] == first[i]) {
+        used.add(j);
+        pairs.add((i, j));
+        break;
+      }
+    }
+  }
+  return pairs;
 }
 
 /// A game as it stands, as this person may see it. The other person's answers

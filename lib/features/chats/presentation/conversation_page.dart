@@ -88,6 +88,10 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
   /// A game is being dealt, started or answered.
   bool _gameBusy = false;
 
+  /// Games that ended while this chat was open, by id: their result plays its
+  /// reveal once, then the id goes.
+  final _reveal = <String>{};
+
   /// The newest game waiting on me, as the list draws it: the key on its card,
   /// and its name for the pill that takes me back to it when it is off screen.
   final _turnKey = GlobalKey();
@@ -309,6 +313,17 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
   /// drops the pending bubble each one answers.
   void _merge(Iterable<Message> incoming) {
     final all = incoming.toList();
+    // A game that ends in a message newer than any held ended while this chat
+    // was open: its card plays its reveal, once. An older page loaded never
+    // does.
+    final newest = _messages.isEmpty ? null : _messages.last.seq;
+    for (final m in all) {
+      final game = m.game;
+      if (game == null || !game.done || newest == null || m.seq <= newest) {
+        continue;
+      }
+      if (!(_games[game.id]?.done ?? false)) _reveal.add(game.id);
+    }
     // Before the filter below: a message already held can still bring a newer
     // copy of its game.
     final moved = _absorb(all);
@@ -1013,6 +1028,11 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
       if (g != null && (g.kind?.live ?? false)) newestOfLive[g.id] = m.seq;
     }
     String? turnTitle;
+    // A finished game stays open while nothing has been said after it; the
+    // next message, even one still sending, folds it.
+    final newestSeq = _pending.isEmpty && _messages.isNotEmpty
+        ? _messages.last.seq
+        : null;
     for (var i = _messages.length - 1; i >= 0; i--) {
       final m = _messages[i];
       final game = m.game == null ? null : _games[m.game!.id] ?? m.game;
@@ -1042,6 +1062,9 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
               onNewWord: game.kind == GameKind.worduel
                   ? () => unawaited(_playGame(only: GameKind.worduel))
                   : null,
+              latest: m.seq == newestSeq,
+              reveal: _reveal.contains(game.id),
+              onRevealed: () => _reveal.remove(game.id),
             )
           : _Bubble(
               message: m,

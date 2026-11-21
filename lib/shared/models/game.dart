@@ -130,12 +130,17 @@ class FlamesResult {
     required this.letter,
     required this.word,
     required this.line,
+    this.left = 0,
   });
 
   final List<String> names;
   final String letter;
   final String word;
   final String line;
+
+  /// How many letters were left after crossing out the shared ones: the count
+  /// round F-L-A-M-E-S.
+  final int left;
 
   static FlamesResult? maybe(Json? j) {
     if (j == null) return null;
@@ -144,8 +149,25 @@ class FlamesResult {
       letter: j.str('letter'),
       word: j.str('word'),
       line: j.str('line'),
+      left: j.intOr('left', 0),
     );
   }
+}
+
+/// The letters of FLAMES, by place, in the order a count of [left] crosses
+/// them out, as the server works it out (chat/games.py): count round that far,
+/// cross out where it lands, and count on from the next. Five go; the one not
+/// listed is the answer. Empty when there is no count to show.
+List<int> flamesOrder(int left) {
+  if (left <= 0) return const [];
+  final letters = [0, 1, 2, 3, 4, 5];
+  final out = <int>[];
+  var at = 0;
+  while (letters.length > 1) {
+    at = (at + left - 1) % letters.length;
+    out.add(letters.removeAt(at));
+  }
+  return out;
 }
 
 /// A game as it stands, as this person may see it. The other person's answers

@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
@@ -1083,12 +1084,17 @@ class WorduelWord extends StatelessWidget {
     required this.word,
     this.tile = 18,
     this.color = AppColors.letterAbsent,
+    this.flipped = 1,
     super.key,
   });
 
   final String word;
   final double tile;
   final Color color;
+
+  /// How far a reveal has got, 0 to 1: the tiles flip over one at a time,
+  /// turning [color] as each passes edge on. 1 draws them all turned.
+  final double flipped;
 
   @override
   Widget build(BuildContext context) {
@@ -1100,28 +1106,36 @@ class WorduelWord extends StatelessWidget {
         children: [
           for (var i = 0; i < word.length; i++) ...[
             if (i > 0) SizedBox(width: tile * 0.15),
-            Container(
-              width: tile,
-              height: tile,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(tile * 0.2),
-              ),
-              child: Text(
-                word[i].toUpperCase(),
-                style: AppText.bodyStrong.copyWith(
-                  color: AppColors.onAccent,
-                  fontSize: tile * 0.5,
-                  height: 1,
-                ),
-              ),
-            ),
+            _tile(i, ((flipped - i * 0.13) / 0.3).clamp(0.0, 1.0)),
           ],
         ],
       ),
     );
   }
+
+  Widget _tile(int i, double flip) => Transform(
+        alignment: Alignment.center,
+        transform: Matrix4.identity()
+          ..setEntry(3, 2, 0.002)
+          ..rotateX(math.sin(flip * math.pi) * math.pi / 2),
+        child: Container(
+          width: tile,
+          height: tile,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: flip >= 0.5 ? color : AppColors.letterAbsent,
+            borderRadius: BorderRadius.circular(tile * 0.2),
+          ),
+          child: Text(
+            word[i].toUpperCase(),
+            style: AppText.bodyStrong.copyWith(
+              color: AppColors.onAccent,
+              fontSize: tile * 0.5,
+              height: 1,
+            ),
+          ),
+        ),
+      );
 }
 
 /// Whether [word] can be set or guessed: five letters, a to z.
@@ -1267,12 +1281,14 @@ Future<int?> showBoardStartSheet(BuildContext context) {
 }
 
 /// A tic tac toe board. [onTap] is called for an empty square, and only when
-/// set: on your turn. [line] lights the three that won.
+/// set: on your turn. [line] lights the three that won, with a stroke across
+/// them drawn as far as [drawn] (0 to 1) says.
 class TicTacToeBoard extends StatelessWidget {
   const TicTacToeBoard({
     required this.board,
     this.onTap,
     this.line,
+    this.drawn = 1,
     this.size = 216,
     super.key,
   });
@@ -1280,27 +1296,35 @@ class TicTacToeBoard extends StatelessWidget {
   final String board;
   final ValueChanged<int>? onTap;
   final List<int>? line;
+  final double drawn;
   final double size;
 
   @override
   Widget build(BuildContext context) {
     final cell = (size - 8) / 3;
+    final won = line;
     return SizedBox(
       width: size,
       height: size,
-      child: Wrap(
-        spacing: 4,
-        runSpacing: 4,
-        children: [
-          for (var i = 0; i < 9; i++) _square(i, cell),
-        ],
+      child: CustomPaint(
+        foregroundPainter: won == null || won.length < 3 || drawn <= 0
+            ? null
+            : _LinePainter(won.first, won.last, cell, drawn),
+        child: Wrap(
+          spacing: 4,
+          runSpacing: 4,
+          children: [
+            for (var i = 0; i < 9; i++) _square(i, cell),
+          ],
+        ),
       ),
     );
   }
 
   Widget _square(int i, double side) {
     final mark = i < board.length ? board[i] : ' ';
-    final lit = line?.contains(i) ?? false;
+    // The winning squares light once the stroke has crossed them.
+    final lit = (line?.contains(i) ?? false) && drawn >= 1;
     final open = mark == ' ' && onTap != null;
     return Pressable(
       onTap: open ? () => onTap!(i) : null,
@@ -1330,6 +1354,38 @@ class TicTacToeBoard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The stroke through a winning line, from the centre of its first square to
+/// its last, drawn [drawn] of the way.
+class _LinePainter extends CustomPainter {
+  _LinePainter(this.from, this.to, this.cell, this.drawn);
+
+  final int from;
+  final int to;
+  final double cell;
+  final double drawn;
+
+  Offset _centre(int i) =>
+      Offset((i % 3) * (cell + 4) + cell / 2, (i ~/ 3) * (cell + 4) + cell / 2);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final a = _centre(from);
+    final b = _centre(to);
+    canvas.drawLine(
+      a,
+      Offset.lerp(a, b, drawn)!,
+      Paint()
+        ..color = AppColors.accent
+        ..strokeWidth = 4
+        ..strokeCap = StrokeCap.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_LinePainter old) =>
+      old.drawn != drawn || old.from != from || old.to != to;
 }
 
 /// A finished game, opened from its line in the chat: frosted glass over the

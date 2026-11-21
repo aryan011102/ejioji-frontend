@@ -615,4 +615,121 @@ void main() {
     await tester.pumpAndSettle();
     expect(picked, GameKind.worduel);
   });
+
+  // Results: open while nothing has been said after them, and a reveal.
+
+  test('FLAMES crosses out in the order the server counts', () {
+    // The server's worked example (test_chat_games.py): a count of 5 crosses
+    // out E, M, S, L, A and leaves F.
+    expect(flamesOrder(5), [4, 3, 5, 1, 2]);
+    expect(flamesOrder(0), isEmpty);
+  });
+
+  Message answered(Map<String, Object?> g) =>
+      Message.fromJson(message(g, sender: me, event: 'answered'));
+
+  Widget latest(Message m, {bool reveal = false, VoidCallback? onRevealed}) =>
+      GameBubble(
+        message: m,
+        game: m.game!,
+        me: me,
+        theirName: 'Priya',
+        latest: true,
+        reveal: reveal,
+        onRevealed: onRevealed,
+        onPicks: (_) {},
+        onGuess: (_) {},
+        onText: (_) {},
+        onMove: (_) {},
+        onWord: (_) {},
+      );
+
+  testWidgets('a result stays open while nothing has been said after it',
+      (tester) async {
+    final m =
+        answered(game(status: 'done', starterPicks: [1], replyPicks: [1]));
+    await pump(tester, latest(m));
+    // Two cards turned over, both lit, and the verdict.
+    expect(find.text('Beach'), findsNWidgets(2));
+    expect(find.text('You both said Beach'), findsOneWidget);
+    // The same message once the chat has moved on: one line.
+    await pump(tester, bubble(m));
+    expect(find.text('You both said Beach'), findsNothing);
+    expect(
+      find.text('Would you rather · you both said Beach'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('never have I ever: a hand for each, lit only for I have',
+      (tester) async {
+    Map<String, Object?> never(int mine, int hers) => {
+          ...game(
+            status: 'done',
+            kind: 'never_have_i_ever',
+            starterPicks: [hers],
+            replyPicks: [mine],
+          ),
+          'cards': [
+            {
+              'key': 'nhie_missed_flight',
+              'text': 'Never have I ever missed a flight or a train.',
+              'options': ['I have', 'I haven’t'],
+            },
+          ],
+        };
+    await pump(tester, latest(answered(never(0, 0))));
+    expect(find.text('You both have'), findsOneWidget);
+    expect(find.bySemanticsLabel('You have'), findsOneWidget);
+    expect(find.bySemanticsLabel('Priya have'), findsOneWidget);
+    await pump(tester, latest(answered(never(0, 1))));
+    expect(find.text('Only you have'), findsOneWidget);
+    await pump(tester, latest(answered(never(1, 0))));
+    expect(find.text('Only Priya has'), findsOneWidget);
+    await pump(tester, latest(answered(never(1, 1))));
+    expect(find.text('Neither of you has'), findsOneWidget);
+  });
+
+  testWidgets('a reveal plays once, then says so', (tester) async {
+    var revealed = 0;
+    final m =
+        answered(game(status: 'done', starterPicks: [0], replyPicks: [1]));
+    await pump(
+      tester,
+      latest(m, reveal: true, onRevealed: () => revealed++),
+    );
+    // Partway: the cards have not turned yet.
+    expect(find.text('?'), findsNWidgets(2));
+    await tester.pumpAndSettle();
+    expect(revealed, 1);
+    expect(find.text('You two differ'), findsOneWidget);
+    expect(find.text('?'), findsNothing);
+  });
+
+  testWidgets('a finished Worduel in the chat sends a new word in place',
+      (tester) async {
+    var asked = 0;
+    final m = finished();
+    await pump(
+      tester,
+      GameBubble(
+        message: m,
+        game: m.game!,
+        me: me,
+        theirName: 'Priya',
+        latest: true,
+        onPicks: (_) {},
+        onGuess: (_) {},
+        onText: (_) {},
+        onMove: (_) {},
+        onWord: (_) {},
+        onNewWord: () => asked++,
+      ),
+    );
+    await tester.tap(find.text('Send a new word'));
+    await tester.pumpAndSettle();
+    expect(asked, 1);
+    // Nothing was closed on the way: the chat is still there.
+    expect(find.text('Send a new word'), findsOneWidget);
+  });
 }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/routes.dart';
+import '../../../core/session/session.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../data/providers.dart';
 import '../../../shared/format.dart';
@@ -10,6 +11,7 @@ import '../../../shared/widgets/buttons.dart';
 import '../../../shared/widgets/identity.dart';
 import '../../../shared/widgets/layout.dart';
 import '../../../shared/widgets/states.dart';
+import '../../home/presentation/waitlisted.dart';
 
 /// People you saved with the bookmark on their profile, newest first. Premium.
 ///
@@ -34,6 +36,8 @@ class SavedPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final saved = ref.watch(savedProvider);
+    final waitlisted =
+        ref.watch(sessionProvider.select((s) => s.isWaitlisted));
 
     return AppScaffold(
       navBar: AppNavBar(
@@ -41,7 +45,8 @@ class SavedPage extends ConsumerWidget {
         backLabel: backLabel,
         onBack: () => context.pop(),
       ),
-      child: saved.when(
+      // Nobody to open while they wait; the server sends nobody either.
+      child: waitlisted ? const ProfilesOpenLater() : saved.when(
         loading: () => const LoadingView(),
         error: (e, _) => ErrorView(
           error: e,

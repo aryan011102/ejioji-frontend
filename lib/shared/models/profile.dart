@@ -132,6 +132,7 @@ class PublishState {
     required this.blocking,
     required this.underReview,
     this.stealth = false,
+    this.waitlisted = false,
   });
 
   final bool published;
@@ -146,6 +147,11 @@ class PublishState {
   /// change [visible]: whoever they ask still sees the profile.
   final bool stealth;
 
+  /// New, and not yet taken live by the team. Nobody sees the profile and the
+  /// person is shown nobody until then. A server without the waitlist sends
+  /// nothing, which reads as false.
+  final bool waitlisted;
+
   bool get canPublish => blocking.isEmpty;
 
   static PublishState fromJson(Json j) => PublishState(
@@ -153,6 +159,7 @@ class PublishState {
         visible: j.flag('visible'),
         underReview: j.flag('under_review'),
         stealth: j.flag('stealth'),
+        waitlisted: j.flag('waitlisted'),
         blocking: j
             .objects('blocking')
             .map(

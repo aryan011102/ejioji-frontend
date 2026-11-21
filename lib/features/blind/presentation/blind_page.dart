@@ -19,7 +19,9 @@ import '../../../shared/widgets/ask_about_sheet.dart';
 import '../../../shared/widgets/pressable.dart';
 import '../../../shared/widgets/sheets.dart';
 import '../../../shared/widgets/states.dart';
-import '../../home/presentation/home_page.dart' show feedMissingStep;
+import '../../home/presentation/home_page.dart'
+    show completeProfileWhileWaiting, feedMissingStep;
+import '../../home/presentation/waitlisted.dart';
 import 'blind_field.dart';
 import 'blind_layout.dart';
 
@@ -193,6 +195,12 @@ class _BlindPageState extends ConsumerState<BlindPage>
             await context.push<Object?>(step.route);
             await ref.read(blindProvider.notifier).shuffle();
           },
+        );
+      }
+      // New and waiting for the team: the same as Home's other face says.
+      if (isWaitlistedError(error)) {
+        return WaitlistedState(
+          onCompleteProfile: () => completeProfileWhileWaiting(context, ref),
         );
       }
       return ErrorView(

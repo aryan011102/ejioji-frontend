@@ -13,7 +13,17 @@ import '../../../../shared/widgets/sheets.dart';
 
 /// The games, like the apps row in iMessage: tap one to play it in this chat.
 /// Frosted glass over the chat, one row a game: its mark and its name.
-Future<GameKind?> showGamesSheet(BuildContext context) {
+///
+/// [waiting] games this person started wait on [theirName]; at [cap] no more
+/// can start until one is played, so the list says so up front and only FLAMES
+/// (which waits on nobody) can be picked.
+Future<GameKind?> showGamesSheet(
+  BuildContext context, {
+  int waiting = 0,
+  int cap = 5,
+  String theirName = 'them',
+}) {
+  final full = waiting >= cap;
   return _showGlassSheet<GameKind>(
     context,
     builder: (sheetContext) => Column(
@@ -21,29 +31,47 @@ Future<GameKind?> showGamesSheet(BuildContext context) {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text('Play a game', style: AppText.bodyStrong),
+        if (waiting > 0) ...[
+          const SizedBox(height: 4),
+          Text(
+            full
+                ? 'You have $waiting games waiting on $theirName. Once '
+                    '$theirName plays one, you can start another.'
+                : 'You have $waiting '
+                    '${waiting == 1 ? 'game' : 'games'} waiting on $theirName.',
+            style: AppText.footnote.copyWith(
+              color: full ? AppColors.accent : AppColors.label2,
+            ),
+          ),
+        ],
         const SizedBox(height: 10),
         for (final game in GameKind.values.where((g) => g.offered))
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
-            child: Pressable(
-              onTap: () => Navigator.of(sheetContext).pop(game),
-              semanticLabel: game.title,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-                decoration: BoxDecoration(
-                  color: AppColors.liquidSheen,
-                  borderRadius: BorderRadius.circular(Radii.row),
-                  border: Border.all(color: AppColors.glassEdge),
-                ),
-                child: Row(
-                  children: [
-                    GameIcon(game: game, size: 28),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(game.title, style: AppText.body),
-                    ),
-                  ],
+            child: Opacity(
+              opacity: full && game != GameKind.flames ? 0.4 : 1,
+              child: Pressable(
+                onTap: full && game != GameKind.flames
+                    ? null
+                    : () => Navigator.of(sheetContext).pop(game),
+                semanticLabel: game.title,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: AppColors.liquidSheen,
+                    borderRadius: BorderRadius.circular(Radii.row),
+                    border: Border.all(color: AppColors.glassEdge),
+                  ),
+                  child: Row(
+                    children: [
+                      GameIcon(game: game, size: 28),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(game.title, style: AppText.body),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

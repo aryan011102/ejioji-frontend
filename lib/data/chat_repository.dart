@@ -74,6 +74,13 @@ class ChatRepository {
     return Message.fromJson(body);
   }
 
+  /// How many games this person started here wait on the other person, and
+  /// how many may: at the cap the server refuses another (FLAMES aside).
+  Future<({int waiting, int cap})> gamesWaiting(String matchId) async {
+    final body = await _api.getJson(Api.gamesWaiting(matchId));
+    return (waiting: body.intOr('waiting', 0), cap: body.intOr('cap', 5));
+  }
+
   /// Cards for a new game, ones the two have not had while there are enough.
   /// Nothing is written until [startGame].
   Future<List<GameCard>> dealGame(String matchId, GameKind game) async {

@@ -545,14 +545,33 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
     await _playGame();
   }
 
+  /// The games list, told first how many already wait on them so it can say so
+  /// before a pick. Unknown, it shows no count and the server still has its
+  /// say.
+  Future<GameKind?> _pickGame() async {
+    ({int waiting, int cap})? load;
+    try {
+      load = await ref.read(chatRepositoryProvider).gamesWaiting(_matchId);
+    } on ApiException {
+      load = null;
+    }
+    if (!mounted) return null;
+    return showGamesSheet(
+      context,
+      waiting: load?.waiting ?? 0,
+      cap: load?.cap ?? 5,
+      theirName: _person?.firstName ?? 'them',
+    );
+  }
+
   /// Starts a game: the one picked from the games list, or [only] without the
   /// list (a finished Worduel's "Send a new word").
   Future<void> _playGame({GameKind? only}) async {
     if (_ended || _gameBusy) return;
     if (_mustVerify) return _askToVerify();
-    final game = only ?? await showGamesSheet(context);
-    if (game == null || !mounted) return;
     final repo = ref.read(chatRepositoryProvider);
+    final game = only ?? await _pickGame();
+    if (game == null || !mounted) return;
     final clientId = Ids.uuid();
     setState(() => _gameBusy = true);
     try {

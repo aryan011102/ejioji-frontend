@@ -589,6 +589,67 @@ void main() {
     expect(later.newer(early), same(later));
   });
 
+  Future<GameKind?> openList(
+    WidgetTester tester, {
+    required int waiting,
+    Finder? tap,
+  }) async {
+    GameKind? picked;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () async => picked = await showGamesSheet(
+                context,
+                waiting: waiting,
+                theirName: 'Priya',
+              ),
+              child: const Text('Play'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Play'));
+    await tester.pumpAndSettle();
+    if (tap != null) {
+      await tester.ensureVisible(tap);
+      await tester.pumpAndSettle();
+      await tester.tap(tap, warnIfMissed: false);
+      await tester.pumpAndSettle();
+    }
+    return picked;
+  }
+
+  testWidgets('the games list says how many already wait on them',
+      (tester) async {
+    await openList(tester, waiting: 3);
+    expect(find.text('You have 3 games waiting on Priya.'), findsOneWidget);
+  });
+
+  testWidgets('at the limit, games that wait cannot start', (tester) async {
+    expect(
+      await openList(tester, waiting: 5, tap: find.text('Worduel')),
+      isNull,
+    );
+    expect(
+      find.text(
+        'You have 5 games waiting on Priya. Once Priya plays one, you can '
+        'start another.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('at the limit, FLAMES still starts: it waits on nobody',
+      (tester) async {
+    expect(
+      await openList(tester, waiting: 5, tap: find.text('FLAMES')),
+      GameKind.flames,
+    );
+  });
+
   testWidgets('the games list: names only, and no Truth to start',
       (tester) async {
     GameKind? picked;

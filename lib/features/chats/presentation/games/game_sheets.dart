@@ -1831,24 +1831,36 @@ class _FlamesWorkingState extends State<FlamesWorking>
               _flame(i, letter, hop, won: won),
           ],
         ),
-        const SizedBox(height: 10),
-        Opacity(
-          opacity: ((_s - _winAt - 0.2) / 0.5).clamp(0.0, 1.0),
-          child: Column(
-            children: [
-              Text(
-                widget.result.word,
-                textAlign: TextAlign.center,
-                style: AppText.title2,
-              ),
-              const SizedBox(height: 2),
-              Text(
-                widget.result.line,
-                textAlign: TextAlign.center,
-                style: AppText.footnote.copyWith(color: AppColors.label2),
-              ),
-            ],
-          ),
+        // No room kept for the word while it is worked out: the card grows to
+        // fit it once one letter is left.
+        AnimatedSize(
+          duration: Motion.fade,
+          curve: Ease.emphasised,
+          alignment: Alignment.topCenter,
+          child: won
+              ? Opacity(
+                  opacity: ((_s - _winAt) / 0.5).clamp(0.0, 1.0),
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Column(
+                      children: [
+                        Text(
+                          widget.result.word,
+                          textAlign: TextAlign.center,
+                          style: AppText.title2,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          widget.result.line,
+                          textAlign: TextAlign.center,
+                          style: AppText.footnote
+                              .copyWith(color: AppColors.label2),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : const SizedBox(width: double.infinity),
         ),
         if (_play.isAnimating)
           Center(

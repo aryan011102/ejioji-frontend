@@ -752,6 +752,8 @@ void main() {
       find.text('Cross out the letters both names share, one for one.'),
       findsOneWidget,
     );
+    // No space kept for the word while it is worked out.
+    expect(find.text('Marriage'), findsNothing);
     expect(find.text('Skip'), findsOneWidget);
     await tester.tap(find.text('Skip'));
     await tester.pumpAndSettle();

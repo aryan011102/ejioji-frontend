@@ -569,18 +569,9 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
         case GameKind.flames:
           sending = repo.startGame(_matchId, game: game, clientId: clientId);
         case GameKind.truth:
-          final cards = await repo.dealGame(_matchId, game);
-          if (!mounted || cards.isEmpty) return;
-          final answered =
-              await showTruthStartSheet(context, question: cards.first.text);
-          if (answered == null || !mounted) return;
-          sending = repo.startGame(
-            _matchId,
-            game: game,
-            clientId: clientId,
-            cards: [answered.$1 ?? cards.first.key],
-            text: answered.$2,
-          );
+          // Not in the list any more (GameKind.offered): a question is asked
+          // in the chat. Truth games already sent are still answered.
+          return;
         case GameKind.guessMovie:
           // Deal until they send one or back out.
           while (true) {

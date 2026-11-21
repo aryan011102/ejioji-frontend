@@ -10,53 +10,37 @@ import '../../../../shared/widgets/pressable.dart';
 import '../../../../shared/widgets/sheets.dart';
 
 /// The games, like the apps row in iMessage: tap one to play it in this chat.
+/// Frosted glass over the chat, one row a game: its mark and its name.
 Future<GameKind?> showGamesSheet(BuildContext context) {
-  return showAppSheet<GameKind>(
+  return _showGlassSheet<GameKind>(
     context,
     builder: (sheetContext) => Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Play a game', style: AppText.title3),
-        const SizedBox(height: 4),
-        Text(
-          'You go first. They see your answer once they have played.',
-          style: AppText.footnote.copyWith(color: AppColors.label2),
-        ),
-        const SizedBox(height: 14),
-        for (final game in GameKind.values)
+        Text('Play a game', style: AppText.bodyStrong),
+        const SizedBox(height: 10),
+        for (final game in GameKind.values.where((g) => g.offered))
           Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(bottom: 6),
             child: Pressable(
               onTap: () => Navigator.of(sheetContext).pop(game),
               semanticLabel: game.title,
               child: Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
                 decoration: BoxDecoration(
-                  color: AppColors.menu,
+                  color: AppColors.liquidSheen,
                   borderRadius: BorderRadius.circular(Radii.row),
-                  border: Border.all(color: AppColors.hairline),
+                  border: Border.all(color: AppColors.glassEdge),
                 ),
                 child: Row(
                   children: [
-                    GameIcon(game: game),
+                    GameIcon(game: game, size: 28),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(game.title, style: AppText.bodyStrong),
-                          const SizedBox(height: 2),
-                          Text(
-                            game.pitch,
-                            style: AppText.footnote
-                                .copyWith(color: AppColors.label2),
-                          ),
-                        ],
-                      ),
+                      child: Text(game.title, style: AppText.body),
                     ),
-                    const Icon(Icons.chevron_right, color: AppColors.label3),
                   ],
                 ),
               ),
@@ -434,35 +418,22 @@ class _TwoTruthsState extends State<_TwoTruths> {
 }
 
 /// Truth: the question, and your answer in your own words. Null if they back
-/// out.
+/// out. Truth is no longer started (GameKind.offered); this answers one sent
+/// before.
 Future<String?> showTruthSheet(
   BuildContext context, {
   required String question,
-}) async {
-  final answered = await showAppSheet<(OwnCard?, String)>(
+}) {
+  return showAppSheet<String>(
     context,
     builder: (_) => _TruthAnswer(question: question),
-  );
-  return answered?.$2;
-}
-
-/// Truth, for the starter: the question dealt or one of their own, and their
-/// answer. Null if they back out.
-Future<(OwnCard?, String)?> showTruthStartSheet(
-  BuildContext context, {
-  required String question,
-}) {
-  return showAppSheet<(OwnCard?, String)>(
-    context,
-    builder: (_) => _TruthAnswer(question: question, canWriteOwn: true),
   );
 }
 
 class _TruthAnswer extends StatefulWidget {
-  const _TruthAnswer({required this.question, this.canWriteOwn = false});
+  const _TruthAnswer({required this.question});
 
   final String question;
-  final bool canWriteOwn;
 
   @override
   State<_TruthAnswer> createState() => _TruthAnswerState();
@@ -472,18 +443,11 @@ class _TruthAnswerState extends State<_TruthAnswer> {
   /// The server's limit.
   static const _maxChars = 300;
   final _field = TextEditingController();
-  OwnCard? _own;
 
   @override
   void dispose() {
     _field.dispose();
     super.dispose();
-  }
-
-  Future<void> _writeOwn() async {
-    final own =
-        await showOwnCardSheet(context, game: GameKind.truth, initial: _own);
-    if (own != null && mounted) setState(() => _own = own);
   }
 
   @override
@@ -507,21 +471,11 @@ class _TruthAnswerState extends State<_TruthAnswer> {
               ],
             ),
             const SizedBox(height: 12),
-            Text(_own?.text ?? widget.question, style: AppText.body),
-            if (widget.canWriteOwn)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextActionButton(
-                  label: _own == null
-                      ? 'Ask your own question'
-                      : 'Edit your question',
-                  onPressed: _writeOwn,
-                ),
-              ),
+            Text(widget.question, style: AppText.body),
             const SizedBox(height: 12),
             TextField(
               controller: _field,
-              autofocus: !widget.canWriteOwn,
+              autofocus: true,
               maxLength: _maxChars,
               maxLines: 5,
               minLines: 2,
@@ -545,7 +499,7 @@ class _TruthAnswerState extends State<_TruthAnswer> {
               label: 'Send',
               onPressed: _field.text.trim().isEmpty
                   ? null
-                  : () => Navigator.of(context).pop((_own, _field.text.trim())),
+                  : () => Navigator.of(context).pop(_field.text.trim()),
             ),
           ],
         ),
@@ -726,7 +680,6 @@ class _OwnCardState extends State<_OwnCard> {
           OwnCard(text: _t, options: [_a, _b]),
         GameKind.neverHaveIEver when _t.isNotEmpty => OwnCard(text: _t),
         GameKind.rapidFire when _twoAnswers => OwnCard(options: [_a, _b]),
-        GameKind.truth when _t.isNotEmpty => OwnCard(text: _t),
         GameKind.guessMovie when _t.isNotEmpty && _a.isNotEmpty =>
           OwnCard(text: _t, options: [_a]),
         _ => null,
@@ -797,20 +750,6 @@ class _OwnCardState extends State<_OwnCard> {
             ),
           ],
         );
-      case GameKind.truth:
-        return (
-          'Ask anything warm and curious. You both answer it.',
-          [
-            _GameField(
-              controller: _text,
-              hint: 'Your question',
-              maxChars: _question,
-              multiline: true,
-              autofocus: true,
-              onChanged: changed,
-            ),
-          ],
-        );
       case GameKind.guessMovie:
         return (
           'Spell out any film in emoji. They type its name to guess.',
@@ -832,6 +771,7 @@ class _OwnCardState extends State<_OwnCard> {
             ),
           ],
         );
+      case GameKind.truth:
       case GameKind.twoTruths:
       case GameKind.flames:
       case GameKind.ticTacToe:
@@ -1212,7 +1152,17 @@ Future<void> showGameResultSheet(
   BuildContext context, {
   required Widget child,
 }) {
-  return showModalBottomSheet<void>(
+  return _showGlassSheet<void>(context, builder: (_) => child);
+}
+
+/// A sheet of frosted glass over the chat, for the games only: the list of
+/// games and a finished game's result. Every other sheet in the app is solid
+/// (showAppSheet), and stays so until glass is decided for all of them.
+Future<T?> _showGlassSheet<T>(
+  BuildContext context, {
+  required Widget Function(BuildContext) builder,
+}) {
+  return showModalBottomSheet<T>(
     context: context,
     backgroundColor: const Color(0x00000000),
     barrierColor: AppColors.scrimLight,
@@ -1251,7 +1201,9 @@ Future<void> showGameResultSheet(
                       constraints: BoxConstraints(
                         maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.7,
                       ),
-                      child: SingleChildScrollView(child: child),
+                      child: SingleChildScrollView(
+                        child: builder(sheetContext),
+                      ),
                     ),
                   ],
                 ),

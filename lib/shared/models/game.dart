@@ -4,51 +4,31 @@ import '../../core/network/json.dart';
 
 /// The games two matched people can play in a chat. The server decides what
 /// each game deals and who may see what; the phone only draws it.
+///
+/// In the order the games list shows them.
 enum GameKind {
-  wouldYouRather(
-    'would_you_rather',
-    'Would you rather',
-    'Two choices. Pick yours, then see theirs.',
-  ),
-  rapidFire('rapid_fire', 'Rapid fire', 'Five quick picks, side by side.'),
-  neverHaveIEver(
-    'never_have_i_ever',
-    'Never have I ever',
-    'Have you or haven’t you? Find out together.',
-  ),
-  twoTruths(
-    'two_truths',
-    'Two truths and a lie',
-    'Write three things about you. They spot the lie.',
-  ),
-  flames('flames', 'FLAMES', 'The schoolyard classic, with your two names.'),
-  truth('truth', 'Truth', 'One question, both answer. No dares.'),
-  guessMovie(
-    'guess_movie',
-    'Guess the movie',
-    'Send a film in emoji. Can they get it?',
-  ),
-  ticTacToe(
-    'tic_tac_toe',
-    'Tic tac toe',
-    'Noughts and crosses, a move at a time.',
-  ),
-  worduel(
-    'worduel',
-    'Worduel',
-    'Set a five letter word. They get six tries.',
-  );
+  wouldYouRather('would_you_rather', 'Would you rather'),
+  rapidFire('rapid_fire', 'Rapid fire'),
+  neverHaveIEver('never_have_i_ever', 'Never have I ever'),
+  truth('truth', 'Truth'),
+  twoTruths('two_truths', 'Two truths and a lie'),
+  guessMovie('guess_movie', 'Guess the movie'),
+  worduel('worduel', 'Worduel'),
+  ticTacToe('tic_tac_toe', 'Tic tac toe'),
+  flames('flames', 'FLAMES');
 
-  const GameKind(this.wire, this.title, this.pitch);
+  const GameKind(this.wire, this.title);
 
   final String wire;
   final String title;
 
-  /// One line under its name in the list.
-  final String pitch;
-
   /// Played a move at a time on one live card, drawn where its newest move is.
   bool get live => this == ticTacToe || this == worduel;
+
+  /// In the games list, to start. Truth is not (Aryan, 2026-11-21: it is a
+  /// question, which can be asked in the chat); its games already played
+  /// still draw and can still be answered.
+  bool get offered => this != truth;
 
   /// Null for a game this build does not know: it is drawn as its text line.
   static GameKind? parse(String? raw) {

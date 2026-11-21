@@ -1,4 +1,5 @@
 import 'package:ejioji/features/chats/presentation/games/game_bubble.dart';
+import 'package:ejioji/features/chats/presentation/games/game_sheets.dart';
 import 'package:ejioji/shared/models/chat.dart';
 import 'package:ejioji/shared/models/enums.dart';
 import 'package:ejioji/shared/models/game.dart';
@@ -472,5 +473,32 @@ void main() {
     );
     expect(early.newer(later), same(later));
     expect(later.newer(early), same(later));
+  });
+
+  testWidgets('the games list: names only, and no Truth to start',
+      (tester) async {
+    GameKind? picked;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () async => picked = await showGamesSheet(context),
+              child: const Text('Play'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Play'));
+    await tester.pumpAndSettle();
+    expect(find.text('Play a game'), findsOneWidget);
+    expect(find.text('Worduel'), findsOneWidget);
+    expect(find.text('FLAMES'), findsOneWidget);
+    expect(find.text('Truth'), findsNothing);
+    expect(find.textContaining('six tries'), findsNothing);
+    await tester.tap(find.text('Worduel'));
+    await tester.pumpAndSettle();
+    expect(picked, GameKind.worduel);
   });
 }

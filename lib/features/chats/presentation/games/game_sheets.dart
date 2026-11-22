@@ -1099,13 +1099,17 @@ class WorduelWord extends StatelessWidget {
   final Color color;
 
   /// How far a reveal has got, 0 to 1: the tiles flip over one at a time,
-  /// turning [color] as each passes edge on. 1 draws them all turned.
+  /// each blank until edge on, then its letter in [color]. 1 draws them all
+  /// turned.
   final double flipped;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: 'The word: ${word.toUpperCase()}',
+      // Not read out before it is all turned over.
+      label: flipped < 1
+          ? 'The word, turning over'
+          : 'The word: ${word.toUpperCase()}',
       excludeSemantics: true,
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1133,7 +1137,7 @@ class WorduelWord extends StatelessWidget {
             borderRadius: BorderRadius.circular(tile * 0.2),
           ),
           child: Text(
-            word[i].toUpperCase(),
+            flip >= 0.5 ? word[i].toUpperCase() : '',
             style: AppText.bodyStrong.copyWith(
               color: AppColors.onAccent,
               fontSize: tile * 0.5,

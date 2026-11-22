@@ -3,7 +3,9 @@ import 'package:ejioji/features/chats/presentation/games/game_sheets.dart';
 import 'package:ejioji/shared/models/chat.dart';
 import 'package:ejioji/shared/models/enums.dart';
 import 'package:ejioji/shared/models/game.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Games in a chat: what the phone reads from the server, and what the card
@@ -874,5 +876,220 @@ void main() {
     expect(asked, 1);
     // Nothing was closed on the way: the chat is still there.
     expect(find.text('Send a new word'), findsOneWidget);
+  });
+
+  Map<String, Object?> ended(
+    String kind,
+    String title, [
+    Map<String, Object?> fields = const {},
+  ]) =>
+      {
+        ...v2({'game': kind, 'title': title}),
+        'status': 'done',
+        'turn': null,
+        ...fields,
+      };
+
+  Map<String, Object?> handsUp(int mine, int theirs) =>
+      ended('never_have_i_ever', 'Never have I ever', {
+        'starter_picks': [theirs],
+        'reply_picks': [mine],
+        'cards': [
+          {
+            'key': 'nhie_flight',
+            'text': 'Never have I ever missed a flight or a train.',
+            'options': ['I have', 'I haven’t'],
+          },
+        ],
+      });
+
+  Map<String, Object?> flamesEnded(String letter, String word) =>
+      ended('flames', 'FLAMES', {
+        'flames': {
+          'names': ['Arjun', 'Priya'],
+          'letter': letter,
+          'word': word,
+          'line': 'The cards have spoken.',
+          'left': 6,
+        },
+      });
+
+  Map<String, Object?> wordEnded({required bool won}) =>
+      ended('worduel', 'Worduel', {
+        'word': won ? 'mango' : 'tiger',
+        'correct': won,
+        'guesses': [
+          for (var i = 0; i < (won ? 1 : 5); i++)
+            {'word': 'salty', 'marks': 'aaaaa'},
+          {'word': 'mango', 'marks': won ? 'ccccc' : 'aaapa'},
+        ],
+      });
+
+  // Each game, ended in ways that only its reveal should tell apart.
+  final endings = <String, List<Map<String, Object?>> Function()>{
+    'Would you rather': () => [
+          for (final theirs in [0, 1])
+            ended('would_you_rather', 'Would you rather', {
+              'starter_picks': [theirs],
+              'reply_picks': [1],
+              'cards': [
+                {
+                  'key': 'own',
+                  'text': 'A holiday in the hills or by the beach?',
+                  'options': [
+                    'Hills',
+                    'A long week by the beach with no plans',
+                  ],
+                },
+              ],
+            }),
+        ],
+    'Never have I ever': () =>
+        [handsUp(0, 0), handsUp(0, 1), handsUp(1, 0), handsUp(1, 1)],
+    'Rapid fire': () => [
+          for (final theirs in [0, 1])
+            ended('rapid_fire', 'Rapid fire', {
+              'starter_picks': [theirs, theirs],
+              'reply_picks': [0, 0],
+              'cards': [
+                for (final key in ['rf_a', 'rf_b'])
+                  {
+                    'key': key,
+                    'text': 'Tea or coffee?',
+                    'options': ['Tea', 'A very strong filter coffee, no sugar'],
+                  },
+              ],
+            }),
+        ],
+    'Two truths and a lie': () => [
+          for (final lie in [0, 1])
+            ended('two_truths', 'Two truths and a lie', {
+              'statements': ['I can juggle', 'I sing', 'I hate mangoes'],
+              'lie': lie,
+              'guess': 1,
+            }),
+        ],
+    'Guess the movie': () => [
+          for (final answer in [0, 1])
+            ended('guess_movie', 'Guess the movie', {
+              'answer': answer,
+              'guess': 1,
+            }),
+        ],
+    'Guess the movie, typed': () => [
+          for (final right in [true, false])
+            ended('guess_movie', 'Guess the movie', {
+              'cards': [
+                {'key': 'own', 'text': '🚂🌾🧥', 'options': <String>[], 'own': true},
+              ],
+              'own_film': true,
+              'film': right ? 'Sholay' : 'Dilwale Dulhania Le Jayenge',
+              'reply_text': 'Sholay',
+              'correct': right,
+            }),
+        ],
+    'Tic tac toe': () => [
+          for (final line in [true, false])
+            ended('tic_tac_toe', 'Tic tac toe', {
+              'board': 'xxxoo    ',
+              'line': line ? [0, 1, 2] : null,
+              'winner': line ? 'x' : null,
+            }),
+        ],
+    'Worduel': () => [wordEnded(won: true), wordEnded(won: false)],
+    'FLAMES': () => [flamesEnded('M', 'Marriage'), flamesEnded('E', 'Enemies')],
+  };
+
+  for (final MapEntry(key: name, value: make) in endings.entries) {
+    testWidgets('$name: the header waits for the reveal', (tester) async {
+      final m = answered(make().first);
+      final title = m.game!.title;
+      await pump(tester, latest(m, reveal: true));
+      expect(find.text(title), findsOneWidget);
+      expect(find.textContaining('$title ·'), findsNothing);
+      await tester.pump(const Duration(milliseconds: 1000));
+      expect(find.textContaining('$title ·'), findsNothing);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('$title ·'), findsOneWidget);
+    });
+
+    testWidgets('$name: a reveal starts the same however it ended',
+        (tester) async {
+      const boundary = Key('starts');
+      Uint8List? firstPixels;
+      List<String>? firstSpoken;
+      for (final g in make()) {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await pump(
+          tester,
+          RepaintBoundary(
+            key: boundary,
+            child: latest(answered(g), reveal: true),
+          ),
+        );
+        final spoken = [
+          for (final node in tester.semantics.simulatedAccessibilityTraversal())
+            node.label,
+        ];
+        final render =
+            tester.renderObject<RenderRepaintBoundary>(find.byKey(boundary));
+        final pixels = await tester.runAsync(() async {
+          final image = await render.toImage();
+          final bytes = await image.toByteData();
+          image.dispose();
+          return bytes!.buffer.asUint8List();
+        });
+        firstSpoken ??= spoken;
+        firstPixels ??= pixels;
+        expect(spoken, firstSpoken, reason: 'what a screen reader hears');
+        expect(
+          listEquals(pixels, firstPixels),
+          isTrue,
+          reason: 'what is on screen',
+        );
+      }
+      await tester.pumpAndSettle();
+    });
+  }
+
+  testWidgets('a Worduel keeps its word and rows until they are revealed',
+      (tester) async {
+    await pump(tester, latest(answered(wordEnded(won: true)), reveal: true));
+    for (final letter in 'MANGO'.split('')) {
+      expect(find.text(letter), findsNothing);
+    }
+    expect(find.bySemanticsLabel('The word: MANGO'), findsNothing);
+    expect(find.bySemanticsLabel(RegExp('^Guess 1')), findsNothing);
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('The word: MANGO'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('^Guess 1')), findsOneWidget);
+  });
+
+  testWidgets('See the working hides the word until it is worked out again',
+      (tester) async {
+    await pump(tester, latest(answered(flamesEnded('M', 'Marriage'))));
+    expect(find.text('FLAMES · Marriage'), findsOneWidget);
+    await tester.tap(find.text('See the working'));
+    await tester.pump();
+    expect(find.text('FLAMES'), findsOneWidget);
+    expect(find.text('FLAMES · Marriage'), findsNothing);
+    await tester.pumpAndSettle();
+    expect(find.text('FLAMES · Marriage'), findsOneWidget);
+  });
+
+  testWidgets('never have I ever says who has, open and folded',
+      (tester) async {
+    for (final (mine, theirs, said) in [
+      (0, 0, 'you both have'),
+      (1, 1, 'neither of you has'),
+      (0, 1, 'only you have'),
+      (1, 0, 'only Priya has'),
+    ]) {
+      final m = answered(handsUp(mine, theirs));
+      await pump(tester, latest(m));
+      expect(find.text('Never have I ever · $said'), findsOneWidget);
+      await pump(tester, bubble(m));
+      expect(find.text('Never have I ever · $said'), findsOneWidget);
+    }
   });
 }

@@ -92,6 +92,10 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
   /// reveal once, then the id goes.
   final _reveal = <String>{};
 
+  /// The first read of the chat is in: an empty one is empty, not still
+  /// loading.
+  bool _opened = false;
+
   /// The newest game waiting on me, as the list draws it: the key on its card,
   /// and its name for the pill that takes me back to it when it is off screen.
   final _turnKey = GlobalKey();
@@ -227,6 +231,10 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
       final page = await ref.read(chatRepositoryProvider).messages(_matchId);
       if (!mounted) return;
       setState(() {
+        // An empty chat catches up by loading again: what ended meanwhile
+        // ended while it was open.
+        if (_messages.isEmpty) _markEnded(page.messages);
+        _opened = true;
         _messages
           ..clear()
           ..addAll(page.messages);
@@ -309,21 +317,29 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
     }
   }
 
+  /// A game that ends in a message newer than any held ended while this chat
+  /// was open: its card plays its reveal, once. In a chat that opened empty,
+  /// any message is newer. An older page, or what the chat opened on, never
+  /// plays.
+  void _markEnded(Iterable<Message> incoming) {
+    final newest = _messages.isNotEmpty
+        ? _messages.last.seq
+        : _opened
+            ? 0
+            : null;
+    if (newest == null) return;
+    for (final m in incoming) {
+      final game = m.game;
+      if (game == null || !game.done || m.seq <= newest) continue;
+      if (!(_games[game.id]?.done ?? false)) _reveal.add(game.id);
+    }
+  }
+
   /// Adds messages not already held, keeps the list in sequence order, and
   /// drops the pending bubble each one answers.
   void _merge(Iterable<Message> incoming) {
     final all = incoming.toList();
-    // A game that ends in a message newer than any held ended while this chat
-    // was open: its card plays its reveal, once. An older page loaded never
-    // does.
-    final newest = _messages.isEmpty ? null : _messages.last.seq;
-    for (final m in all) {
-      final game = m.game;
-      if (game == null || !game.done || newest == null || m.seq <= newest) {
-        continue;
-      }
-      if (!(_games[game.id]?.done ?? false)) _reveal.add(game.id);
-    }
+    _markEnded(all);
     // Before the filter below: a message already held can still bring a newer
     // copy of its game.
     final moved = _absorb(all);

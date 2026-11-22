@@ -218,9 +218,10 @@ class _GameBubbleState extends State<GameBubble>
   /// Mine to play now: the line is lit.
   bool _myMove(GameState game) => game.myTurn(widget.me);
 
-  /// What the line says after the game's name.
+  /// What the line says after the game's name: nothing while a reveal plays,
+  /// so the line never tells the ending first.
   String _status(GameState game) {
-    if (game.done) return _summary(game);
+    if (game.done) return _working || _t < 1 ? '' : _summary(game);
     final mine = _myMove(game);
     switch (game.kind) {
       case GameKind.ticTacToe:
@@ -274,6 +275,9 @@ class _GameBubbleState extends State<GameBubble>
         }
         final card = game.cards.first;
         final pick = _at(mine, 0);
+        if (game.kind == GameKind.neverHaveIEver) {
+          return _whoHas(pick, _at(theirs, 0));
+        }
         return same == 1 && pick != null && pick < card.options.length
             ? 'you both said ${card.options[pick]}'
             : 'you differ';
@@ -704,7 +708,10 @@ class _GameBubbleState extends State<GameBubble>
                 opacity: shown,
                 child: Transform.translate(
                   offset: Offset(0, (1 - shown) * 4),
-                  child: _answerChip(_name, said(theirs), same),
+                  // Empty until it shows, or a longer answer's height would
+                  // tell which it is.
+                  child:
+                      _answerChip(_name, shown > 0 ? said(theirs) : '', same),
                 ),
               ),
             ),
@@ -792,12 +799,16 @@ class _GameBubbleState extends State<GameBubble>
             Opacity(
               opacity: 0.3 + 0.7 * up,
               child: Transform.translate(
-                offset: Offset(0, have ? (1 - up) * 10 : 6),
+                // Both start grey and down, so neither tells before it moves.
+                offset: Offset(0, have ? (1 - up) * 6 : 6),
                 child: Icon(
                   Icons.front_hand_rounded,
                   size: 32,
-                  color: have ? color : AppColors.label4,
-                  semanticLabel: '$who ${have ? 'have' : 'haven’t'}',
+                  color: have
+                      ? Color.lerp(AppColors.label4, color, up)
+                      : AppColors.label4,
+                  semanticLabel:
+                      up == 0 ? who : '$who ${have ? 'have' : 'haven’t'}',
                 ),
               ),
             ),
@@ -805,14 +816,7 @@ class _GameBubbleState extends State<GameBubble>
             Text(who, style: AppText.micro.copyWith(color: AppColors.label2)),
           ],
         );
-    final String verdict;
-    if (iHave && theyHave) {
-      verdict = 'You both have';
-    } else if (!iHave && !theyHave) {
-      verdict = 'Neither of you has';
-    } else {
-      verdict = iHave ? 'Only you have' : 'Only $_name has';
-    }
+    final verdict = _capital(_whoHas(mine, theirs));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -830,11 +834,28 @@ class _GameBubbleState extends State<GameBubble>
     );
   }
 
+  /// Never have I ever, in words. The first answer is always "I have".
+  String _whoHas(int? mine, int? theirs) {
+    if (mine == 0 && theirs == 0) return 'you both have';
+    if (mine == 0) return 'only you have';
+    return theirs == 0 ? 'only $_name has' : 'neither of you has';
+  }
+
+  /// What a reveal ends on: no room is kept for it before, as how much room
+  /// would tell the ending. The card grows by it as it fades in.
+  Widget _unfold(double shown, Widget child) => ClipRect(
+        child: Align(
+          alignment: Alignment.topCenter,
+          heightFactor: shown,
+          child: Opacity(opacity: shown, child: child),
+        ),
+      );
+
   /// The line under a reveal, once it has played.
-  Widget _verdict(String text, {required bool lit}) => Padding(
-        padding: const EdgeInsets.only(top: 8),
-        child: Opacity(
-          opacity: _step(0.7, 0.3),
+  Widget _verdict(String text, {required bool lit}) => _unfold(
+        _step(0.7, 0.3),
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
           child: Text(
             text,
             textAlign: TextAlign.center,
@@ -1023,9 +1044,9 @@ class _GameBubbleState extends State<GameBubble>
               ),
             ],
           ),
-          Opacity(
-            opacity: _step(0.65, 0.3),
-            child: Text(
+          _unfold(
+            _step(0.65, 0.3),
+            Text(
               right
                   ? 'It was ${game.film ?? ''}'
                   : '${_capital(_guesser)} said $said. It was '
@@ -1197,8 +1218,14 @@ class _GameBubbleState extends State<GameBubble>
                 : AppColors.letterAbsent,
           ),
         ),
-        const SizedBox(height: 12),
-        Center(child: WorduelPath(guesses: game.guesses, size: 14)),
+        // Then the rows: how many there are tells whether it was solved.
+        _unfold(
+          _step(0.8, 0.2),
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Center(child: WorduelPath(guesses: game.guesses, size: 14)),
+          ),
+        ),
         if (newWord != null) ...[
           const SizedBox(height: 14),
           Center(

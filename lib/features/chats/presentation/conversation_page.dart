@@ -634,7 +634,12 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
             if (choice == MovieChoice.another) continue;
             final Object card;
             if (choice == MovieChoice.own) {
-              final own = await showOwnCardSheet(context, game: game);
+              final own = await showOwnCardSheet(
+                context,
+                game: game,
+                suggestClues: (title) =>
+                    repo.suggestMovieClues(_matchId, title),
+              );
               if (own == null || !mounted) return;
               card = own;
             } else {

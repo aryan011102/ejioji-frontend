@@ -114,6 +114,8 @@ abstract final class Api {
   static String gamesWaiting(String matchId) =>
       '$prefix/chat/$matchId/games/waiting';
   static String games(String matchId) => '$prefix/chat/$matchId/games';
+  static String movieClues(String matchId) =>
+      '$prefix/chat/$matchId/games/movie-clues';
   static String gameAnswer(String matchId, String gameId) =>
       '$prefix/chat/$matchId/games/$gameId/answer';
   static String gameMove(String matchId, String gameId) =>

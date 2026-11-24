@@ -91,6 +91,18 @@ class ChatRepository {
     return body.objects('cards').map(GameCard.fromJson).toList(growable: false);
   }
 
+  /// Emoji clues for a film of this person's own in guess the movie, easiest
+  /// first, from the [title] they typed. Only the title is sent; nothing is
+  /// written. Empty when the film is not one the model knows: they write
+  /// their own.
+  Future<List<String>> suggestMovieClues(String matchId, String title) async {
+    final body = await _api.post(
+      Api.movieClues(matchId),
+      body: {'title': title},
+    );
+    return body.strings('clues');
+  }
+
   /// Starts a game with this person's own answer in it: a pick on each dealt
   /// card, or three statements and which is the lie. FLAMES needs neither.
   /// Each of [cards] is the key of a card dealt, or an [OwnCard] in its place.

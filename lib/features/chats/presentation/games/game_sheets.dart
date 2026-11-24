@@ -4,6 +4,7 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/tokens.dart';
 import '../../../../core/theme/typography.dart';
 import '../../../../shared/models/game.dart';
@@ -654,22 +655,29 @@ class _GameField extends StatelessWidget {
 /// answers, a never have I ever line, two sides of a rapid fire card, a truth
 /// question, or a film and its emoji. Null if they back out. The server checks
 /// it as it checks a message.
+///
+/// For a film, [suggestClues] offers emoji clues for the title typed (AI, from
+/// the title only): they fill the clue field, which stays theirs to change.
+/// Without it there is no Suggest button.
 Future<OwnCard?> showOwnCardSheet(
   BuildContext context, {
   required GameKind game,
   OwnCard? initial,
+  Future<List<String>> Function(String title)? suggestClues,
 }) {
   return showAppSheet<OwnCard>(
     context,
-    builder: (_) => _OwnCard(game: game, initial: initial),
+    builder: (_) =>
+        _OwnCard(game: game, initial: initial, suggestClues: suggestClues),
   );
 }
 
 class _OwnCard extends StatefulWidget {
-  const _OwnCard({required this.game, this.initial});
+  const _OwnCard({required this.game, this.initial, this.suggestClues});
 
   final GameKind game;
   final OwnCard? initial;
+  final Future<List<String>> Function(String title)? suggestClues;
 
   @override
   State<_OwnCard> createState() => _OwnCardState();
@@ -690,12 +698,66 @@ class _OwnCardState extends State<_OwnCard> {
     text: widget.initial?.options.elementAtOrNull(1),
   );
 
+  /// Guess the movie: clues suggested for [_cluesFor], the title as it was
+  /// when asked, and a line when there were none or asking failed.
+  List<String> _clues = const [];
+  String? _cluesFor;
+  String? _clueNote;
+  bool _suggesting = false;
+
   @override
   void dispose() {
     _text.dispose();
     _first.dispose();
     _second.dispose();
     super.dispose();
+  }
+
+  Future<void> _suggest() async {
+    final suggest = widget.suggestClues;
+    final title = _a;
+    if (suggest == null || title.isEmpty || _suggesting) return;
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _suggesting = true;
+      _clueNote = null;
+    });
+    try {
+      final clues = await suggest(title);
+      if (!mounted || _a != title) return;
+      setState(() {
+        _clues = clues;
+        _cluesFor = title;
+        _clueNote = clues.isEmpty
+            ? 'No emoji for that one. Spell it out yourself.'
+            : null;
+      });
+      // An empty clue field takes the easiest; a clue already written stays.
+      if (clues.isNotEmpty && _t.isEmpty) _fillClue(clues.first);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _clueNote = e.message);
+    } finally {
+      if (mounted) setState(() => _suggesting = false);
+    }
+  }
+
+  void _fillClue(String clue) {
+    _text.value = TextEditingValue(
+      text: clue,
+      selection: TextSelection.collapsed(offset: clue.length),
+    );
+    setState(() {});
+  }
+
+  /// A new title makes the clues for the old one wrong: they go.
+  void _titleChanged(String _) {
+    setState(() {
+      if (_cluesFor != null && _a != _cluesFor) {
+        _clues = const [];
+        _cluesFor = null;
+      }
+      _clueNote = null;
+    });
   }
 
   String get _t => _text.text.trim();
@@ -781,22 +843,32 @@ class _OwnCardState extends State<_OwnCard> {
           ],
         );
       case GameKind.guessMovie:
+        final suggest = widget.suggestClues;
         return (
           'Spell out any film in emoji. They type its name to guess.',
           [
             _GameField(
-              controller: _text,
-              hint: 'Emoji clue, like 🦁👑🌅',
-              maxChars: _clue,
-              autofocus: true,
-              capitals: TextCapitalization.none,
-              onChanged: changed,
-            ),
-            _GameField(
               controller: _first,
               hint: 'The film’s name',
               maxChars: _title,
+              autofocus: true,
               capitals: TextCapitalization.words,
+              onChanged: _titleChanged,
+            ),
+            if (suggest != null)
+              _ClueSuggestions(
+                clues: _clues,
+                chosen: _t,
+                note: _clueNote,
+                busy: _suggesting,
+                onSuggest: _a.isEmpty ? null : _suggest,
+                onPick: _fillClue,
+              ),
+            _GameField(
+              controller: _text,
+              hint: 'Emoji clue, like 🦁👑🌅',
+              maxChars: _clue,
+              capitals: TextCapitalization.none,
               onChanged: changed,
             ),
           ],
@@ -848,6 +920,78 @@ class _OwnCardState extends State<_OwnCard> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Guess the movie, your own film: a button that asks for emoji clues for the
+/// title, then the clues as chips to tap into the clue field (the one in it lit),
+/// and a line saying where they come from.
+class _ClueSuggestions extends StatelessWidget {
+  const _ClueSuggestions({
+    required this.clues,
+    required this.chosen,
+    required this.note,
+    required this.busy,
+    required this.onSuggest,
+    required this.onPick,
+  });
+
+  final List<String> clues;
+  final String chosen;
+  final String? note;
+  final bool busy;
+  final VoidCallback? onSuggest;
+  final ValueChanged<String> onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            // Asking again for the same title gives the same clues, so the
+            // button goes once there are some; a new title brings it back.
+            if (clues.isEmpty)
+              MiniButton(
+                label: 'Suggest emoji',
+                icon: Icon(
+                  Icons.auto_awesome_rounded,
+                  size: 15,
+                  color:
+                      onSuggest == null ? AppColors.label3 : AppColors.accent,
+                ),
+                tone: MiniTone.quiet,
+                busy: busy,
+                onPressed: onSuggest,
+              ),
+            for (final clue in clues)
+              Pressable(
+                onTap: () => onPick(clue),
+                semanticLabel: 'Use $clue',
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: clue == chosen ? AppColors.fill : AppColors.fill2,
+                    borderRadius: BorderRadius.circular(Radii.chip),
+                    border: Border.all(color: AppColors.hairline),
+                  ),
+                  child: Text(clue, style: AppText.body),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          note ?? 'Suggested by AI from the film’s name. Change it if you like.',
+          style: AppText.caption.copyWith(color: AppColors.label2),
+        ),
+      ],
     );
   }
 }

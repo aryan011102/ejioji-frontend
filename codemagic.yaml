@@ -152,8 +152,9 @@ workflows:
         # beta_groups:    # uncomment + add group name once testers are added
         #   - Team
 
-  # Google Play build, started by hand from Codemagic. Linux is enough: nothing
-  # here needs a Mac.
+  # Google Play build, started by hand from Codemagic. On the same Mac as iOS:
+  # nothing here needs one, but Linux machines are not on this account's
+  # billing plan ("The selected instance type is not available").
   #
   # Also from theonebytwo_secrets: API_BASE_URL, FCM_PROJECT_ID, FCM_SENDER_ID
   # (shared with iOS), plus
@@ -166,8 +167,8 @@ workflows:
   #                       Play Console (Users and permissions) lets release
   #                       apps. Only needed once publishing below is turned on.
   #
-  # The upload keystore is a team code signing identity (Team settings, Code
-  # signing identities, Android keystores) with the reference name below.
+  # The upload keystore is a code signing identity (Settings, Code signing
+  # identities, Android keystores) with the reference name below.
   # Keep a copy of the .jks and its passwords outside Codemagic too.
   #
   # Google Play takes no upload through its API until the app has one release,
@@ -175,7 +176,7 @@ workflows:
   # hand in Play Console. After that, uncomment publishing.
   android-play:
     name: Android Google Play
-    instance_type: linux_x2
+    instance_type: mac_mini_m2
     max_build_duration: 60
     environment:
       groups:

@@ -151,3 +151,115 @@ workflows:
         submit_to_testflight: true
         # beta_groups:    # uncomment + add group name once testers are added
         #   - Team
+
+  # Google Play build, started by hand from Codemagic. Linux is enough: nothing
+  # here needs a Mac.
+  #
+  # Also from theonebytwo_secrets: API_BASE_URL, FCM_PROJECT_ID, FCM_SENDER_ID
+  # (shared with iOS), plus
+  #   FCM_ANDROID_APP_ID  mobilesdk_app_id from google-services.json, for the
+  #                       Android app com.theonebytwo.app in the same Firebase
+  #                       project
+  #   FCM_ANDROID_API_KEY current_key from the same file
+  #   GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+  #                       the JSON key of a Google Cloud service account that
+  #                       Play Console (Users and permissions) lets release
+  #                       apps. Only needed once publishing below is turned on.
+  #
+  # The upload keystore is a team code signing identity (Team settings, Code
+  # signing identities, Android keystores) with the reference name below.
+  # Keep a copy of the .jks and its passwords outside Codemagic too.
+  #
+  # Google Play takes no upload through its API until the app has one release,
+  # so the first .aab is downloaded from this build's artifacts and uploaded by
+  # hand in Play Console. After that, uncomment publishing.
+  android-play:
+    name: Android Google Play
+    instance_type: linux_x2
+    max_build_duration: 60
+    environment:
+      groups:
+        - theonebytwo_secrets
+      android_signing:
+        - theonebytwo_upload
+      flutter: stable
+      java: 17
+      vars:
+        PACKAGE_NAME: "com.theonebytwo.app"
+    scripts:
+      - name: Check the upload key is here
+        script: |
+          set -e
+          # Without it Gradle falls back to the debug key, and Play refuses the
+          # upload only after the whole build. Stop now instead.
+          test -n "$CM_KEYSTORE_PATH" || { echo "ERROR: no keystore. Add theonebytwo_upload under Team settings, Code signing identities."; exit 1; }
+          # The upload key's fingerprints, not secret: the SHA-1 and SHA-256 go
+          # into Firebase (phone sign-in), the SHA-256 into the site's
+          # .well-known/assetlinks.json (the Google sign-in return link), each
+          # next to Play's own app signing key from Play Console, App integrity.
+          keytool -list -v -keystore "$CM_KEYSTORE_PATH" -storepass "$CM_KEYSTORE_PASSWORD" -alias "$CM_KEY_ALIAS" | grep -E "SHA1|SHA256"
+      - name: Write build configuration from secrets
+        script: |
+          set -e
+          case "$API_BASE_URL" in
+            https://*) ;;
+            *) echo "ERROR: API_BASE_URL must be set and start with https://"; exit 1 ;;
+          esac
+          # Staging, as on iOS: prod requires CERT_PINS, and the test server's
+          # certificate is not pinned. No RevenueCat key: buying Premium is
+          # iPhone only until Play Billing is set up.
+          cat > "$CM_BUILD_DIR/config/play.json" <<JSON
+          {
+            "FLAVOR": "staging",
+            "API_BASE_URL": "$API_BASE_URL",
+            "CERT_PINS": "",
+            "FCM_PROJECT_ID": "$FCM_PROJECT_ID",
+            "FCM_SENDER_ID": "$FCM_SENDER_ID",
+            "FCM_ANDROID_APP_ID": "$FCM_ANDROID_APP_ID",
+            "FCM_ANDROID_API_KEY": "$FCM_ANDROID_API_KEY"
+          }
+          JSON
+          test -n "$FCM_ANDROID_APP_ID" || echo "WARNING: no FCM_ANDROID_APP_ID. This build cannot receive notifications."
+      - name: Point Gradle at Codemagic's Flutter
+        script: |
+          echo "flutter.sdk=$HOME/programs/flutter" > "$CM_BUILD_DIR/android/local.properties"
+      - name: Get Flutter packages
+        script: |
+          cd $CM_BUILD_DIR
+          flutter pub get
+      - name: Set build number
+        script: |
+          set -e
+          # One more than the highest Play has seen, once Play can be asked.
+          # Before that (no service account, or no release yet) Codemagic's own
+          # count for this workflow, which only goes up. The larger of the two,
+          # so a hand-uploaded build is never repeated.
+          LATEST=0
+          if [ -n "$GCLOUD_SERVICE_ACCOUNT_CREDENTIALS" ]; then
+            LATEST=$(google-play get-latest-build-number --package-name "$PACKAGE_NAME" 2>/dev/null || echo 0)
+          fi
+          NEXT=$((LATEST + 1))
+          if [ "$BUILD_NUMBER" -gt "$NEXT" ]; then NEXT=$BUILD_NUMBER; fi
+          echo "Using build number: $NEXT"
+          echo "PLAY_BUILD_NUMBER=$NEXT" >> $CM_ENV
+      - name: Build AAB
+        script: |
+          cd $CM_BUILD_DIR
+          # build name (versionName) comes from pubspec.yaml
+          flutter build appbundle --release \
+            --build-number=$PLAY_BUILD_NUMBER \
+            --dart-define-from-file=config/play.json
+    artifacts:
+      - build/app/outputs/bundle/release/*.aab
+      - build/app/outputs/mapping/release/mapping.txt
+      - flutter_drive.log
+    # Uncomment once the first .aab is in Play Console and
+    # GCLOUD_SERVICE_ACCOUNT_CREDENTIALS is set. "alpha" is Play's name for
+    # closed testing, the track the 12 testers for 14 days run on; "internal"
+    # for the team only. As a draft while the app has never been published,
+    # since Play refuses anything else then; roll it out in Play Console.
+    # publishing:
+    #   google_play:
+    #     credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+    #     track: alpha
+    #     submit_as_draft: true

@@ -183,7 +183,9 @@ workflows:
         - theonebytwo_secrets
       android_signing:
         - theonebytwo_upload
-      flutter: stable
+      # Pinned, not stable: newer Flutter refuses Gradle below 9.3.1 and this
+      # project is on 8.14 (android/gradle/wrapper). Move both together.
+      flutter: 3.41.2
       java: 17
       vars:
         PACKAGE_NAME: "com.theonebytwo.app"

@@ -214,7 +214,7 @@ final premiumProvider = FutureProvider.autoDispose<PremiumStatus>(
   (ref) => ref.watch(premiumRepositoryProvider).status(),
 );
 
-/// The App Store's own price for each plan, by product id, formatted by Apple
+/// The store's own price for each plan, by product id, formatted by the store
 /// for this person. Empty until it loads, and wherever the store is not set
 /// up; the Premium page then shows the server's list price.
 final storePricesProvider = FutureProvider.autoDispose<Map<String, String>>(

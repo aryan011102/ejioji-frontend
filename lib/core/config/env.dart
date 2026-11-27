@@ -46,6 +46,12 @@ abstract final class Env {
   static const String revenueCatIosKey =
       String.fromEnvironment('REVENUECAT_IOS_KEY');
 
+  /// RevenueCat's public Android key (`goog_...`), for buying Premium in
+  /// Google Play. Not a secret, for the same reasons. Empty means buying is
+  /// off on Android in this build.
+  static const String revenueCatAndroidKey =
+      String.fromEnvironment('REVENUECAT_ANDROID_KEY');
+
   /// Firebase, for push notifications only.
   ///
   /// None of these is a secret: every Android app ships them in plain sight

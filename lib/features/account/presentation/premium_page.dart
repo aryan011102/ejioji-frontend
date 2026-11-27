@@ -22,7 +22,7 @@ import '../../../shared/widgets/states.dart';
 ///
 /// The plans come from the server. While it says `free_for_now`, starting a
 /// plan grants it for that long at no charge. After that a plan is bought in
-/// the App Store (one, three and twelve months renew; three days is a one-off
+/// the App Store or Google Play (one, three and twelve months renew; three days is a one-off
 /// pass), and the server is asked to check the store. The app never sets
 /// Premium in its own state; it asks, and reads the answer back.
 ///
@@ -96,8 +96,18 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
 
   static final _privacy = Uri.parse('https://theonebytwo.com/privacy');
   static final _terms = Uri.parse('https://theonebytwo.com/terms');
-  static final _manage =
-      Uri.parse('https://apps.apple.com/account/subscriptions');
+
+  /// The store on this phone: the App Store on an iPhone, Google Play on
+  /// Android.
+  Store get _here => ref.read(storePurchasesProvider).store ?? Store.appStore;
+
+  /// The store the running plan was bought in, which is where it is managed
+  /// and cancelled, whichever phone this is.
+  Store _managedBy(PremiumStatus status) =>
+      Store.fromSource(status.source) ?? _here;
+
+  Uri _manage(PremiumStatus status) =>
+      _managedBy(status).manage(productId: status.current?.productId);
 
   static String _subtitle(PremiumPlan plan, {required bool freeForNow}) {
     if (freeForNow) return 'Free for now';
@@ -141,15 +151,35 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
       if (mounted) showAppToast(context, 'Sign in again to buy onebytwo plus.');
       return;
     }
+    final here = _here;
+    final current = status.current;
+    final renewing = status.active &&
+        status.fromStore &&
+        current != null &&
+        current.renews;
+    // A subscription renewing in the other store can't be switched from
+    // here: buying would start a second one alongside it.
+    if (renewing && plan.renews && _managedBy(status) != here) {
+      final there = _managedBy(status);
+      if (mounted) {
+        showAppToast(
+          context,
+          'Your plan renews in ${there.name}. Change it on your '
+          '${there.device}, or cancel it there first.',
+        );
+      }
+      return;
+    }
     final outcome = await ref.read(storePurchasesProvider).buy(
           userId: userId,
           productId: plan.productId,
           renews: plan.renews,
+          replacing: renewing ? current.productId : null,
         );
     if (outcome == BuyOutcome.cancelled) return;
     await _checkStore(
       found: status.active
-          ? 'Done. The App Store has your new plan.'
+          ? 'Done. ${here.title} has your new plan.'
           : 'onebytwo plus is on.',
       notYet: 'Paid. onebytwo plus turns on in a minute or two.',
     );
@@ -163,7 +193,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
       await ref.read(storePurchasesProvider).restore(userId: userId);
       await _checkStore(
         found: 'onebytwo plus restored.',
-        notYet: 'Nothing to restore on this Apple ID.',
+        notYet: 'Nothing to restore on this ${_here.account}.',
       );
     } on StoreFailure catch (e) {
       if (mounted) showAppToast(context, e.message);
@@ -172,7 +202,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
     }
   }
 
-  /// The payment is Apple's; whether it counts is the server's. If the server
+  /// The payment is the store's; whether it counts is the server's. If the server
   /// cannot see it yet, RevenueCat's notification will reach it shortly.
   Future<void> _checkStore({
     required String found,
@@ -215,20 +245,26 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
         return 'Until $day. Nothing renews and nothing is charged.';
       }
       return current != null && current.renews
-          ? 'Renews on $day. Cancel any time in the App Store.'
+          ? 'Renews on $day. Cancel any time in ${_managedBy(status).name}.'
           : 'Until $day. Does not renew.';
     }
     if (status.freeForNow) {
       return 'Free for now. Nothing renews and nothing is charged.';
     }
     if (plan == null) return '';
-    final terms = plan.terms(prices[plan.productId] ?? plan.price);
+    final terms = plan.terms(
+      prices[plan.productId] ?? plan.price,
+      account: _here.account,
+    );
     if (!status.active) return terms;
     if (!plan.renews) {
       return '$terms It runs alongside the plan you have, not after it.';
     }
-    if (status.fromStore && current != null && current.renews) {
-      return '$terms The App Store moves you over and credits any unused '
+    if (status.fromStore &&
+        current != null &&
+        current.renews &&
+        _managedBy(status) == _here) {
+      return '$terms ${_here.title} moves you over and credits any unused '
           'time.';
     }
     return terms;
@@ -287,7 +323,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
             onPressed: status == null || _starting
                 ? null
                 : manages
-                    ? () => _open(_manage)
+                    ? () => _open(_manage(status))
                     : canBuy
                         ? () => _start(status)
                         : null,
@@ -301,7 +337,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
           if (renewing && !manages)
             TextActionButton(
               label: 'Manage subscription',
-              onPressed: () => _open(_manage),
+              onPressed: () => _open(_manage(status)),
             ),
           if (selling && !active)
             Row(

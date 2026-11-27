@@ -17,7 +17,8 @@ class PremiumPlan {
 
   final String key;
 
-  /// The App Store product that sells it.
+  /// The store product that sells it, the same id in the App Store and
+  /// Google Play.
   final String productId;
 
   /// Renews on its own in the App Store, or a one-off pass that just ends.
@@ -41,11 +42,12 @@ class PremiumPlan {
   String get storeSubtitle =>
       renews ? 'Renews every $period' : 'Once, for $title. Does not renew';
 
-  /// What Apple asks to be said by the buy button: the price, the length, and
-  /// whether and how it renews. [price] is the App Store's when it has loaded.
-  String terms(String price) => renews
+  /// What the stores ask to be said by the buy button: the price, the length,
+  /// and whether and how it renews. [price] is the store's when it has
+  /// loaded; [account] is whose Subscriptions it is cancelled in.
+  String terms(String price, {String account = 'Apple ID'}) => renews
       ? '$price every $period. Renews automatically unless cancelled at '
-          "least 24 hours before it ends, in your Apple ID's Subscriptions."
+          "least 24 hours before it ends, in your $account's Subscriptions."
       : '$price once, for $title. Does not renew.';
 
   /// "₹1,499": rupees, grouped the Indian way.

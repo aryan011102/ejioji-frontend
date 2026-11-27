@@ -10,5 +10,6 @@
   "FCM_IOS_APP_ID": "",
   "FCM_IOS_API_KEY": "",
 
-  "REVENUECAT_IOS_KEY": ""
+  "REVENUECAT_IOS_KEY": "",
+  "REVENUECAT_ANDROID_KEY": ""
 }

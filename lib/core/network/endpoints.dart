@@ -142,7 +142,7 @@ abstract final class Api {
   // Support. "Report a problem" is about the app; a person is a report above.
   static const feedback = '$prefix/support/feedback';
 
-  // Premium. Free plans until prices go live; then bought in the App Store,
+  // Premium. Free plans until prices go live; then bought in the App Store or Google Play,
   // and `premiumSync` asks the server to check the store after a purchase.
   static const premium = '$prefix/premium';
   static const premiumPurchases = '$prefix/premium/purchases';

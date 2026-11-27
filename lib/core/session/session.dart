@@ -146,7 +146,7 @@ class SessionController extends Notifier<Session> {
     // the only place it happens, so somebody who signed in on a build without
     // push gets asked the next time they open the app.
     unawaited(ref.read(pushRegistrationProvider).start());
-    // App Store purchases belong to the account, not the phone.
+    // Store purchases belong to the account, not the phone.
     unawaited(ref.read(storePurchasesProvider).logIn(userId));
   }
 

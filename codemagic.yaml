@@ -162,6 +162,10 @@ workflows:
   #                       Android app com.theonebytwo.app in the same Firebase
   #                       project
   #   FCM_ANDROID_API_KEY current_key from the same file
+  #   REVENUECAT_ANDROID_KEY
+  #                       RevenueCat's public Google key (goog_...), from the
+  #                       Play Store app under Apps in RevenueCat, for buying
+  #                       Premium. Not a secret; unset means buying is off.
   #   GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
   #                       the JSON key of a Google Cloud service account that
   #                       Play Console (Users and permissions) lets release
@@ -209,8 +213,7 @@ workflows:
             *) echo "ERROR: API_BASE_URL must be set and start with https://"; exit 1 ;;
           esac
           # Staging, as on iOS: prod requires CERT_PINS, and the test server's
-          # certificate is not pinned. No RevenueCat key: buying Premium is
-          # iPhone only until Play Billing is set up.
+          # certificate is not pinned.
           cat > "$CM_BUILD_DIR/config/play.json" <<JSON
           {
             "FLAVOR": "staging",
@@ -219,10 +222,12 @@ workflows:
             "FCM_PROJECT_ID": "$FCM_PROJECT_ID",
             "FCM_SENDER_ID": "$FCM_SENDER_ID",
             "FCM_ANDROID_APP_ID": "$FCM_ANDROID_APP_ID",
-            "FCM_ANDROID_API_KEY": "$FCM_ANDROID_API_KEY"
+            "FCM_ANDROID_API_KEY": "$FCM_ANDROID_API_KEY",
+            "REVENUECAT_ANDROID_KEY": "$REVENUECAT_ANDROID_KEY"
           }
           JSON
           test -n "$FCM_ANDROID_APP_ID" || echo "WARNING: no FCM_ANDROID_APP_ID. This build cannot receive notifications."
+          test -n "$REVENUECAT_ANDROID_KEY" || echo "WARNING: no REVENUECAT_ANDROID_KEY. This build cannot buy Premium."
       - name: Point Gradle at Codemagic's Flutter
         script: |
           echo "flutter.sdk=$HOME/programs/flutter" > "$CM_BUILD_DIR/android/local.properties"
